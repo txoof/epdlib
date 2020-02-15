@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[3]:
+# In[81]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Block2.ipynb')
@@ -11,7 +11,7 @@
 
 
 
-# In[4]:
+# In[82]:
 
 
 #get_ipython().run_line_magic('nbconvert', '')
@@ -19,7 +19,7 @@
 
 
 
-# In[2]:
+# In[1]:
 
 
 import logging
@@ -37,15 +37,6 @@ except ImportError as e:
 
 
 # In[3]:
-
-
-logger = logging.getLogger(__name__)
-logger.root.setLevel('DEBUG')
-
-
-
-
-# In[4]:
 
 
 def check_num(func):
@@ -67,7 +58,7 @@ def check_num(func):
 
 
 
-# In[5]:
+# In[4]:
 
 
 def strict_enforce(*types):
@@ -93,7 +84,7 @@ def strict_enforce(*types):
 
 
 
-# In[7]:
+# In[5]:
 
 
 def permissive_enforce(*types):
@@ -122,12 +113,12 @@ def permissive_enforce(*types):
 
 
 
-# In[8]:
+# In[6]:
 
 
 class Block:
     
-    def __init__(self, area=(0, 0), hcenter=False, vcenter=False, rand=False, inverse=False,
+    def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
                 abs_coordinates=(0, 0), padding=0):
         """initialize the Block object
         
@@ -173,21 +164,6 @@ class Block:
         
         # set dimensions of image portion of block 
         self.dimensions = (0, 0)
-#     def check_num(func):
-#         """decorator function wrapper"""
-#         def func_wrapper(d, *args, **kwargs):
-#             """Check for positive integers
-#             Params:
-#                 d(int): integer to check
-
-#             Raises:
-#                 ValueError - values that are negative, not integer"""
-#             if not isinstance(d, int):
-#                 raise ValueError (f'{d} is not an integer')
-#             if d < 0:
-#                 raise ValueError (f'{d} < 0 {func} only accepts values >= 0')
-#             return func(d, *args, **kwargs)
-#         return func_wrapper
     
     @property
     def hcenter(self):
@@ -306,7 +282,7 @@ class Block:
 
 
 
-# In[71]:
+# In[23]:
 
 
 class TextBlock(Block):
@@ -346,8 +322,8 @@ class TextBlock(Block):
     Overrides:
         image (:obj:`PIL.Image` or str): PIL image object or string path to image file
         upate (method): update contents of ImageBlock"""        
-    def __init__(self, font, area, text='NONE', font_size=0, max_lines=1, maxchar=None, 
-                 chardist=None, *args, **kwargs):
+    def __init__(self, font, area, *args, text='NONE', font_size=0, max_lines=1, maxchar=None, 
+                 chardist=None, **kwargs):
         """Intializes TextBlock object
         
         Args:
@@ -362,7 +338,7 @@ class TextBlock(Block):
             chardist (str, optional): string matching one of the character 
                 distributions in constants.py (default USA_CHARDIST)
             """        
-        super().__init__(*args, **kwargs)
+        super().__init__(area, *args, **kwargs)
         self.area = area
         
         logging.info('TextBlock created')
@@ -399,7 +375,7 @@ class TextBlock(Block):
         
     @property
     def font(self):
-        """:obj:Path: Path to TTF font file
+        """:obj:ImageFont.truetype: Path to TTF font file
         
         If the fontface is changed after initialization, it is recommended to
         recalculate the 
@@ -411,11 +387,6 @@ class TextBlock(Block):
     @font.setter
     @strict_enforce((Path, str))
     def font(self, font):
-#         try:
-#             if font != self.font:
-#                 self.font_change = True
-#         except AttributeError as e:
-#             self.font_change = False
             
         if font:
             if hasattr(self, '_font'):
@@ -428,6 +399,7 @@ class TextBlock(Block):
                             
     @property
     def max_lines(self):
+        """:obj:int maximum number of lines to use when word-wrapping"""
         return self._max_lines
     
     @max_lines.setter
@@ -437,6 +409,7 @@ class TextBlock(Block):
         
     @property
     def maxchar(self):
+        """:obj:int maximum number of characters on one line"""
         return self._maxchar
     
     @maxchar.setter
@@ -449,6 +422,7 @@ class TextBlock(Block):
 
     @property
     def text(self):
+        """:obj:str text string to format"""
         return self._text
     
     @text.setter
@@ -488,9 +462,21 @@ class TextBlock(Block):
             
     
     def _update_maxchar(self):
+        """force an update of maxchar property"""
         self.max_char = False
     
     def _text_formatter(self):
+        """format text using word-wrap strategies. 
+        
+        Formatting is based on number of lines, area size and maximum characters per line
+        
+        Args:
+            text (str): raw text
+            maxchar (int): maximum number of characters on each line
+            max_lines (int): maximum number of lines
+            
+        Returns:
+            :obj:`list` of :obj:`str`"""        
         logging.debug(f'formatting string: {self.text}')
         wrapper = textwrap.TextWrapper(width=self.maxchar, max_lines=self.max_lines, placeholder='…')
         formatted = wrapper.wrap(self.text)
@@ -569,118 +555,140 @@ class TextBlock(Block):
         image.paste(text_image, (x_pos, y_pos))
             
                 
-        return image        
-
-
-
-
-# In[72]:
-
-
-b = TextBlock(area=[600, 150], font='../fonts/Concert_One/ConcertOne-Regular.ttf')
-
-
-
-
-# In[70]:
-
-
-b.font.getname()
-
-
-
-
-# In[66]:
-
-
-b.font = '../fonts/Anton/Anton-Regular.ttf'
-
-
-
-
-# In[49]:
-
-
-b = TextBlock(max_lines=5, area=[600, 150], vcenter=True)
-
-
-
-
-# In[56]:
-
-
-b.text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-
-
-
-
-# In[57]:
-
-
-b.image
-
-
-
-
-# In[389]:
-
-
-b.font = "../fonts/Anton/Anton-Regular.ttf"
-
-
-
-
-# In[390]:
-
-
-c = Block()
-
-
-
-
-# In[370]:
-
-
-if 'randx' in dir(c):
-    print( 'wooo')
-
-
-
-
-# In[336]:
-
-
-b.maxchar=False
-
-
-
-
-# In[332]:
-
-
-b.area = [400, 200]
-
-
-
-
-# In[311]:
-
-
-b.maxchar
-
-
-
-
-# In[252]:
-
-
-b = Block()
-c = Block()
-
-
-
-
-# In[253]:
+        return image
+    
+    def update(self, update=None):
+        """Update image data including coordinates (overrides base class)
+        
+        Args:
+            update (str): text to format and use
+            
+        Returns:
+            :obj:bool - true for successful update"""
+        if update:
+            try:
+                self.text = update
+            except Exception as e:
+                logging.error(f'failed to update: {e}')
+                return False
+            return True
+
+
+
+
+# In[24]:
+
+
+# b = TextBlock(area=[600, 150], font='../fonts/Concert_One/ConcertOne-Regular.ttf', max_lines=5, hcenter=True)
+
+
+
+
+# In[71]:
+
+
+class ImageBlock(Block):
+    
+    def __init__(self, area, *args, image=None, **kwargs):
+        super().__init__(area, *args, **kwargs)
+        
+        self.area = area
+        logging.info('Image Block Created')
+        logging.debug(f'image={image}')
+        self.image = image
+
+    @property
+    def image(self):
+        return self._image
+
+    @image.setter
+    def image(self, image):
+        image_area = Image.new('L', self.area, self.bkground)
+        logging.debug(f'block area: {self.area}')
+        if not image:
+            logging.debug(f'no image provided, setting to blank image: {self.area}')
+            self._image = image_area
+            return
+
+        # use the smallest dimension of the area use for scaling thumbnails
+        thumbnail_min = min(self.area)-self.padding*2
+        logging.debug(f'max dimension of thumbnail: {thumbnail_min}')
+
+        # handle image files
+        if isinstance(image, (str, Path)):
+            logging.debug(f'using image file: {image}')
+            try:
+                im = Image.open(image)
+                logging.debug(f'creating thumbnail of image to fit in min dimension : {thumbnail_min}')
+                im.thumbnail((thumbnail_min, thumbnail_min))
+            except (PermissionError, FileNotFoundError, OSError) as e:
+                logging.warning(f'could not open image file {image}')
+                logging.warning(f'error: {e}')
+                logging.warning(f'using empty image')
+                self._image = image_area
+
+        elif isinstance(image, Image.Image):
+            logging.debug(f'using PIL image')
+            im = image
+            if max(im.size) > thumbnail_min:
+                logging.debug(f'creating thumbnail of image to fit in min dimension : {thumbnail_min}')
+                im.thumbnail((thumbnail_min, thumbnail_min))
+
+        self.dimensions = im.size
+        logging.debug(f'final dimensions of resized image: {self.dimensions}')
+
+        x_pos = self.padding
+        y_pos = self.padding
+        
+        logging.debug(f'starting with x: {x_pos}, y: {y_pos}')
+
+        if self._rand:
+            # pick random coordinates for the image within the area
+            logging.debug('using random coordinates for image within area')
+            x_range = self.area[0] - self.dimensions[0] - self.padding*2
+            y_range = self.area[1] - self.dimensiosn[1] - self.padding*2
+            x_pos = randrange(x_range)+padding
+            y_pos = randrange(y_range)+padding
+
+        # h/v center is mutually exclusive to random
+        else:
+            if self.hcenter:
+                logging.debug('h-center image')
+                x_pos = round((self.area[0]-self.dimensions[0])/2)
+            if self.vcenter:
+                logging.debug('v-center image')
+                y_pos = round((self.area[1]-self.dimensions[1])/2)
+        if self.inverse:
+            im = ImageOps.invert(im)
+
+        logging.debug(f'pasting image into area at {x_pos}, {y_pos}')
+        image_area.paste(im, [x_pos, y_pos])
+
+        self._image = image_area
+        
+    def update(self, update=None):
+        """Update image data including coordinates (overrides base class)
+        
+        Args:
+            update (str): text to format and use
+            
+        Returns:
+            :obj:bool on success"""        
+        if update:
+            try:
+                self.image = update
+            except Exception as e:
+                logging.error(f'failed to update due to error: {e}')
+                return False
+            return True
+        else:
+            logging.warn('update called with no arguments, no action taken')
+            return False
+
+
+
+
+# In[ ]:
 
 
 def dir2dict(obj):
@@ -692,7 +700,7 @@ def dir2dict(obj):
 
 
 
-# In[254]:
+# In[ ]:
 
 
 def compare_obj(a, b):
@@ -707,18 +715,10 @@ def compare_obj(a, b):
 
 
 
-# In[255]:
+# In[2]:
 
 
-b_d = dir2dict(b)
-c_d = dir2dict(c)
-
-
-
-
-# In[256]:
-
-
-compare_obj(b_d, c_d)
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
 
 
