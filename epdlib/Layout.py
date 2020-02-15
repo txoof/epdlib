@@ -14,16 +14,24 @@
 
 
 
-# In[75]:
+# In[19]:
 
 
-#get_ipython().run_line_magic('alias', 'nbconvert nbconvert Layout2.ipynb')
+#get_ipython().run_line_magic('alias', 'nbconvert nbconvert Layout.ipynb')
 #get_ipython().run_line_magic('nbconvert', '')
 
 
 
 
-# In[1]:
+# In[ ]:
+
+
+
+
+
+
+
+# In[7]:
 
 
 import logging
@@ -34,7 +42,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 
-# In[2]:
+# In[8]:
 
 
 try:
@@ -50,16 +58,16 @@ except ImportError as e:
 
 
 
-# In[3]:
+# In[9]:
 
 
 def strict_enforce(*types):
     """strictly enforce type compliance within classes
     
     Usage:
-    @strict_enforce(type1, type2, (type3, type4))
-    def foo(val1, val2, val4):
-        ...
+        @strict_enforce(type1, type2, (type3, type4))
+        def foo(val1, val2, val3):
+            ...
     """
     def decorator(f):
         def new_f(self, *args, **kwds):
@@ -76,18 +84,103 @@ def strict_enforce(*types):
 
 
 
-# In[61]:
+# In[14]:
 
 
 class Layout:
+    """Class for defining layout of epd screen
     
+    This class allows screen layouts to be declared in terms of image blocks within an area. 
+    Block placement is defined in terms of absolute or relative positions. Only one block 
+    with absolute coordinates is needed. Block size is calculated based on screen size making
+    it possible to define one layout that will work on screens of different dimensions.
+    
+    layouts are specified using the following key/value pairs. Those marked with a * are required
+    for all blocks
+    *'image': (None/True)          # None/False indicates this will NOT be an image block
+    'max_lines': (int)             # maximum number of lines of text this block can accomodate
+    'padding': (int)               # number of pixles to add around an image
+    *'widht': (int/real)           # fractional portion of screen width this block occupies e.g. 
+                                   # 1/2, 1, .25
+    *'height': (int/real)          # fractional portion of the screen height this block occupies
+    *'abs_coordinates': (tuple)    # tuple of X, Y coordinates where this block lies within the 
+                                   # larger screen area. EVERY layout must have at least one block
+                                   # that is defined ABSOLUTELY - typically: (0, 0)
+                                   # When a block is placed relative to another
+                                   # block use `None` to indicate that this is a calculated coordiante
+                                   # e.g. (0, None) - Use an absolute value of X=0 and Y=None(calculated)
+    'hcenter': (bool)              # horizontally center the text and image of the text in the block
+    'vcenter': (bool)              # vertically center the text within the image block
+    'rand' (bool)                  # True: randomply place the image within the area (overrides v/h center)
+    *'relative': (False/list)      # False for blocks with absolute position; use a list other blocks
+                                   # to use for calculating the position of this block e.g.
+                                   # ['coverart', title] - reference the block `coverart` for the 
+                                   # X position and `title` for the Y position of this block
+    'font': (str):                 # Path to font file (relative paths are acceptable)
+    'font_size': (None/int)        # None - calculate the font size, int - size in points
+    'inverse': (bool)              # True: use black background, white fill
+
+    
+    Layouts are defined using any name and can be updated by calling the update() method with 
+    a parameter that includes a dictionary containing a key/value pair that matches the names
+    see the example below.
+    Sample Laout:
+    myLayout = {
+        'title': {                       # text only block
+            'image': None,               # do not expect an image
+            'max_lines': 2,              # number of lines of text
+            'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
+            'height': 2/3,               # 1/3 of the entire height
+            'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
+            'hcenter': True,             # horizontally center text
+            'vcenter': True,             # vertically center text 
+            'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
+            'font': './fonts/Anton/Anton-Regular.ttf', # path to font file
+            'font_size': None            # Calculate the font size because none was provided
+        }
+    
+        'artist' {
+            'image': None,
+            'max_lines': 1,
+            'width': 1,
+            'height', 1/3,
+            'abs_coordinates': (0, None)   # X = 0, Y will be calculated
+            'hcenter': True,
+            'vcenter': True,
+            'relative': ['artist', title], # use the X postion from abs_coord from `artist` (this block: 0)
+                                           # calculate the y position based on the size of `title` block
+            
+        }
+    }
+    
+    
+    Example creating and updating a layout:
+    layouts.threeRow has the sections: 'title', 'album', 'artist', 'mode', 'coverart'
+    # creates the object and calculates the positions based on the rules set 
+    # in the layouts file and screen size
+    l = Layout(resolution=(600, 448), layout=myLayout)
+    # update/add content to the layout object, applying formatting from layout file
+    l.update_contents({'title': 'Hannah Hunt', 'album': 'Modern Vampires of the City', 
+                       'artist': 'Vampire Weekend')
+                       
+    Example displaying layout:
+    """    
     def __init__(self, resolution, layout=None):
+        """Initializes layout object
+        
+        Args:
+            resolution (:obj:`tuple` of :obj: `int`): X, Y screen resolution in pixles
+            layout: (dict): layout
+        Attributes:
+            blocks (:obj:`dict` of :obj:`Block`): dictionary of ImageBlock and TextBlock objects"""
+        
         logging.debug('creating layout')           
         self.resolution = resolution
         self.layout = layout
         
     @property
     def resolution(self):
+        """:obj:tuple of :obj:int - resolution in pixles of entire layout area"""
         return self._resolution
     
     
@@ -103,10 +196,17 @@ class Layout:
     
     @property
     def layout(self):
+        """:obj:dict dictionary defnining layout
+        
+            missing and relative coordinates values are calculated and set here
+        
+        Properties set:
+            images(:obj:dict of :obj:PIL.Image)"""
         return self._layout
     
     @layout.setter
     def layout(self, layout):
+        
         if layout:
             logging.debug(f'calculating layout for resolution {self.resolution}')
         else:
@@ -119,6 +219,13 @@ class Layout:
         self._set_images()
         
     def _calculate_layout(self):
+        """Calculate the size and position of each text block based on rules in layout
+        
+        Args:
+            layout(dict): dictionary containing the layout to be used
+        
+        Returns:
+            layout(dict): dictionary that includes rules and values for the layout"""
         if not self.layout:
             return None
         
@@ -126,7 +233,8 @@ class Layout:
         values = {'image': None, 'max_lines': 1, 'padding': 0, 'width': 1, 'height': 1, 
                   'abs_coordinates': (None, None), 'hcenter': False, 'vcenter': False, 
                   'rand': False, 'inverse': False, 'relative': False, 'font': None, 
-                  'font_size': None, 'maxchar': None, 'dimensions': None}               
+                  'font_size': None, 'maxchar': None, 'dimensions': None,
+                  'scale_x': None, 'scale_y': None}               
         
         for section in self.layout:
             logging.debug(f'*****{section}*****')
@@ -174,6 +282,19 @@ class Layout:
                                                             maxchar=this_section['maxchar'])
                 
     def _scalefont(self, font, dimensions, lines, maxchar, text="W W W "):
+        """Scale a font to fit the number of `lines` within `dimensions`
+        
+        Args:
+            font(str): path to true type font
+            dimensions(:obj:`tuple` of :obj:`int`): dimensions of pixles         
+            lines(int): number of lines of text to fit within the `dimensions`            
+            maxchar(int): number of characters of `text` to use when calculating 
+                default is 'W W W ' -- W is a large character and spaces allow 
+                textwrap to work properly
+            text(str): string to use when calculating (default: 'W W W ')
+            
+        Returns:
+            :obj:int: font size as integer"""        
         if not maxchar:
             maxchar = 6
         
@@ -185,7 +306,7 @@ class Layout:
         # start calculating at size = 1
         fontsize = 1
         x_fraction = .85 # fraction of x height to use
-        y_fraction = .70 # fraction of y width to use
+        y_fraction = .75 # fraction of y width to use
         xtarget = dimensions[0]/x_fraction # target width of font
         ytarget = dimensions[1]/lines*y_fraction # target heigight of font
         
@@ -219,10 +340,10 @@ class Layout:
     
         
     def _set_images(self):
-        """create dictonary of all image blocks with using the current set layout
+        """create dictonary of all image blocks using the specified layout
         
-         Sets:
-            blocks (dict): dictionary of :obj:`TextBlock`, :obj:`ImageBlock`"""
+         properties set:
+            blocks(:obj:dict): dictionary of :obj:`TextBlock`, :obj:`ImageBlock`"""
                           
         layout = self.layout
         
@@ -257,6 +378,14 @@ class Layout:
         self.blocks = blocks
     
     def _check_keys(self, dictionary, values):
+        """Check `dictionary` for missing key/value pairs specified in `values`
+        
+        Args:
+            dictionary(dict): dictionary to check
+            values(dict): dictionary of default key and value pairs
+            
+        Returns:
+            dictionary(dict): dictionary with missing key/value pairs updated"""        
         logging.debug('checking layout keys')
         for k, v in values.items():
             try:
@@ -288,7 +417,7 @@ class Layout:
 
 
 
-# In[62]:
+# In[11]:
 
 
 # logger = logging.getLogger(__name__)
