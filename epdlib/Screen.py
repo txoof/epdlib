@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[4]:
+# In[1]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Screen.ipynb')
@@ -21,14 +21,6 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 from datetime import datetime
 from pathlib import Path
-
-
-
-
-# In[ ]:
-
-
-
 
 
 
@@ -114,7 +106,7 @@ class ScreenShot:
 
 
 class Update:
-    """Class for creating a montotonicly aware object that records passage of time
+    """Class for creating a montotonicaly aware object that records passage of time
     
     create an update aware object:
         myObj = Update()
@@ -256,35 +248,35 @@ class Screen:
         image = Image.new('L', self.resolution, 255)
         return image
     
-    def concat(self, elements=None):
-        '''Concatenate multiple image objects into a single composite image
+#     def concat(self, elements=None):
+#         '''Concatenate multiple image objects into a single composite image
         
-        Args:
-            elements (:obj:`list` of :obj:`ImageBlock` or `TextBlock`) - if none are
-                provided, use the existing elements
+#         Args:
+#             elements (:obj:`list` of :obj:`ImageBlock` or `TextBlock`) - if none are
+#                 provided, use the existing elements
                 
-        Sets:
-            image (:obj:`PIL.Image`): concatination of all image members of `elements` 
-            last_updated (:obj: `Update`): registeres the time the images were updated
+#         Sets:
+#             image (:obj:`PIL.Image`): concatination of all image members of `elements` 
+#             last_updated (:obj: `Update`): registeres the time the images were updated
             
-        Returns:
-            image (:obj:`PIL.Image`)
-        '''
-        self.image = self.clearScreen()
-        # register that the object has been modified
-        self.update.update = True
-        if elements:
-            elements = elements
-        else:
-            elements = self.elements
+#         Returns:
+#             image (:obj:`PIL.Image`)
+#         '''
+#         self.image = self.clearScreen()
+#         # register that the object has been modified
+#         self.update.update = True
+#         if elements:
+#             elements = elements
+#         else:
+#             elements = self.elements
             
-        for e in elements:
-            logging.debug(f'pasting image at: {e.abs_coordinates}')
-            self.image.paste(e.image,  e.abs_coordinates)
+#         for e in elements:
+#             logging.debug(f'pasting image at: {e.abs_coordinates}')
+#             self.image.paste(e.image,  e.abs_coordinates)
 
 #             logging.debug(f'pasting image at: {e.img_coordinates}')
 #             self.image.paste(e.image,  e.img_coordinates)
-        return(self.image)
+#         return(self.image)
     
     def initEPD(self):
         '''Initialize the connection with the EPD Hat.
@@ -318,7 +310,7 @@ class Screen:
             logging.error(f'failed to clear epd: {e}')
         return True
     
-    def writeEPD(self, image=None, sleep=True):
+    def writeEPD(self, image, sleep=True):
         '''Write an image to the EPD.
         
         Args:
@@ -333,6 +325,7 @@ class Screen:
             raise UnboundLocalError('no epd object has been assigned')
         try:
             epd.display(epd.getbuffer(self.image))
+            self.update.update = True
             if sleep:
                 epd.sleep()
         except Exception as e:

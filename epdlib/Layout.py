@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[73]:
+# In[20]:
 
 
 #get_ipython().run_line_magic('load_ext', 'autoreload')
@@ -14,7 +14,7 @@
 
 
 
-# In[19]:
+# In[31]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert Layout.ipynb')
@@ -23,15 +23,7 @@
 
 
 
-# In[ ]:
-
-
-
-
-
-
-
-# In[7]:
+# In[22]:
 
 
 import logging
@@ -42,7 +34,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 
-# In[8]:
+# In[23]:
 
 
 try:
@@ -58,7 +50,7 @@ except ImportError as e:
 
 
 
-# In[9]:
+# In[24]:
 
 
 def strict_enforce(*types):
@@ -84,7 +76,7 @@ def strict_enforce(*types):
 
 
 
-# In[14]:
+# In[30]:
 
 
 class Layout:
@@ -172,11 +164,13 @@ class Layout:
             resolution (:obj:`tuple` of :obj: `int`): X, Y screen resolution in pixles
             layout: (dict): layout
         Attributes:
-            blocks (:obj:`dict` of :obj:`Block`): dictionary of ImageBlock and TextBlock objects"""
+            blocks (:obj:`dict` of :obj:`Block`): dictionary of ImageBlock and TextBlock objects
+            screen (:obj:PIL.Image): single image composed from all of the blocks defined in the layout"""
         
         logging.debug('creating layout')           
         self.resolution = resolution
         self.layout = layout
+        self.screen = None
         
     @property
     def resolution(self):
@@ -413,106 +407,26 @@ class Layout:
                 self.blocks[key].update(val)
             else:
                 logging.debug(f'ignoring block {key}')
-
-
-
-
-# In[11]:
-
-
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
-
-
-
-
-# In[63]:
-
-
-# l = Layout(resolution=(600, 440), layout=lo)
-# q = Layout(resolution=(300, 200), layout=lo)
-
-
-
-
-# In[66]:
-
-
-# l.update_contents(update)
-# q.update_contents(update)
-
-
-
-
-# In[71]:
-
-
-# l.blocks['temperature'].image
-
-
-
-
-# In[72]:
-
-
-# q.blocks['temperature'].image
-
-
-
-
-# In[64]:
-
-
-# update = {
-#     'weather_img': '../Avatar_cloud.png',      # weather_img block will recieve a .png
-#     'temperature': '15C',                     # temperature block will receive `15C`
-#     'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, 12 overnight.'
-# }
-
-
-
-
-# In[41]:
-
-
-# lo = { # basic two row layout
-#     'weather_img': {                
-#             'image': True,               # image block
-#             'width': 1/2,                  # 1/1 of the width - this stretches the entire width of the display
-#             'height': 1/4,               # 1/3 of the entire height
-#             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
-#             'hcenter': True,             # horizontally center text
-#             'vcenter': True,             # vertically center text 
-#             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-#         },
-#     'temperature': { 
-#                 'image': None,
-#                 'max_lines': 1,
-#                 'padding': 10,
-#                 'width': 1/2,
-#                 'height': 1/4,
-#                 'abs_coordinates': (None, 0),
-#                 'hcenter': True,
-#                 'vcenter': True,
-#                 'relative': ['weather_img', 'temperature'],
-#                 'font': '../fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#                 'font_size': None
-#     },
-#     'forecast': {
-#                 'image': None,
-#                 'max_lines': 5,
-#                 'padding': 10,
-#                 'width': 1,
-#                 'height': 1/2,
-#                 'abs_coordinates': (0, None),
-#                 'hcenter': False,
-#                 'vcenter': True,
-#                 'relative': ['forecast', 'temperature'],
-#                 'font': '../fonts/Open_Sans/OpenSans-Regular.ttf',
-#                 'font_size': None
-#     }
-
-# }
+                
+    def concat(self):
+        """Concatenate multiple image block objects into a single composite image
+                
+        Sets:
+            image (:obj:`PIL.Image`): concatination of all image members of `elements` 
+            last_updated (:obj: `Update`): registeres the time the images were updated
+            
+        Property Set:
+            screen (:obj:`PIL.Image`): image composed of all blocks"""
+        
+        # create a blank image as a canvas 
+        self.image = Image.new('L', self.resolution, 255)
+        if self.blocks:
+            logging.debug('concating blocks into single image')
+            for b in self.blocks:
+                logging.debug(f'pasitng image at: {b.abs_coordinates}')
+                self.image.paste(b.image, b.abs_coordinates)
+        return self.image
+        
 
 
 
