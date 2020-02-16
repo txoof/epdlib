@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[1]:
+# In[ ]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Screen.ipynb')
@@ -13,7 +13,7 @@
 
 
 
-# In[6]:
+# In[ ]:
 
 
 import logging
@@ -21,6 +21,32 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 from datetime import datetime
 from pathlib import Path
+
+
+
+
+# In[ ]:
+
+
+def strict_enforce(*types):
+    """strictly enforce type compliance within classes
+    
+    Usage:
+        @strict_enforce(type1, type2, (type3, type4))
+        def foo(val1, val2, val3):
+            ...
+    """
+    def decorator(f):
+        def new_f(self, *args, **kwds):
+            #we need to convert args into something mutable   
+            newargs = []        
+            for (a, t) in zip(args, types):
+                if not isinstance(a, t):
+                    raise TypeError(f'"{a}" is not type {t}')
+#                 newargs.append( t(a)) #feel free to have more elaborated convertion
+            return f(self, *args, **kwds)
+        return new_f
+    return decorator
 
 
 
@@ -53,9 +79,8 @@ class ScreenShot:
         return self._total
     
     @total.setter
+    @strict_enforce(int)
     def total(self, n):
-        if not isinstance(n, int):
-            raise TypeError(f'"{n}" must be a positive integer')
         if n < 1:
             raise ValueError(f'`n` must be >= 1')
     
@@ -102,7 +127,7 @@ class ScreenShot:
 
 
 
-# In[5]:
+# In[ ]:
 
 
 class Update:
@@ -160,6 +185,14 @@ class Update:
 
 
 
+# In[ ]:
+
+
+
+
+
+
+
 # In[3]:
 
 
@@ -171,17 +204,10 @@ class Screen:
         
     def __init__(self, resolution=None, elements=None, epd=None):
         """Constructor for Screen class.
-        
-        Args:
-            resolution (:obj:`tuple` of :obj:`int`): resolution of EPD
-            elements (:obj:`list` of :obj:`Block`): images to be assembled
-            image (:obj:`PIL.Image`): composite image to be written to screen
-            epd (:obj:`waveshare.epd`): waveshare EPD object
-            
+                    
         Properties:
             resolution (tuple): resolution of screen
-            elements (:obj:`list` of :obj:`PIL.Image`: list of all image objects that form the larger image
-            
+            epd (WaveShare EPD object)
             
         Examples:
         * Create a screen object:

@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[20]:
+# In[68]:
 
 
 #get_ipython().run_line_magic('load_ext', 'autoreload')
@@ -14,7 +14,7 @@
 
 
 
-# In[31]:
+# In[32]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert Layout.ipynb')
@@ -76,7 +76,7 @@ def strict_enforce(*types):
 
 
 
-# In[30]:
+# In[65]:
 
 
 class Layout:
@@ -421,19 +421,12 @@ class Layout:
         # create a blank image as a canvas 
         self.image = Image.new('L', self.resolution, 255)
         if self.blocks:
+            blocks = self.blocks
             logging.debug('concating blocks into single image')
-            for b in self.blocks:
-                logging.debug(f'pasitng image at: {b.abs_coordinates}')
-                self.image.paste(b.image, b.abs_coordinates)
+            for b in blocks:
+                logging.debug(f'pasitng **{b}** image at: {blocks[b].abs_coordinates}')
+                self.image.paste(blocks[b].image, blocks[b].abs_coordinates)
         return self.image
         
-
-
-
-
-# In[ ]:
-
-
-
 
 
