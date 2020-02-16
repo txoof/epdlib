@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[ ]:
+# In[1]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Screen.ipynb')
@@ -13,7 +13,7 @@
 
 
 
-# In[ ]:
+# In[2]:
 
 
 import logging
@@ -25,7 +25,7 @@ from pathlib import Path
 
 
 
-# In[ ]:
+# In[3]:
 
 
 def strict_enforce(*types):
@@ -51,7 +51,7 @@ def strict_enforce(*types):
 
 
 
-# In[2]:
+# In[4]:
 
 
 class ScreenShot:
@@ -127,7 +127,7 @@ class ScreenShot:
 
 
 
-# In[ ]:
+# In[5]:
 
 
 class Update:
@@ -181,14 +181,6 @@ class Update:
         if update:
             self._last_updated = self.now
     
-
-
-
-
-# In[ ]:
-
-
-
 
 
 
