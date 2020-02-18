@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[1]:
+# In[3]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Block.ipynb')
@@ -11,7 +11,7 @@
 
 
 
-# In[2]:
+# In[4]:
 
 
 #get_ipython().run_line_magic('nbconvert', '')
@@ -399,11 +399,12 @@ class TextBlock(Block):
     def font(self, font):
             
         if font:
+            old_font = None
+            logging.debug(f'setting old_font = {old_font}')
             if hasattr(self, '_font'):
                 old_font = self.font
-            else:
-                old_font = 'None'
-                
+                logging.debug(f'old_font now = {old_font}')
+            
             self._font = ImageFont.truetype(str(Path(font).resolve()), size=self.font_size)
             # trigger a calculation of maxchar if not already set
             if not self.maxchar or (self.font != old_font):
