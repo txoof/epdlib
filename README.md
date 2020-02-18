@@ -6,7 +6,39 @@ EpdLib is a library for creating dynamically scaled screen layouts for frame-buf
 * Layout - generate dynamic layouts from Blocks
 * Screen - simple interface for waking and writing to WaveShare EPD devices
 
-## `Block` Module
+- [epdlib](#epdlib)
+  * [Block Module](#block-module)
+    + [Properties](#properties)
+    + [Methods](#methods)
+  * [Block.TextBlock](#blocktextblock)
+    + [Properties](#properties-1)
+    + [Functions](#functions)
+    + [Methods](#methods-1)
+  * [Block.ImageBlock](#blockimageblock)
+    + [Properties](#properties-2)
+  * [Layout Module](#layout-module)
+  * [Scaling Example](#scaling-example)
+    + [Properties](#properties-3)
+    + [Methods](#methods-2)
+    + [Functions](#functions-1)
+  * [Screen Module](#screen-module)
+    + [Properties](#properties-4)
+    + [Methods](#methods-3)
+    + [Example](#example)
+  * [Screen.Update](#screenupdate)
+    + [Properties](#properties-5)
+    + [Methods](#methods-4)
+    + [Example](#example-1)
+  * [Screen.ScreenShot](#screenscreenshot)
+    + [Properties](#properties-6)
+    + [Methods](#methods-5)
+  * [Quick-Start Recipe](#quick-start-recipe)
+    + [Creating a Layout Image](#creating-a-layout-image)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
+
+## Block Module
 `Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
 *Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0)`
 
@@ -30,7 +62,7 @@ EpdLib is a library for creating dynamically scaled screen layouts for frame-buf
 Place holder method for child classes.
  
 
-## `Block.TextBlock`
+## Block.TextBlock
 Child class of `Block` that contains formatted text. `TextBlock` objects can do basic formatting of strings. Text is always rendered as a 1 bit image (black on white or white on black). Text can be horizontally justified and centered and vertically centered within the area of the block. 
 
 All properties of the parent class are inherited.
@@ -64,7 +96,7 @@ All properties of the parent class are inherited.
 * `update(update=None)` - Update the text string with a new string and sets `image` property
     - update (str)
 
-## `Block.ImageBlock`
+## Block.ImageBlock
 Child class of `Block` that contains formated images. `ImageBlock` objects do basic formatting of color, centering and scaling. All `ImageBlock` images are 8 bit grayscale `Pillow.Image(mode='L')`. Images that are too large for the area are rescaled using the `Pillow.Image.thumbnail()` strageies to limit distortion. Images that are smaller than the set area will **not** be resized.
 
 All properties of the parent class are inherited.
@@ -74,7 +106,7 @@ All properties of the parent class are inherited.
 ### Properties
 * `image` (:obj:PIL.Image or :obj:str) - `Pillow` image or path provided as a `str` to an image file; relative paths are acceptable
 
-## `Layout` Module
+## Layout Module
 `Layout` objects support scaling images and dynamically scaling [TTF](https://en.wikipedia.org/wiki/TrueType) font-size for different screen sizes. 
 
 Font sizes are set based on each individual font and scaled to fit within text blocks using the maximum number of lines specified in the layout. Text is line-broken using the python [textwrap logic](https://docs.python.org/3.7/library/textwrap.html).
@@ -109,7 +141,7 @@ epdlib `Layout` objects can be scaled to any resolution while maintaining intern
         - dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
 
 
-## `Screen` Module
+## Screen Module
 `Screen` objects provide a method for waking and writing to a WaveShare E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
 
 *Class* `Screen(resolution=None, epd=None)`
@@ -141,7 +173,7 @@ myScreen.writeEPD('./my_image.png')
 ```
 
 
-## `Screen.Update`
+## Screen.Update
 Create a monotonically aware object that records the passage of time.
 
 *Class* `Screen.Update()`
@@ -170,7 +202,7 @@ u.last_updated
 >>> 0.00021347898291423917
 ```
 
-## `Screen.ScreenShot`
+## Screen.ScreenShot
 Capture a rolling set of screenshots. When the total number of screenshots exceeds `n` the oldest is deleted. Images are stored as .png.
 
 This is useful for debugging over time.
