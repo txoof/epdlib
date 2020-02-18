@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[83]:
+# In[ ]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Block.ipynb')
@@ -11,7 +11,7 @@
 
 
 
-# In[84]:
+# In[ ]:
 
 
 #get_ipython().run_line_magic('nbconvert', '')
@@ -36,7 +36,7 @@ except ImportError as e:
 
 
 
-# In[3]:
+# In[2]:
 
 
 def check_num(func):
@@ -58,7 +58,7 @@ def check_num(func):
 
 
 
-# In[4]:
+# In[3]:
 
 
 def strict_enforce(*types):
@@ -84,7 +84,7 @@ def strict_enforce(*types):
 
 
 
-# In[5]:
+# In[4]:
 
 
 def permissive_enforce(*types):
@@ -113,7 +113,7 @@ def permissive_enforce(*types):
 
 
 
-# In[6]:
+# In[5]:
 
 
 class Block:
@@ -282,7 +282,7 @@ class Block:
 
 
 
-# In[23]:
+# In[30]:
 
 
 class TextBlock(Block):
@@ -342,11 +342,12 @@ class TextBlock(Block):
         self.area = area
         
         logging.info('TextBlock created')
-        if chardist:
-            self._chardist = chardist
-        else:
-            self._chardist = constants.USA_CHARDIST
-        
+#         if chardist:
+#             self._chardist = chardist
+#         else:
+#             self._chardist = constants.USA_CHARDIST
+        self.chardist = chardist
+    
         self.maxchar = maxchar
         self.font_size = font_size
         self.font = font
@@ -355,7 +356,16 @@ class TextBlock(Block):
         
         self.text = text
         
-       
+    @property
+    def chardist(self):
+        return self._chardist
+    
+    @chardist.setter
+    def chardist(self, chardist):
+        if not chardist:
+            self._chardist = constants.USA_CHARDIST
+        else:
+            self._chardist = getattr(constants, chardist)
  
     @property
     def font_size(self):
@@ -391,6 +401,8 @@ class TextBlock(Block):
         if font:
             if hasattr(self, '_font'):
                 old_font = self.font
+            else:
+                old_font = None
                 
             self._font = ImageFont.truetype(str(Path(font).resolve()), size=self.font_size)
             # trigger a calculation of maxchar if not already set
@@ -448,8 +460,8 @@ class TextBlock(Block):
         # max number of characters to sample from the character distribution
         n = 1000
         # create a random string of characters containing the letter distribution
-        for char in self._chardist:
-            s = s+(char*int(self._chardist[char]*n))
+        for char in self.chardist:
+            s = s+(char*int(self.chardist[char]*n))
         s_length = self.font.getsize(s)[0] # string length in Pixles
         # find average width of each character
         avg_width = s_length/len(s)
@@ -572,11 +584,31 @@ class TextBlock(Block):
                 logging.error(f'failed to update: {e}')
                 return False
             return True
+        
+    def print_chardist(self, chardist=None):
+        """Print supported character distributions
+        
+            call with no arguments to see available distributions
+            
+            call with name of character distrubtion to see fractional distribution
+        
+        Args:
+            chardist(:obj:str): string representing listed character distribution """
+        if not chardist:
+            print('available character distributions:')
+            print ([ f'{i}' for i in dir(constants) if not i.startswith("__")])
+        else:
+            print(f'Character Distribution for {chardist}:')
+            char_dict = getattr(constants, chardist)
+            
+            for i in char_dict:
+                print(f'{i}:     {char_dict[i]:.5f}')
+                
 
 
 
 
-# In[24]:
+# In[ ]:
 
 
 # b = TextBlock(area=[600, 150], font='../fonts/Concert_One/ConcertOne-Regular.ttf', max_lines=5, hcenter=True)
@@ -584,7 +616,7 @@ class TextBlock(Block):
 
 
 
-# In[71]:
+# In[ ]:
 
 
 class ImageBlock(Block):
@@ -715,7 +747,7 @@ def compare_obj(a, b):
 
 
 
-# In[2]:
+# In[ ]:
 
 
 # logger = logging.getLogger(__name__)
