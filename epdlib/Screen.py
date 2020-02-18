@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[1]:
+# In[ ]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Screen.ipynb')
@@ -127,7 +127,7 @@ class ScreenShot:
 
 
 
-# In[5]:
+# In[6]:
 
 
 class Update:
@@ -185,7 +185,7 @@ class Update:
 
 
 
-# In[3]:
+# In[15]:
 
 
 class Screen:
@@ -229,7 +229,7 @@ class Screen:
             """
         logging.info('Screen created')
 #         self.resolution = resolution
-        self.elements = elements
+#         self.elements = elements # FIXME - remove this - unneeded
         
         if resolution:
             if isinstance(resolution, (list, tuple)):
@@ -342,7 +342,9 @@ class Screen:
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         try:
-            epd.display(epd.getbuffer(self.image))
+            logging.debug('writing to epd')
+#             epd.display(epd.getbuffer(self.image))
+            epd.display(epd.getbuffer(image))
             self.update.update = True
             if sleep:
                 epd.sleep()
@@ -351,5 +353,13 @@ class Screen:
             return False
         return True
         
+
+
+
+
+# In[ ]:
+
+
+
 
 
