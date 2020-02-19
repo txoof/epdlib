@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[8]:
+# In[10]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Screen.ipynb')
@@ -155,7 +155,7 @@ class Update:
             update (boolean): indicates that the object has been updated'''
             
         self.start = self.now
-        self.update = True
+        self.update()
         
     @property
     def age(self):
@@ -177,8 +177,7 @@ class Update:
         """update the object   
         Args:
             update(boolean): True updates object"""
-        if update:
-            self._last_updated = self.now
+        self._last_updated = self.now
     
 
 
