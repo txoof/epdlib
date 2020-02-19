@@ -13,7 +13,7 @@
 
 
 
-# In[2]:
+# In[1]:
 
 
 import logging
@@ -25,7 +25,7 @@ from pathlib import Path
 
 
 
-# In[3]:
+# In[2]:
 
 
 def strict_enforce(*types):
@@ -51,7 +51,7 @@ def strict_enforce(*types):
 
 
 
-# In[4]:
+# In[3]:
 
 
 class ScreenShot:
@@ -127,7 +127,7 @@ class ScreenShot:
 
 
 
-# In[6]:
+# In[4]:
 
 
 class Update:
@@ -172,10 +172,9 @@ class Update:
         """seconds since object was last updated"""
         return self.now - self._last_updated
     
-    @last_updated.setter
-    def update(self, update=True):
-        """update the object
-        
+#     @last_updated.setter
+    def update(self):
+        """update the object   
         Args:
             update(boolean): True updates object"""
         if update:
@@ -185,7 +184,7 @@ class Update:
 
 
 
-# In[15]:
+# In[5]:
 
 
 class Screen:
@@ -221,10 +220,10 @@ class Screen:
             # update the screen object with the layout block values
             s.elements = l.blocks.values()
             # create a composite imate from all the blocks
-            s.concat()
+            l.concat()
             # init and write the composite to the EPD
             s.initEPD()
-            s.writeEPD()
+            s.writeEPD(l.image)
             ```
             """
         logging.info('Screen created')
@@ -332,7 +331,7 @@ class Screen:
         '''Write an image to the EPD.
         
         Args:
-            image (:obj:`PIL.Image`, optional): if none is provided use object `image`
+            image (:obj:`PIL.Image`): write a PIL image to the screen 
             sleep (bool): default - True; put the EPD to low power mode when done writing
             
         Returns:
@@ -345,7 +344,7 @@ class Screen:
             logging.debug('writing to epd')
 #             epd.display(epd.getbuffer(self.image))
             epd.display(epd.getbuffer(image))
-            self.update.update = True
+            self.update.update()
             if sleep:
                 epd.sleep()
         except Exception as e:
@@ -353,13 +352,5 @@ class Screen:
             return False
         return True
         
-
-
-
-
-# In[ ]:
-
-
-
 
 
