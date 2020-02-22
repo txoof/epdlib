@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[68]:
+# In[47]:
 
 
 #get_ipython().run_line_magic('load_ext', 'autoreload')
@@ -14,7 +14,7 @@
 
 
 
-# In[32]:
+# In[48]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert Layout.ipynb')
@@ -23,7 +23,7 @@
 
 
 
-# In[22]:
+# In[39]:
 
 
 import logging
@@ -34,7 +34,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 
-# In[23]:
+# In[40]:
 
 
 try:
@@ -50,7 +50,7 @@ except ImportError as e:
 
 
 
-# In[24]:
+# In[41]:
 
 
 def strict_enforce(*types):
@@ -76,7 +76,7 @@ def strict_enforce(*types):
 
 
 
-# In[65]:
+# In[42]:
 
 
 class Layout:
@@ -347,7 +347,7 @@ class Layout:
             section = layout[sec]
             # any section with max lines accepts text
             if not section['image']: # ['max_lines']:
-                logging.debug('set text block')
+                logging.info(f'set text block: {sec}')
                 blocks[sec] = Block.TextBlock(area=section['dimensions'], 
                                               text='.', 
                                               font=section['font'], 
@@ -360,7 +360,7 @@ class Layout:
                                               rand=section['rand'], 
                                               abs_coordinates=section['abs_coordinates'])
             if section['image']:
-                logging.debug('set image block')
+                logging.info(f'set image block {sec}')
                 blocks[sec] = Block.ImageBlock(image=None, 
                                                abs_coordinates=section['abs_coordinates'], 
                                                area=section['dimensions'], 
@@ -369,6 +369,7 @@ class Layout:
                                                vcenter=section['vcenter'], 
                                                padding=section['padding'], 
                                                rand=section['rand'])
+                
         self.blocks = blocks
     
     def _check_keys(self, dictionary, values):
@@ -412,8 +413,7 @@ class Layout:
         """Concatenate multiple image block objects into a single composite image
                 
         Sets:
-            image (:obj:`PIL.Image`): concatination of all image members of `elements` 
-            last_updated (:obj: `Update`): registeres the time the images were updated
+            image (:obj:`PIL.Image`): concatination of all image members of `elements`
             
         Property Set:
             screen (:obj:`PIL.Image`): image composed of all blocks"""
@@ -428,5 +428,14 @@ class Layout:
                 self.image.paste(blocks[b].image, blocks[b].abs_coordinates)
         return self.image
         
+
+
+
+
+# In[44]:
+
+
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
 
 
