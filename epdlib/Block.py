@@ -3,7 +3,7 @@
 # coding: utf-8
 
 
-# In[3]:
+# In[15]:
 
 
 #get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Block.ipynb')
@@ -11,7 +11,7 @@
 
 
 
-# In[4]:
+# In[16]:
 
 
 #get_ipython().run_line_magic('nbconvert', '')
@@ -19,7 +19,7 @@
 
 
 
-# In[1]:
+# In[3]:
 
 
 import logging
@@ -36,7 +36,16 @@ except ImportError as e:
 
 
 
-# In[2]:
+# In[4]:
+
+
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
+
+
+
+
+# In[5]:
 
 
 def check_num(func):
@@ -58,7 +67,7 @@ def check_num(func):
 
 
 
-# In[3]:
+# In[6]:
 
 
 def strict_enforce(*types):
@@ -84,7 +93,7 @@ def strict_enforce(*types):
 
 
 
-# In[4]:
+# In[7]:
 
 
 def permissive_enforce(*types):
@@ -113,7 +122,7 @@ def permissive_enforce(*types):
 
 
 
-# In[5]:
+# In[8]:
 
 
 class Block:
@@ -145,7 +154,10 @@ class Block:
             image (None): None in base class 
             dimensions (:obj:`tuple` of :obj:`int`): dimensions of image in pixels"""        
         
-        
+        # set default backround to white (255)
+        self.bkground = 255
+        # set default fill to black (0)
+        self.fill = 0
         self.area = area
         self.hcenter = hcenter
         self.vcenter = vcenter
@@ -153,12 +165,7 @@ class Block:
         self.inverse = inverse
         self.abs_coordinates = abs_coordinates
         self.padding = padding
-        
-        # set default bkground color to white - 255
-        self.bkground = 255
-        # set default fill color to black - 0
-        self.fill = 0
-    
+            
         # set default image coordinates 
         self.img_coordinates = None
         
@@ -208,15 +215,14 @@ class Block:
     @strict_enforce(bool)
     def inverse(self, inverse):
         self._inverse = inverse
+        # 0 = Black
+        # 255 = White 
         if inverse:
-            bkground = 0
-            fill = 255
+            self.bkground = 0
+            self.fill = 255
         else:
-            bkground = 255
-            fill = 0
-            
-        self.fill = fill
-        self.bkground = bkground
+            self.bkground = 255
+            self.fill = 0
         
     @property
     def area(self):
@@ -282,7 +288,7 @@ class Block:
 
 
 
-# In[30]:
+# In[9]:
 
 
 class TextBlock(Block):
@@ -605,14 +611,6 @@ class TextBlock(Block):
             for i in char_dict:
                 print(f'{i}:     {char_dict[i]:.5f}')
                 
-
-
-
-
-# In[ ]:
-
-
-# b = TextBlock(area=[600, 150], font='../fonts/Concert_One/ConcertOne-Regular.ttf', max_lines=5, hcenter=True)
 
 
 
