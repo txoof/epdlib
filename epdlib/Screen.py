@@ -1,19 +1,9 @@
-#!/usr/bin/env python
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 
-# In[11]:
 
 
-#get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Screen.ipynb')
-
-#get_ipython().run_line_magic('nbconvert', '')
-
-
-
-
-# In[1]:
 
 
 import logging
@@ -21,11 +11,11 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 from datetime import datetime
 from pathlib import Path
+import inspect
 
 
 
 
-# In[2]:
 
 
 def strict_enforce(*types):
@@ -51,7 +41,6 @@ def strict_enforce(*types):
 
 
 
-# In[3]:
 
 
 class ScreenShot:
@@ -127,7 +116,6 @@ class ScreenShot:
 
 
 
-# In[4]:
 
 
 class Update:
@@ -183,7 +171,6 @@ class Update:
 
 
 
-# In[5]:
 
 
 class Screen:
@@ -346,10 +333,35 @@ class Screen:
             self.update.update()
             if sleep:
                 epd.sleep()
+        # if this is a 3 color display, pass a clear image as the secondary image
+        except TypeError as e:
+            args = inspect.getfullargspec(epd.display)
+            if len(args.args) > 2:
+                epd.display(epd.getbuffer(image), epd.getbuffer(self.clearScreen()))
+                self.update.update()
         except Exception as e:
             logging.error(f'failed to write to epd: {e}')
             return False
         return True
         
+
+
+
+
+
+
+
+# import sys
+# sys.path.append("..") # Adds higher directory to python modules path.
+# from waveshare_epd import epd2in7b
+
+
+
+# s = Screen()
+
+# s.epd = epd2in7b
+
+# s.initEPD()
+# s.writeEPD(s.clearScreen())
 
 
