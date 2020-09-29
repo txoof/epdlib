@@ -308,6 +308,8 @@ class Screen:
             logging.error(f'failed to init epd: {e}')
             
         logging.info(f'{self.epd} initialized')
+        self.buffer_no_image = self.epd.getbuffer(
+            Image.new('L', self.resolution, 255))
         return True
     
     def clearEPD(self):
@@ -342,7 +344,13 @@ class Screen:
         try:
             logging.debug('writing to epd')
 #             epd.display(epd.getbuffer(self.image))
-            epd.display(epd.getbuffer(image))
+            # the presence of 'bc' in waveshare module name indicates a
+            # bicolor display
+            if 'bc' in self.epd.__class__.__module__:
+                epd.display(self.epd.getbuffer(image), self.buffer_no_image)
+            else:
+                epd.display(self.epd.getbuffer(image))
+
             self.update.update()
             if sleep:
                 epd.sleep()
