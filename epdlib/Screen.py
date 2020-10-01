@@ -185,6 +185,7 @@ class Screen:
         Properties:
             resolution (tuple): resolution of screen
             epd (WaveShare EPD object)
+            buffer_no_image (blank image to support writing to 3 color displays)
             
         Examples:
         * Create a screen object:
@@ -213,8 +214,6 @@ class Screen:
             ```
             """
         logging.info('Screen created')
-#         self.resolution = resolution
-#         self.elements = elements # FIXME - remove this - unneeded
         
         if resolution:
             if isinstance(resolution, (list, tuple)):
@@ -225,9 +224,10 @@ class Screen:
         if epd:
             self.epd = epd
             self.image = self.clearScreen()
-            
+
+        
         self.update = Update()
-    
+
     @property
     def epd(self):
         return self._epd
@@ -241,6 +241,7 @@ class Screen:
         resolution.sort(reverse=True)
         self.resolution = resolution
         self.image = self.clearScreen()
+        self.buffer_no_image = self._epd.getbuffer(Image.new('L', self.resolution, 255))
     
     def clearScreen(self):
         '''Sets a clean base image for building screen layout.
@@ -331,17 +332,19 @@ class Screen:
 #             epd.display(epd.getbuffer(self.image))
             epd.display(epd.getbuffer(image))
             self.update.update()
-            if sleep:
-                epd.sleep()
         # if this is a 3 color display, pass a clear image as the secondary image
         except TypeError as e:
             args = inspect.getfullargspec(epd.display)
             if len(args.args) > 2:
-                epd.display(epd.getbuffer(image), epd.getbuffer(self.clearScreen()))
+                # send a 1x1 pixel image to the colored layer
+                epd.display(epd.getbuffer(image), self.buffer_no_image)
                 self.update.update()
         except Exception as e:
             logging.error(f'failed to write to epd: {e}')
             return False
+        finally:
+            if sleep:
+                epd.sleep()
         return True
         
 
@@ -350,20 +353,23 @@ class Screen:
 
 
 
+def main():
+    # set your screent type here
+    from waveshare_epd import epd2in7b as my_epd
+    print('refresh screen -- screen should flash and be wiped')
+    s = Screen()
+    
+    s.epd = my_epd
+    s.initEPD()
+    s.writeEPD(s.clearScreen())
 
-# import sys
-# sys.path.append("..") # Adds higher directory to python modules path.
-# from waveshare_epd import epd2in7b
 
 
 
-# s = Screen()
 
-# s.epd = epd2in7b
 
-# s.initEPD()
-
-# s.writeEPD(s.clearScreen())
+if __name__ == '__main__':
+    main()
 
 
 
