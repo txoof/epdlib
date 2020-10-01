@@ -1,5 +1,5 @@
 name="epdlib" # Replace with your own username
-version="0.0.1.6"
+version="0.1.0-devel-2020.10.01"
 author="Aaron Ciuffo"
 author_email="aaron.ciuffo@gmail.com"
 description="EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays."
