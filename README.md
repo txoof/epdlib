@@ -1,6 +1,21 @@
 # epdlib 
 EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
 
+## Dependencies
+Python Modules:
+* Pillow
+    - System dependencies for Pillow:
+        * libopenjp2-7
+        * libtiff5
+* RPi.GPIO
+* spidev
+    - ensure SPI is enabled on the pi
+* waveshare-epd 
+    - this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
+    - see [notes](#Notes) below for installation instructions
+
+
+
 **Modules:**
 * Block - image and text blocks that can be assembed into a final layout
 * Layout - generate dynamic layouts from Blocks
@@ -329,5 +344,36 @@ myImg = myLayout.concat()
 
 # write the image out to a file
 myImg.save('./my_forecast.png')
+
+```
+<a name="Notes"></a>
+## Notes
+The Waveshare-epd library is not provided in an easily usable format. As of 1 Oct 2020, it cannot be directly installed with `pip` or `pipenv`. The package maintainers have used a literal '&' character in the subdirectory for the library making it extra difficult to use. Try the following to install it:
+
+```
+pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi\&JetsonNano/python"
+```
+
+This will likely result in a heap of errors. The library is not installed, but it does fetch the source.
+```
+    ERROR: Error [Errno 2] No such file or directory: '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi': '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi' while executing command python setup.py egg_info
+ERROR: Could not install packages due to an EnvironmentError: [Errno 2] No such file or directory: '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi': '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi
+```
+
+Finally install the library with:
+```
+MYVENV=$(pipenv --venv) pipenv install -e $MYVENV/src/waveshare-epd/RaspberryPi\&JetsonNano/python
+```
+
+getting ready for pypi:
+https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65edc5fe9c56
+
+
+```python
+!jupyter-nbconvert --to markdown --stdout > README.md
+```
+
+
+```python
 
 ```
