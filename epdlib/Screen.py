@@ -348,9 +348,14 @@ class Screen:
         return True
         
 
+class ScreenRotated180(Screen):
+
+    def writeEPD(self, image, *args, **kwargs):
+        Screen.writeEPD(self, image.rotate(180), *args, **kwargs)
 
 
-
+def rotateScreen180(screen):
+    screen.__class__ = ScreenRotated180
 
 
 def main():
