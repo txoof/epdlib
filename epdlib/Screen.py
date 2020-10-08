@@ -179,7 +179,7 @@ class Screen:
     `Screen` creates an object that provides methods for assembling images
     and updating a WaveShare EPD."""
         
-    def __init__(self, resolution=None, elements=None, epd=None):
+    def __init__(self, resolution=None, elements=None, epd=None, rotation=0):
         """Constructor for Screen class.
                     
         Properties:
@@ -224,16 +224,24 @@ class Screen:
         if epd:
             self.epd = epd
             self.image = self.clearScreen()
-
+            
+        self.rotation = rotation
         
         self.update = Update()
 
     @property
     def epd(self):
+        '''epd type 
+        
+        Sets properties:
+            resolution: epd width and height (defaults to landscape)
+            image: empty `PIL.Image`
+            buffer_no_image: empty `epd.getbuffer(Image)` to support colored screens that require an additional image'''
         return self._epd
     
     @epd.setter
     def epd(self, epd):
+        ''''''
         self._epd = epd.EPD()
         # set resolution for screen
         resolution = [epd.EPD_HEIGHT, epd.EPD_WIDTH]
@@ -242,6 +250,30 @@ class Screen:
         self.resolution = resolution
         self.image = self.clearScreen()
         self.buffer_no_image = self._epd.getbuffer(Image.new('L', self.resolution, 255))
+    
+    @property
+    def rotation(self):
+        return self._rotation
+    
+    @rotation.setter
+    @strict_enforce(int)
+    def rotation(self, rotation):
+        '''
+        set the display rotation'''
+            
+        if rotation not in [0, 90, -90, 180]:
+            raise ValueError('value must be type `int` and [0, 90, -90, 180]')
+        self._rotation = rotation
+        if rotation == 90 or rotation == -90:
+                
+            resolution = self.resolution
+            # set short dimension first
+            resolution.sort()
+            # set resolution
+            self.resolution = resolution
+            # set a new clearscreen image
+            self.image = self.clearScreen()
+            self.buffer_no_image = self.epd.getbuffer(Image.new('L', self.resolution, 255))
     
     def clearScreen(self):
         '''Sets a clean base image for building screen layout.
@@ -325,6 +357,11 @@ class Screen:
             bool: True if successful
         '''
         epd = self.epd
+        # rotate the image as needed
+        if self.rotation == 180 or self.rotation == -90:
+            image = image.rotate(180)
+    
+        
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         try:
@@ -355,13 +392,52 @@ class Screen:
 
 def main():
     # set your screent type here
-    from waveshare_epd import epd2in7b as my_epd
-    print('refresh screen -- screen should flash and be wiped')
-    s = Screen()
+    from waveshare_epd import epd5in83 as my_epd
+    import Layout
+    import sys
     
-    s.epd = my_epd
-    s.initEPD()
-    s.writeEPD(s.clearScreen())
+    sys.path.append('../')
+    
+    for r in [0, 90, -90, 180]:
+        print(f'setup for rotation: {r}')
+        s = Screen(epd=my_epd, rotation=r)
+        myLayout = {
+                'title': {                       # text only block
+                    'image': None,               # do not expect an image
+                    'max_lines': 3,              # number of lines of text
+                    'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
+                    'height': 4/7,               # 1/3 of the entire height
+                    'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
+                    'hcenter': True,             # horizontally center text
+                    'vcenter': True,             # vertically center text 
+                    'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
+                    'font': '../fonts/Font.ttc', # path to font file
+                    'font_size': None            # Calculate the font size because none was provided
+                },
+
+                'artist': {
+                    'image': None,
+                    'max_lines': 2,
+                    'width': 1,
+                    'height': 3/7,
+                    'abs_coordinates': (0, None),   # X = 0, Y will be calculated
+                    'hcenter': True,
+                    'vcenter': True,
+                    'font': '../fonts/Font.ttc',
+                    'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
+                                                   # calculate the y position based on the size of `title` block
+
+                }
+        }    
+        l = Layout.Layout(resolution=s.resolution)
+        l.layout = myLayout
+        l.update_contents({'title': 'spam, spam, spam, spam & ham', 'artist': 'monty python'})
+        print('print some text on the display')
+        s.initEPD()
+        s.writeEPD(l.concat())
+        print('refresh screen -- screen should flash and be wiped')
+        s.initEPD()
+        s.writeEPD(s.clearScreen())
 
 
 
