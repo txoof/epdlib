@@ -259,11 +259,18 @@ class Screen:
     @strict_enforce(int)
     def rotation(self, rotation):
         '''
-        set the display rotation'''
+        set the display rotation
+        Sets or resets properties:
+            rotation(`int`): [0, 90, -90, 180]
+            resolution: sets resolution to match rotation (width/height)
+            image: empty `PIL.Image`
+            buffer_no_image: empty `epd.getbuffer(Image)` to support colored screens that require an additional image 
+        '''
             
         if rotation not in [0, 90, -90, 180]:
             raise ValueError('value must be type `int` and [0, 90, -90, 180]')
         self._rotation = rotation
+        logging.debug(f'Screen rotation set to: {self._rotation}')
         if rotation == 90 or rotation == -90:
                 
             resolution = self.resolution
