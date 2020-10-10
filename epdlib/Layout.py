@@ -1,29 +1,11 @@
-#!/usr/bin/env python
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 
-# In[47]:
-
-
-#get_ipython().run_line_magic('load_ext', 'autoreload')
-#get_ipython().run_line_magic('autoreload', '2')
-
-#get_ipython().run_line_magic('reload_ext', 'autoreload')
 
 
 
 
-# In[48]:
-
-
-#get_ipython().run_line_magic('alias', 'nbconvert nbconvert Layout.ipynb')
-#get_ipython().run_line_magic('nbconvert', '')
-
-
-
-
-# In[39]:
 
 
 import logging
@@ -34,7 +16,6 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 
-# In[40]:
 
 
 try:
@@ -50,7 +31,6 @@ except ImportError as e:
 
 
 
-# In[41]:
 
 
 def strict_enforce(*types):
@@ -76,7 +56,6 @@ def strict_enforce(*types):
 
 
 
-# In[42]:
 
 
 class Layout:
@@ -117,32 +96,34 @@ class Layout:
     a parameter that includes a dictionary containing a key/value pair that matches the names
     see the example below.
     Sample Laout:
-    myLayout = {
-        'title': {                       # text only block
-            'image': None,               # do not expect an image
-            'max_lines': 2,              # number of lines of text
-            'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
-            'height': 2/3,               # 1/3 of the entire height
-            'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
-            'hcenter': True,             # horizontally center text
-            'vcenter': True,             # vertically center text 
-            'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-            'font': './fonts/Anton/Anton-Regular.ttf', # path to font file
-            'font_size': None            # Calculate the font size because none was provided
-        }
     
-        'artist' {
-            'image': None,
-            'max_lines': 1,
-            'width': 1,
-            'height', 1/3,
-            'abs_coordinates': (0, None)   # X = 0, Y will be calculated
-            'hcenter': True,
-            'vcenter': True,
-            'relative': ['artist', title], # use the X postion from abs_coord from `artist` (this block: 0)
-                                           # calculate the y position based on the size of `title` block
-            
-        }
+    myLayout = {
+            'title': {                       # text only block
+                'image': None,               # do not expect an image
+                'max_lines': 2,              # number of lines of text
+                'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
+                'height': 2/3,               # 1/3 of the entire height
+                'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
+                'hcenter': True,             # horizontally center text
+                'vcenter': True,             # vertically center text 
+                'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
+                'font': './fonts/Font.ttc', # path to font file
+                'font_size': None            # Calculate the font size because none was provided
+            },
+
+            'artist': {
+                'image': None,
+                'max_lines': 1,
+                'width': 1,
+                'height': 1/3,
+                'abs_coordinates': (0, None),   # X = 0, Y will be calculated
+                'hcenter': True,
+                'vcenter': True,
+                'font': './fonts/Font.ttc',
+                'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
+                                               # calculate the y position based on the size of `title` block
+
+            }
     }
     
     
@@ -432,7 +413,6 @@ class Layout:
 
 
 
-# In[44]:
 
 
 # logger = logging.getLogger(__name__)
