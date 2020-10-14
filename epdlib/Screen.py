@@ -371,17 +371,17 @@ class Screen:
         
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
+        image_buffer = epd.getbuffer(image)
         try:
             logging.debug('writing to epd')
-#             epd.display(epd.getbuffer(self.image))
-            epd.display(epd.getbuffer(image))
+            epd.display(image_buffer)
             self.update.update()
         # if this is a 3 color display, pass a clear image as the secondary image
         except TypeError as e:
             args = inspect.getfullargspec(epd.display)
             if len(args.args) > 2:
                 # send a 1x1 pixel image to the colored layer
-                epd.display(epd.getbuffer(image), self.buffer_no_image)
+                epd.display(image_buffer, self.buffer_no_image)
                 self.update.update()
         except Exception as e:
             logging.error(f'failed to write to epd: {e}')
