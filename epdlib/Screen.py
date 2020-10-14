@@ -228,6 +228,8 @@ class Screen:
         self.rotation = rotation
         
         self.update = Update()
+        
+        self.update_lag = 0
 
     @property
     def epd(self):
@@ -337,6 +339,13 @@ class Screen:
         logging.info(f'{self.epd} initialized')
         return True
     
+    def lag_measure_before_update(self):
+        self.write_start = time.clock_gettime(time.CLOCK_MONOTONIC)
+        
+    def lag_measure_after_update(self):
+        self.update_lag = max(time.clock_gettime(time.CLOCK_MONOTONIC) - self.write_start, self.update_lag)
+        logging.debug(f"screen lag: {self.update_lag}")
+
     def clearEPD(self):
         '''Clear the EPD screen.
         
@@ -348,7 +357,9 @@ class Screen:
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         try:
-            self.epd.Clear();
+            self.lag_measure_before_update()
+            self.epd.Clear()
+            self.lag_measure_after_update()
         except Exception as e:
             logging.error(f'failed to clear epd: {e}')
         return True
@@ -363,6 +374,7 @@ class Screen:
         Returns:
             bool: True if successful
         '''
+        self.lag_measure_before_update()
         epd = self.epd
         # rotate the image as needed
         if self.rotation == 180 or self.rotation == -90:
@@ -389,6 +401,7 @@ class Screen:
         finally:
             if sleep:
                 epd.sleep()
+        self.lag_measure_after_update()
         return True
         
 
