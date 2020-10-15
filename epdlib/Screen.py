@@ -374,6 +374,7 @@ class Screen:
         image_buffer = epd.getbuffer(image)
         try:
             logging.debug('writing to epd')
+#             epd.display(epd.getbuffer(self.image))
             epd.display(image_buffer)
             self.update.update()
         # if this is a 3 color display, pass a clear image as the secondary image
