@@ -406,25 +406,6 @@ class Screen:
 
 
 
-# from waveshare_epd import epd2in7
-
-# d = epd2in7.EPD()
-
-# d.init()
-
-# d.Clear(0xFF)
-
-# q = inspect.getfullargspec(d.Clear)
-
-# c_a = {"color": 0xFF}
-
-# c_a
-
-
-
-
-
-
 def main():
     # set your screent type here
     try:
@@ -489,49 +470,7 @@ def main():
 
 
 
-
-
-
-
-
-
-
 if __name__ == '__main__':
     e= main()
-
-
-
-
-
-
-e.init()
-
-
-
-
-
-
-e.initEPD()
-
-
-
-
-
-
-e.clearScreen()
-
-
-
-
-
-
-e.clearEPD()
-
-
-
-
-
-
-
 
 
