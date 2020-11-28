@@ -186,6 +186,7 @@ class Screen:
             resolution (tuple): resolution of screen
             epd (WaveShare EPD object)
             buffer_no_image (blank image to support writing to 3 color displays)
+            clear_args(dict) kwargs dict containing appropriate clear screen arguments
             
         Examples:
         * Create a screen object:
@@ -250,7 +251,14 @@ class Screen:
         self.resolution = resolution
         self.image = self.clearScreen()
         self.buffer_no_image = self._epd.getbuffer(Image.new('L', self.resolution, 255))
-    
+        args = inspect.getfullargspec(self._epd.Clear)
+        
+        # handle screens that expect `color` and `mode` arguments
+        self.clear_args = {}
+        if 'color' in args.args:
+            self.clear_args['color'] = 0xFF
+        if 'mode' in args.args:
+            self.clear_args['mode'] = 0
     @property
     def rotation(self):
         return self._rotation
@@ -348,7 +356,7 @@ class Screen:
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         try:
-            self.epd.Clear();
+            self.epd.Clear(**self.clear_args);
         except Exception as e:
             logging.error(f'failed to clear epd: {e}')
         return True
@@ -398,11 +406,38 @@ class Screen:
 
 
 
+# from waveshare_epd import epd2in7
+
+# d = epd2in7.EPD()
+
+# d.init()
+
+# d.Clear(0xFF)
+
+# q = inspect.getfullargspec(d.Clear)
+
+# c_a = {"color": 0xFF}
+
+# c_a
+
+
+
+
+
+
 def main():
     # set your screent type here
-    from waveshare_epd import epd5in83 as my_epd
+    try:
+        import sys
+        from waveshare_epd import epd2in7 as my_epd
+    except FileNotFoundError as e:
+        logging.error(f''''Error loading waveshare_epd module: {e}
+        This is typically due to SPI not being enabled, or the current user is 
+        not a member of the SPI group.
+        "$ sudo raspi-config nonint get_spi" will return 0 if SPI is enabled
+        Exiting...''')
+        return
     import Layout
-    import sys
     
     sys.path.append('../')
     
@@ -445,7 +480,16 @@ def main():
         s.writeEPD(l.concat())
         print('refresh screen -- screen should flash and be wiped')
         s.initEPD()
-        s.writeEPD(s.clearScreen())
+#         s.writeEPD(s.clearScreen())
+        s.clearEPD()
+    return s
+
+
+
+
+
+
+
 
 
 
@@ -453,7 +497,35 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    e= main()
+
+
+
+
+
+
+e.init()
+
+
+
+
+
+
+e.initEPD()
+
+
+
+
+
+
+e.clearScreen()
+
+
+
+
+
+
+e.clearEPD()
 
 
 
