@@ -221,12 +221,14 @@ class Screen:
                 self.resolution = resolution
             else:
                 raise TypeError('resolution must be a list-like object with a length of 2')
+                
+                
+        self.rotation = rotation
 
         if epd:
             self.epd = epd
             self.image = self.clearScreen()
             
-        self.rotation = rotation
         
         self.update = Update()
 
@@ -374,7 +376,11 @@ class Screen:
         epd = self.epd
         # rotate the image as needed
         if self.rotation == 180 or self.rotation == -90:
-            image = image.rotate(180)
+            if image:
+                try:
+                    image = image.rotate(180)
+                except AttributeError as e:
+                    logging.info(f'image is unset, cannot rotate, skipping')
     
         
         if not self.epd:
