@@ -174,20 +174,25 @@ class Update:
 
 
 class Screen:
-    """Class for interfacting with WaveShare EPD screens.
+    '''Class for interfacing with WaveShare EPD Screens
     
-    `Screen` creates an object that provides methods for assembling images
-    and updating a WaveShare EPD."""
+    `Screen` creates an object that provides methods for writing images
+    and updating a WaveShare EPD.
+    '''
+    
+    def __init__(self, epd=None, rotation=0):
+        '''constructor for Screen class
         
-    def __init__(self, resolution=None, elements=None, epd=None, rotation=0):
-        """Constructor for Screen class.
-                    
         Properties:
-            resolution (tuple): resolution of screen
-            epd (WaveShare EPD object)
-            buffer_no_image (blank image to support writing to 3 color displays)
-            clear_args(dict) kwargs dict containing appropriate clear screen arguments
-            
+            resolution(`tuple` of `int`): resolution of screen (defaults to landscape orientation)
+            blank_image(`Pil` Image): white image
+        
+
+        
+        Args:
+            epd(`waveshare EPD class`): imported waveshare epd class
+            rotation(`int`): 0, 90, -90, 180 rotation of screen
+
         Examples:
         * Create a screen object:
             ```
@@ -210,63 +215,53 @@ class Screen:
             # create a composite imate from all the blocks
             l.concat()
             # init and write the composite to the EPD
-            s.initEPD()
             s.writeEPD(l.image)
-            ```
-            """
-        logging.info('Screen created')
         
-        if resolution:
-            if isinstance(resolution, (list, tuple)):
-                self.resolution = resolution
-            else:
-                raise TypeError('resolution must be a list-like object with a length of 2')
-                
-                
+        '''
+        self.epd = epd
         self.rotation = rotation
-
-        if epd:
-            self.epd = epd
-            self.image = self.clearScreen()
-            
-        
         self.update = Update()
-
+        
+    
     @property
     def epd(self):
-        '''epd type 
-        
-        Sets properties:
-            resolution: epd width and height (defaults to landscape)
-            image: empty `PIL.Image`
-            buffer_no_image: empty `epd.getbuffer(Image)` to support colored screens that require an additional image'''
+        '''epd type'''
         return self._epd
     
     @epd.setter
     def epd(self, epd):
-        ''''''
-        self._epd = epd.EPD()
-        # set resolution for screen
-        resolution = [epd.EPD_HEIGHT, epd.EPD_WIDTH]
-        # sort to put longest dimension first for landscape layout
-        resolution.sort(reverse=True)
-        self.resolution = resolution
-        self.image = self.clearScreen()
-        self.buffer_no_image = self._epd.getbuffer(Image.new('L', self.resolution, 255))
-        args = inspect.getfullargspec(self._epd.Clear)
-        
-        # handle screens that expect `color` and `mode` arguments
-        self.clear_args = {}
-        if 'color' in args.args:
-            self.clear_args['color'] = 0xFF
-        if 'mode' in args.args:
-            self.clear_args['mode'] = 0
-    @property
+        if epd:
+            self._epd = epd.EPD()
+            resolution = [epd.EPD_HEIGHT, epd.EPD_WIDTH]
+            resolution.sort(reverse=True)
+            self.resolution = resolution
+            # set a blank image as default
+            self.image = Image.new('L', self.resolution, 255)
+            # create an empty buffer for using with two color screens
+            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
+            
+            # set kwargs for screens that expect `color` and `mode` arguments
+            clear_args_spec = inspect.getfullargspec(self._epd.Clear)
+            self.clear_args = {}
+            if 'color' in clear_args_spec.args:
+                self.clear_args['color'] = 0xFF
+            if 'mode' in clear_args_spec.args:
+                self.clear_args['mode'] = 0
+                
+            display_args_spec = inspect.getfullargspec(self._epd.display)
+            if len(display_args_spec.args) > 2:
+                self._one_bit_display = False
+            else:
+                self._one_bit_display = True
+        else: 
+            self._epd = None
+            self.resolution = (1, 1)
+
+    @property 
     def rotation(self):
         return self._rotation
     
     @rotation.setter
-    @strict_enforce(int)
     def rotation(self, rotation):
         '''
         set the display rotation
@@ -289,122 +284,88 @@ class Screen:
             # set resolution
             self.resolution = resolution
             # set a new clearscreen image
-            self.image = self.clearScreen()
-            self.buffer_no_image = self.epd.getbuffer(Image.new('L', self.resolution, 255))
+            self.image = Image.new('L', self.resolution, 255)
+            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
     
-    def clearScreen(self):
-        '''Sets a clean base image for building screen layout.
+    def blank_image(self):
+        return Image.new('L', self.resolution, 255)
         
-        Returns:
-            :obj:PIL.Image
-        '''
-        image = Image.new('L', self.resolution, 255)
-        return image
-    
-#     def concat(self, elements=None):
-#         '''Concatenate multiple image objects into a single composite image
-        
-#         Args:
-#             elements (:obj:`list` of :obj:`ImageBlock` or `TextBlock`) - if none are
-#                 provided, use the existing elements
-                
-#         Sets:
-#             image (:obj:`PIL.Image`): concatination of all image members of `elements` 
-#             last_updated (:obj: `Update`): registeres the time the images were updated
-            
-#         Returns:
-#             image (:obj:`PIL.Image`)
-#         '''
-#         self.image = self.clearScreen()
-#         # register that the object has been modified
-#         self.update.update = True
-#         if elements:
-#             elements = elements
-#         else:
-#             elements = self.elements
-            
-#         for e in elements:
-#             logging.debug(f'pasting image at: {e.abs_coordinates}')
-#             self.image.paste(e.image,  e.abs_coordinates)
-
-#             logging.debug(f'pasting image at: {e.img_coordinates}')
-#             self.image.paste(e.image,  e.img_coordinates)
-#         return(self.image)
-    
     def initEPD(self):
-        '''Initialize the connection with the EPD Hat.
-        
-        Returns:
-            bool: True if successful
-        '''
+        '''init the EPD for writing'''
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         try:
             self.epd.init()
         except Exception as e:
             logging.error(f'failed to init epd: {e}')
-            
-        logging.info(f'{self.epd} initialized')
+        else:
+            logging.info(f'{self.epd} initialized')
         return True
     
     def clearEPD(self):
-        '''Clear the EPD screen.
+        '''clear the epd screen
         
-        Raises:
-            UnboundLocalError: no EPD has been intialized
+        inits the screen and then sets it to blank (all white)'''
         
-        Returns:
-            bool: True if successful'''
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         try:
-            self.epd.Clear(**self.clear_args);
+            self.initEPD()
+            self.epd.Clear(**self.clear_args)
         except Exception as e:
             logging.error(f'failed to clear epd: {e}')
+            return False
         return True
     
-    def writeEPD(self, image, sleep=True):
-        '''Write an image to the EPD.
+    def writeEPD(self, image=None, sleep=True):
+        '''write an image to EPD
         
         Args:
-            image (:obj:`PIL.Image`): write a PIL image to the screen 
-            sleep (bool): default - True; put the EPD to low power mode when done writing
-            
-        Returns:
-            bool: True if successful
-        '''
-        epd = self.epd
-        # rotate the image as needed
+        image(Pil image or Image file): image to display
+        sleep(bool): put the display to sleep after writing (default True)'''
+        if not self.epd:
+            raise UnboundLocalError('no epd object has been assigned')
+        
+        ret_val = False
+        
         if self.rotation == 180 or self.rotation == -90:
             if image:
                 try:
                     image = image.rotate(180)
                 except AttributeError as e:
                     logging.info(f'image is unset, cannot rotate, skipping')
-    
         
-        if not self.epd:
-            raise UnboundLocalError('no epd object has been assigned')
-        image_buffer = epd.getbuffer(image)
-        try:
-            logging.debug('writing to epd')
-#             epd.display(epd.getbuffer(self.image))
-            epd.display(image_buffer)
-            self.update.update()
-        # if this is a 3 color display, pass a clear image as the secondary image
-        except TypeError as e:
-            args = inspect.getfullargspec(epd.display)
-            if len(args.args) > 2:
-                # send a 1x1 pixel image to the colored layer
-                epd.display(image_buffer, self.buffer_no_image)
-                self.update.update()
-        except Exception as e:
-            logging.error(f'failed to write to epd: {e}')
-            return False
-        finally:
-            if sleep:
-                epd.sleep()
-        return True
+        if image:
+            try:
+                image_buffer = self.epd.getbuffer(image)
+            except AttributeError as e:
+                logging.warning(f'{e} - this does not appear to be an image object')
+                logging.warning('setting image to blank image')
+                image_buffer = self.epd.getbuffer(self.blank_image())
+            
+        
+            try:
+                logging.debug('writing to epd')
+                if self.initEPD():
+                    if self._one_bit_display:
+                        self.epd.display(image_buffer)
+                    else:
+                        # send a blank image for the colored layer
+                        self.epd.display(image_buffer, self.buffer_no_image)
+                    self.update.update()
+                    ret_val = True
+            except Exception as e:
+                logging.error(f'{e} - failed to write to epd')
+            finally:
+                if sleep:
+                    self.epd.sleep()
+                    
+        else:
+            logging.warning('failed to init epd, could not write')
+            
+        return ret_val
+            
+            
         
 
 
@@ -416,7 +377,7 @@ def main():
     # set your screent type here
     try:
         import sys
-        from waveshare_epd import epd2in7 as my_epd
+        from waveshare_epd import epd5in83 as my_epd
     except FileNotFoundError as e:
         logging.error(f''''Error loading waveshare_epd module: {e}
         This is typically due to SPI not being enabled, or the current user is 
@@ -463,12 +424,12 @@ def main():
         l.layout = myLayout
         l.update_contents({'title': 'spam, spam, spam, spam & ham', 'artist': 'monty python'})
         print('print some text on the display')
-        s.initEPD()
-        s.writeEPD(l.concat())
-        print('refresh screen -- screen should flash and be wiped')
-        s.initEPD()
+#         s.initEPD()
+        s.writeEPD(l.concat(), sleep=False)
+        print('refresh screen -- screen should flash and be refreshed')
+#         s.initEPD()
 #         s.writeEPD(s.clearScreen())
-        s.clearEPD()
+    s.clearEPD()
     return s
 
 
@@ -478,5 +439,247 @@ def main():
 
 if __name__ == '__main__':
     e= main()
+
+
+
+
+
+
+# class xScreen:
+#     """Class for interfacting with WaveShare EPD screens.
+    
+#     `Screen` creates an object that provides methods for assembling images
+#     and updating a WaveShare EPD."""
+        
+#     def __init__(self, resolution=None, elements=None, epd=None, rotation=0):
+#         """Constructor for Screen class.
+                    
+#         Properties:
+#             resolution (tuple): resolution of screen
+#             epd (WaveShare EPD object)
+#             buffer_no_image (blank image to support writing to 3 color displays)
+#             clear_args(dict) kwargs dict containing appropriate clear screen arguments
+            
+#         Examples:
+#         * Create a screen object:
+#             ```
+#             import waveshare_epd
+#             s = Screen()
+#             s.epd = wavehsare_epd.epd5in83
+#             ```
+#         * Create and write a composite image from a layout object
+#             - See `help(Layout)` for more information
+#             ```
+#             # create layout object using a predefined layout
+#             import Layout
+#             import layouts
+#             l = Layout(resolution=(s.epd.EPD_WIDTH, s.epd.EPD_HEIGHT), layout=layouts.splash)
+#             # update the layout information
+#             u = {'version': 'version 0.2.1', 'url': 'https://github.com/txoof/slimpi_epd', 'app_name': 'slimpi'}\
+#             l.update_contents(u)
+#             # update the screen object with the layout block values
+#             s.elements = l.blocks.values()
+#             # create a composite imate from all the blocks
+#             l.concat()
+#             # init and write the composite to the EPD
+#             s.initEPD()
+#             s.writeEPD(l.image)
+#             ```
+#             """
+#         logging.info('Screen created')
+        
+#         if resolution:
+#             if isinstance(resolution, (list, tuple)):
+#                 self.resolution = resolution
+#             else:
+#                 raise TypeError('resolution must be a list-like object with a length of 2')
+                
+                
+#         self.rotation = rotation
+
+#         if epd:
+#             self.epd = epd
+#             self.image = self.clearScreen()
+            
+        
+#         self.update = Update()
+
+#     @property
+#     def epd(self):
+#         '''epd type 
+        
+#         Sets properties:
+#             resolution: epd width and height (defaults to landscape)
+#             image: empty `PIL.Image`
+#             buffer_no_image: empty `epd.getbuffer(Image)` to support colored screens that require an additional image'''
+#         return self._epd
+    
+#     @epd.setter
+#     def epd(self, epd):
+#         ''''''
+#         self._epd = epd.EPD()
+#         # set resolution for screen
+#         resolution = [epd.EPD_HEIGHT, epd.EPD_WIDTH]
+#         # sort to put longest dimension first for landscape layout
+#         resolution.sort(reverse=True)
+#         self.resolution = resolution
+#         self.image = self.clearScreen()
+#         self.buffer_no_image = self._epd.getbuffer(Image.new('L', self.resolution, 255))
+#         args = inspect.getfullargspec(self._epd.Clear)
+        
+#         # handle screens that expect `color` and `mode` arguments
+#         self.clear_args = {}
+#         if 'color' in args.args:
+#             self.clear_args['color'] = 0xFF
+#         if 'mode' in args.args:
+#             self.clear_args['mode'] = 0
+#     @property
+#     def rotation(self):
+#         return self._rotation
+    
+#     @rotation.setter
+#     @strict_enforce(int)
+#     def rotation(self, rotation):
+#         '''
+#         set the display rotation
+#         Sets or resets properties:
+#             rotation(`int`): [0, 90, -90, 180]
+#             resolution: sets resolution to match rotation (width/height)
+#             image: empty `PIL.Image`
+#             buffer_no_image: empty `epd.getbuffer(Image)` to support colored screens that require an additional image 
+#         '''
+            
+#         if rotation not in [0, 90, -90, 180]:
+#             raise ValueError('value must be type `int` and [0, 90, -90, 180]')
+#         self._rotation = rotation
+#         logging.debug(f'Screen rotation set to: {self._rotation}')
+#         if rotation == 90 or rotation == -90:
+                
+#             resolution = self.resolution
+#             # set short dimension first
+#             resolution.sort()
+#             # set resolution
+#             self.resolution = resolution
+#             # set a new clearscreen image
+#             self.image = self.clearScreen()
+#             self.buffer_no_image = self.epd.getbuffer(Image.new('L', self.resolution, 255))
+    
+#     def clearScreen(self):
+#         '''Sets a clean base image for building screen layout.
+        
+#         Returns:
+#             :obj:PIL.Image
+#         '''
+#         image = Image.new('L', self.resolution, 255)
+#         return image
+    
+# #     def concat(self, elements=None):
+# #         '''Concatenate multiple image objects into a single composite image
+        
+# #         Args:
+# #             elements (:obj:`list` of :obj:`ImageBlock` or `TextBlock`) - if none are
+# #                 provided, use the existing elements
+                
+# #         Sets:
+# #             image (:obj:`PIL.Image`): concatination of all image members of `elements` 
+# #             last_updated (:obj: `Update`): registeres the time the images were updated
+            
+# #         Returns:
+# #             image (:obj:`PIL.Image`)
+# #         '''
+# #         self.image = self.clearScreen()
+# #         # register that the object has been modified
+# #         self.update.update = True
+# #         if elements:
+# #             elements = elements
+# #         else:
+# #             elements = self.elements
+            
+# #         for e in elements:
+# #             logging.debug(f'pasting image at: {e.abs_coordinates}')
+# #             self.image.paste(e.image,  e.abs_coordinates)
+
+# #             logging.debug(f'pasting image at: {e.img_coordinates}')
+# #             self.image.paste(e.image,  e.img_coordinates)
+# #         return(self.image)
+    
+#     def initEPD(self):
+#         '''Initialize the connection with the EPD Hat.
+        
+#         Returns:
+#             bool: True if successful
+#         '''
+#         if not self.epd:
+#             raise UnboundLocalError('no epd object has been assigned')
+#         try:
+#             self.epd.init()
+#         except Exception as e:
+#             logging.error(f'failed to init epd: {e}')
+            
+#         logging.info(f'{self.epd} initialized')
+#         return True
+    
+#     def clearEPD(self):
+#         '''Clear the EPD screen.
+        
+#         Raises:
+#             UnboundLocalError: no EPD has been intialized
+        
+#         Returns:
+#             bool: True if successful'''
+#         if not self.epd:
+#             raise UnboundLocalError('no epd object has been assigned')
+#         try:
+#             self.epd.Clear(**self.clear_args);
+#         except Exception as e:
+#             logging.error(f'failed to clear epd: {e}')
+#         return True
+    
+#     def writeEPD(self, image, sleep=True):
+#         '''Write an image to the EPD.
+        
+#         Args:
+#             image (:obj:`PIL.Image`): write a PIL image to the screen 
+#             sleep (bool): default - True; put the EPD to low power mode when done writing
+            
+#         Returns:
+#             bool: True if successful
+#         '''
+#         epd = self.epd
+#         # rotate the image as needed
+#         if self.rotation == 180 or self.rotation == -90:
+#             if image:
+#                 try:
+#                     image = image.rotate(180)
+#                 except AttributeError as e:
+#                     logging.info(f'image is unset, cannot rotate, skipping')
+    
+        
+#         if not self.epd:
+#             raise UnboundLocalError('no epd object has been assigned')
+#         try:
+#             image_buffer = epd.getbuffer(image)
+#         except AttributeError as e:
+            
+#         try:
+#             logging.debug('writing to epd')
+# #             epd.display(epd.getbuffer(self.image))
+#             epd.display(image_buffer)
+#             self.update.update()
+#         # if this is a 3 color display, pass a clear image as the secondary image
+#         except TypeError as e:
+#             args = inspect.getfullargspec(epd.display)
+#             if len(args.args) > 2:
+#                 # send a 1x1 pixel image to the colored layer
+#                 epd.display(image_buffer, self.buffer_no_image)
+#                 self.update.update()
+#         except Exception as e:
+#             logging.error(f'failed to write to epd: {e}')
+#             return False
+#         finally:
+#             if sleep:
+#                 epd.sleep()
+#         return True
+        
 
 
