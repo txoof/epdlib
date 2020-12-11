@@ -323,6 +323,7 @@ class Screen:
         Args:
         image(Pil image or Image file): image to display
         sleep(bool): put the display to sleep after writing (default True)'''
+        logging.debug('writing to EPD')
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
         
@@ -354,6 +355,9 @@ class Screen:
                         self.epd.display(image_buffer, self.buffer_no_image)
                     self.update.update()
                     ret_val = True
+                else:
+                    logging.warning('initEPD failed')
+                    ret_val = False
             except Exception as e:
                 logging.error(f'{e} - failed to write to epd')
             finally:
@@ -361,7 +365,7 @@ class Screen:
                     self.epd.sleep()
                     
         else:
-            logging.warning('failed to init epd, could not write')
+            logging.warning('no image provided -- no epd write attempted')
             
         return ret_val
             
