@@ -1,25 +1,9 @@
-#!/usr/bin/env python
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 
-# In[15]:
 
 
-#get_ipython().run_line_magic('alias', 'nbconvert nbconvert ./Block.ipynb')
-
-
-
-
-# In[16]:
-
-
-#get_ipython().run_line_magic('nbconvert', '')
-
-
-
-
-# In[3]:
 
 
 import logging
@@ -36,7 +20,6 @@ except ImportError as e:
 
 
 
-# In[4]:
 
 
 # logger = logging.getLogger(__name__)
@@ -45,29 +28,27 @@ except ImportError as e:
 
 
 
-# In[5]:
 
 
-def check_num(func):
-    """decorator function wrapper"""
-    def func_wrapper(self, d, *args, **kwargs):
-        """Check for positive integers
-        Params:
-            d(int): integer to check
+# def check_num(func):
+#     """decorator function wrapper"""
+#     def func_wrapper(self, d, *args, **kwargs):
+#         """Check for positive integers
+#         Params:
+#             d(int): integer to check
         
-        Raises:
-            ValueError - values that are negative, not integer"""
-        if not isinstance(d, int):
-            raise ValueError (f'{d} is not an integer')
-        if d < 0:
-            raise ValueError (f'{d} < 0 {func} only accepts values >= 0')
-        return func(self, d, *args, **kwargs)
-    return func_wrapper
+#         Raises:
+#             ValueError - values that are negative, not integer"""
+#         if not isinstance(d, int):
+#             raise ValueError (f'{d} is not an integer')
+#         if d < 0:
+#             raise ValueError (f'{d} < 0 {func} only accepts values >= 0')
+#         return func(self, d, *args, **kwargs)
+#     return func_wrapper
 
 
 
 
-# In[6]:
 
 
 def strict_enforce(*types):
@@ -93,7 +74,6 @@ def strict_enforce(*types):
 
 
 
-# In[7]:
 
 
 def permissive_enforce(*types):
@@ -122,59 +102,160 @@ def permissive_enforce(*types):
 
 
 
-# In[8]:
+
+
+class BlockError(Exception):
+    '''General error class for Blocks'''
+    pass
+    
+
+
+
+
 
 
 class Block:
-    
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
-                abs_coordinates=(0, 0), padding=0):
-        """initialize the Block object
+                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1'):
+        '''Create a Block object
         
-        Args:
-            area (:obj:`tuple` of :obj:`int`): x, y integer dimensions of 
-                maximum area in pixles
-            hcenter (boolean, optional): True - horizontal-align image within the area, 
-                False - left-align image                
-            vcenter (boolean, optional): True - vertical-align image within the area,
-                False - top-align image        
-            rand (boolean, optional): True - ignore vcenter, hcenter choose random position for
-                image within area
-            padding(int) number of pixles to pad around edge of block
-            abs_coordinates (:obj:`tuple` of `int`, optional): x, y integer coordinates of image area
+        Parent class for other types of blocks
+        
+        Args [default value]: 
+            area(list/tuple): x and y integer values for dimensions of block area
+            hcenter(bool): True: horizontally center contents [False]
+            vcenter(bool): True: vertically center contents [False]
+            rand(bool): True: randomly place contents in area [False]
+            inverse(bool): True: invert pixel values [False]
+            abs_coordinates(list/tuple): x, y integer coordinates of this block area
                 within a larger image 
-            inverse (boolean, optional): True - invert black and white from default of black text
-            on white background
+            padding(int): number of pixels to pad around edge of contents [0]
+            scale(bool): True: scale the contents to fit inside the padded area [False]
+            fill(int): 0-255 8 bit value for fill color for text/images [0 (black)]
+            bkground(int): 0-255 8 bit value for background color [255 (white)]\
+            mode(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
             
         Properties:
-            fill (int): fill color integer of 0 (black) or 255 (white)
-            bkground (int): bkground integer of 0 (black) or 255 (white)
-            img_coordinates(:obj:`tuple` of :obj:`int`): coordinates of image within the block 
-                (legacy, no longer used)
-            image (None): None in base class 
-            dimensions (:obj:`tuple` of :obj:`int`): dimensions of image in pixels"""        
-        
-        # set default backround to white (255)
-        self.bkground = 255
-        # set default fill to black (0)
-        self.fill = 0
+            image: None - overridden in child classes'''
+        self.mode = mode
+        self.bkground = bkground
+        self.fill = fill
         self.area = area
+        self.padding = padding
         self.hcenter = hcenter
         self.vcenter = vcenter
         self.rand = rand
         self.inverse = inverse
         self.abs_coordinates = abs_coordinates
-        self.padding = padding
+        image = None
+        logging.debug('creating Block')
+        if self.fill == self.bkground:
+            logging.warning('fill and background are identical, this will likely result in no visible image')    
+
+    @property
+    def mode(self):
+        '''string: PIL image color mode "1": 1 bit, "L": 8 bit'''
+        return self._mode
+    
+    @mode.setter
+    @strict_enforce(str)
+    def mode(self, mode):
+        if mode not in ['1', 'L']:
+            raise ValueError(f'invalid mode, valid modes are "1": 1 bit, "L": 8 bit: {mode}')
+        self._mode = mode
             
-        # set default image coordinates 
-        self.img_coordinates = None
+    @property
+    def bkground(self):
+        '''int: background color: (8 bit) 0-255
         
-        # set dimensions of image portion of block 
-        self.dimensions = (0, 0)
+        Raises:
+            ValueError (non positive integer)'''
+        return self._bkground
+    
+    @bkground.setter
+    @strict_enforce(int)
+    def bkground(self, bkground):
+        if  bkground < 0 or bkground > 255:
+            raise ValueError(f'bkground must be between 0:255: {bkground}')
+        
+        # use this as the "original" bkground value
+        if not hasattr(self, 'bkground'):
+            self._set_bkground = bkground
+        
+        self._bkground = bkground
     
     @property
+    def fill(self):
+        '''int: fill color (foreground text, lines, etc.): (8 bit) 0-255
+        
+        Raises:
+            ValueError (non po)'''
+        return self._fill
+    
+    @fill.setter
+    @strict_enforce(int)
+    def fill(self, fill):
+        if fill < 0 or fill > 255:
+            raise ValueError(f'fill must be between 0:255 {bkground}')
+        # use this as the "original" fill value
+        if not hasattr(self, 'fill'):
+            self._set_fill = fill    
+        self._fill = fill
+    
+    @property
+    def area(self):
+        '''tuple/list of int: total area of block: tuple/list of integer
+        
+        Raises:
+            ValueError (non integers)'''
+        return self._area
+    
+    @area.setter
+    @strict_enforce((tuple, list))
+    def area(self, area):
+        if len(area) > 2:
+            raise ValueError(f'area should be a list-like object with length 2: {area}')
+        
+        for i in area:
+            if not isinstance(i, int) or i < 1:
+                raise ValueError(f'area must be integer values greater than 0: {area}')
+                
+        self._area = area
+                
+    
+    @property
+    def padding(self):
+        '''int: pixels to pad around left, right, top, bottom
+        
+        Raises:
+            ValueError(non integers)'''
+        return self._padding
+    
+    @padding.setter
+    @strict_enforce(int)
+    def padding(self, padding):
+        if padding < 0:
+            raise ValueError(f'padding value must be a positive integer: {padding}')
+        
+        for i in self.area:
+            if padding >= i/2:
+                logging.warning(f'padding value is greater >= 1/2 of area dimension {i}, no image will be displayed: {padding}')
+        
+        self._padding = padding
+        self.padded_area = [self.area[0]-2*self.padding, self.area[1]-2*self.padding]
+    
+#     @property
+#     def scale(self):
+#         return self._scale
+    
+#     @scale.setter
+#     @strict_enforce(bool)
+#     def scale(self, scale):
+#         self._scale = scale
+        
+    @property
     def hcenter(self):
-        """:obj:`bool`: horizontallly center contents of block"""        
+        '''bool: horizontally center when true'''
         return self._hcenter
     
     @hcenter.setter
@@ -184,7 +265,7 @@ class Block:
         
     @property
     def vcenter(self):
-        """:obj:`bool`: vertically center contents of block"""        
+        '''bool: vertically center when true'''
         return self._vcenter
     
     @vcenter.setter
@@ -194,7 +275,7 @@ class Block:
         
     @property
     def rand(self):
-        """:obj:`bool`: randomly position image portion of block within area"""
+        '''bool: randomly position when true (overrides hcenter, vcenter)'''
         return self._rand
     
     @rand.setter
@@ -204,91 +285,37 @@ class Block:
         
     @property
     def inverse(self):
-        """:obj:`boolean`: True - invert black and white pixles
-        
-        Sets properties:
-            fill (int): fill color (0: black, 255: white)
-            bkground (int): background color (0: black, 255: white)"""        
+        '''bool: swap fill and foreground colors, invert images'''
         return self._inverse
     
     @inverse.setter
     @strict_enforce(bool)
     def inverse(self, inverse):
-        self._inverse = inverse
-        # 0 = Black
-        # 255 = White 
         if inverse:
-            self.bkground = 0
-            self.fill = 255
+            self.fill = self._set_bkground
+            self.bkground = self._set_fill
         else:
-            self.bkground = 255
-            self.fill = 0
-        
-    @property
-    def area(self):
-        """:obj:`tuple` of :obj:`int`: area in pixles of imageblock
-        
-        Raises:
-            ValueError: if ints are not positive"""        
-        return self._area
+            self.bkground = self._set_bkground
+            self.fill = self._set_fill
+            
+        logging.debug(f'fill: {self.fill}, bkground: {self.bkground}')
+        self._inverse = inverse
     
-    @area.setter
+    @property
+    def abs_coordinates(self):
+        return self._abs_coordinates
+    
+    @abs_coordinates.setter
     @strict_enforce((tuple, list))
-    def area(self, area):
-        if self._coordcheck(area):
-            self._area = area
-        else:
-            raise ValueError(f'area must be a 2-tuple of positive int: {area}')
-    
-    @property
-    def padding(self):
-        """:obj:`int`: number of pixels to add around edge of block"""        
-        return self._padding
-    
-    @padding.setter
-    @strict_enforce(int)
-    def padding(self, padding):
-        self._padding = padding
-
-    def update(self, update=None):
-        """Update contents of object.
-        
-        Placeholder method intended to be overridden by child classes
-        
-        Args:
-            update (:obj:): data
-            
-        Returns:
-            bool: True upon success"""
-        return True
-        
-    def _coordcheck(self, coordinates):
-        """Check that coordinates are of type int and positive.
-
-        Args:
-            coordinates (:obj:`tuple` of :obj: `int`)
-            
-        Returns:
-            True if all members of list are ints
-            False for all other cases
-
-        Raises:
-            TypeError: if `coordinates` are not a list or tuple
-            TypeError: if `coordinates` elements are not an integer
-            ValueError: if `coordinates` are not >=0"""
-        for i, c in enumerate(coordinates):
-            if not isinstance(c, int):
-#                 raise TypeError(f'must be type(int): {c}')
-                return False
-            if c < 0:
-#                 raise ValueError(f'coordinates must be positive integers: {c}')
-                return False
-        return True
+    def abs_coordinates(self, abs_coordinates):
+        if len(abs_coordinates) > 2:
+            raise ValueError(f'area should be a list-like object with length 2: {abs_coordinates}')
+                
+        self._abs_coordinates = abs_coordinates
 
 
 
 
-# In[9]:
 
 
 class TextBlock(Block):
@@ -327,9 +354,9 @@ class TextBlock(Block):
     
     Overrides:
         image (:obj:`PIL.Image` or str): PIL image object or string path to image file
-        upate (method): update contents of ImageBlock"""        
-    def __init__(self, font, area, *args, text='NONE', font_size=0, max_lines=1, maxchar=None, 
-                 chardist=None, **kwargs):
+        upate (method): update contents of ImageBlock"""                    
+    def __init__(self, area, font, *args, text="NONE", font_size=0, 
+                 chardist=None, max_lines=1, maxchar=None, **kwargs):
         """Intializes TextBlock object
         
         Args:
@@ -345,50 +372,32 @@ class TextBlock(Block):
                 distributions in constants.py (default USA_CHARDIST)
             """        
         super().__init__(area, *args, **kwargs)
-        self.area = area
-        
-        logging.info('TextBlock created')
-#         if chardist:
-#             self._chardist = chardist
-#         else:
-#             self._chardist = constants.USA_CHARDIST
-        self.chardist = chardist
     
-        self.maxchar = maxchar
         self.font_size = font_size
+        self.chardist = chardist
+        self.maxchar = maxchar
+        
         self.font = font
-            
         self.max_lines = max_lines
-        
         self.text = text
-        
-    @property
-    def chardist(self):
-        return self._chardist
     
-    @chardist.setter
-    def chardist(self, chardist):
-        if not chardist:
-            self._chardist = constants.USA_CHARDIST
-        else:
-            self._chardist = getattr(constants, chardist)
- 
     @property
     def font_size(self):
-        """:obj:int: Size of font in points"""        
-        return self._font_size
+        '''int: font size in pixels'''
+        return self._font_size  
     
     @font_size.setter
     @strict_enforce(int)
     def font_size(self, font_size):
-        if font_size > 0:
-            self._font_size = font_size
-        else:
-#             raise ValueError(f'font_size must be a positive int: {font_size}')
-            self._font_size = int(self.area[0]/40)
-            logging.debug(f'bad/no font size provided; setting font_size to usable size for given area: {self.font_size}')
-            
+        if font_size < 0:
+            raise ValueError(f'font_size must be integer >= 0')
         
+        if font_size == 0:
+            font_size = int(self.area[0]/40)
+            logging.warning('no font size set, using {font_size}')
+            
+        self._font_size = font_size
+
     @property
     def font(self):
         """:obj:ImageFont.truetype: Path to TTF font file
@@ -402,20 +411,47 @@ class TextBlock(Block):
     
     @font.setter
     @strict_enforce((Path, str))
-    def font(self, font):
+    def font(self, font):   
+        old_font = None
+        logging.debug(f'setting old_font = {old_font}')
+        if hasattr(self, '_font'):
+            old_font = self.font
+            logging.debug(f'old_font now = {old_font}')
+
+        self._font = ImageFont.truetype(str(Path(font).resolve()), size=self.font_size)
+        # trigger a calculation of maxchar if not already set
+        if not self.maxchar or (self.font != old_font):
+            self.maxchar = self._calc_maxchar()          
+        
+    @property
+    def chardist(self):
+        '''`dictionary` character distribution dictionary
+        
+        see method `print_chardist` for included character distributions'''
+        return self._chardist
+    
+    @chardist.setter
+    def chardist(self, chardist):
+        if not chardist:
+            chardist = "USA_CHARDIST"
             
-        if font:
-            old_font = None
-            logging.debug(f'setting old_font = {old_font}')
-            if hasattr(self, '_font'):
-                old_font = self.font
-                logging.debug(f'old_font now = {old_font}')
+        self._chardist = getattr(constants, chardist)
+        
+    @property
+    def maxchar(self):
+        '''`int`: maximum number of characters to render per line (used for calculating word-wrapping)'''
+        return self._maxchar
+    
+    @maxchar.setter
+    def maxchar(self, maxchar):
+        if not maxchar:
+            maxchar = None
+        elif maxchar < 1:
+            raise ValueError(f'maxchar must be integer > 0: {maxchar}')
             
-            self._font = ImageFont.truetype(str(Path(font).resolve()), size=self.font_size)
-            # trigger a calculation of maxchar if not already set
-            if not self.maxchar or (self.font != old_font):
-                self.maxchar = self._calc_maxchar()
-                            
+            
+        self._maxchar = maxchar
+
     @property
     def max_lines(self):
         """:obj:int maximum number of lines to use when word-wrapping"""
@@ -424,21 +460,10 @@ class TextBlock(Block):
     @max_lines.setter
     @strict_enforce(int)
     def max_lines(self, max_lines):
-        self._max_lines = max_lines
+        if max_lines < 1:
+            raise ValueError(f'max lines must be integer > 0: {max_lines}')
+        self._max_lines = max_lines        
         
-    @property
-    def maxchar(self):
-        """:obj:int maximum number of characters on one line"""
-        return self._maxchar
-    
-    @maxchar.setter
-    def maxchar(self, maxchar):
-        if maxchar:
-            self._maxchar = maxchar
-        else: 
-            logging.debug('no maxchar set')
-            self._maxchar = None
-
     @property
     def text(self):
         """:obj:str text string to format"""
@@ -447,9 +472,26 @@ class TextBlock(Block):
     @text.setter
     @permissive_enforce(str)
     def text(self, text):
-        self._text = text
+        if text:
+            self._text = text
         self.text_formatted = self._text_formatter()
         self.image = self._text2image()
+
+    def update(self, update=None):
+        """Update image data including coordinates (overrides base class)
+        
+        Args:
+            update (str): text to format and use
+            
+        Returns:
+            :obj:bool - true for successful update"""
+        if update:
+            try:
+                self.text = update
+            except Exception as e:
+                logging.error(f'failed to update: {e}')
+                return False
+            return True        
 
     def _calc_maxchar(self):
         """calculate the maximum number of characters that can fit within the specified area
@@ -476,14 +518,8 @@ class TextBlock(Block):
         self._maxchar = maxchar
         logging.debug(f'maximum characters per line: {maxchar}')
         
-        return maxchar
- 
-            
-    
-    def _update_maxchar(self):
-        """force an update of maxchar property"""
-        self.max_char = False
-    
+        return maxchar        
+
     def _text_formatter(self):
         """format text using word-wrap strategies. 
         
@@ -500,97 +536,79 @@ class TextBlock(Block):
         wrapper = textwrap.TextWrapper(width=self.maxchar, max_lines=self.max_lines, placeholder='…')
         formatted = wrapper.wrap(self.text)
         logging.debug(f'formatted list:\n {formatted}')
-        return(formatted)       
+        return(formatted)
     
     def _text2image(self):
         """Converts text to grayscale image using
         
-        Sets:
-            dimension (:obj:`tuple` of :obj:`int`): dimensions in pixles of image
-        
         Returns:
             :obj:`PIL.Image`: image of formatted text"""
-        logging.debug(f'creating blank image area: {self.area} with inverse: {self.inverse}')
         
-        # create image for holding text
-        text_image = Image.new('1', self.area, self.bkground)
+        # max area for rendering text
+        text_image = Image.new(mode=self.mode, size=self.area, color=self.bkground)
         # get a drawing context
         draw = ImageDraw.Draw(text_image)
         
-        # create an image to paste the text_image into
-        image = Image.new('1', self.area, self.bkground)
+        # max area for block:
+        image = Image.new(mode=self.mode, size=self.area, color=self.bkground)
         
-        # set the dimensions for the text portion of the block
-        y_total = 0
+        paste_x, paste_y = [self.padding, self.padding]
+        
+        # maxiumum x width of any line
         x_max = 0
-        for line in self.text_formatted:
-            x, y = self.font.getsize(line)
-            logging.debug(f'line size: {x}, {y}')
-            y_total += y # accumulate height
-            if x > x_max:
-                x_max = x # find the longest line
-                logging.debug(f'max x dim so far: {x_max}')
-                
-        # dimensions of text portion for formatting later
-        self.dimensions = (x_max, y_total)
-        logging.debug(f'dimensions of text portion of image: {self.dimensions}')     
-        
-        # layout the text with hcentering
+        # accumulate total Y  value
         y_total = 0
+        line_dimensions = []
         for line in self.text_formatted:
-            x_pos = 0
             x, y = self.font.getsize(line)
-            if self.hcenter:
-                logging.debug(f'hcenter line: {line}')
-                x_pos = round(self.dimensions[0]/2-x/2)
-            logging.debug(f'drawing text at {x_pos}, {y_total}')
-            logging.debug(f'with dimensions: {x}, {y}')
-            draw.text((x_pos, y_total), line, font=self.font, fill=self.fill)
+            if x > x_max:
+                x_max = x
             y_total += y
-            
-        # produce the final image
-        # Start in upper left corner
-        x_pos = 0
-        y_pos = 0
-
-        if self.rand:
-            logging.debug('randomly positioning text within area')
-            x_range = self.area[0] - self.dimensions[0]
-            y_range = self.area[1] - self.dimensions[1]
-            
-
-            x_pos = randrange(x_range)
-
-            y_pos = randrange(y_range)
-
-        else: # random and h/v center are mutually exclusive            
-            if self.hcenter:
-                x_pos = round(self.area[0]/2 - self.dimensions[0]/2)
-            if self.vcenter:
-                y_pos = round(self.area[1]/2 - self.dimensions[1]/2)
-    
-    
-        logging.debug(f'pasting text portion at coordinates: {x_pos}, {y_pos}')
-        image.paste(text_image, (x_pos, y_pos))
-            
-                
-        return image
-    
-    def update(self, update=None):
-        """Update image data including coordinates (overrides base class)
+            line_dimensions.append({'text': line, 'dim': (x, y)})
         
-        Args:
-            update (str): text to format and use
+        line_x = 0
+        line_y = 0
+        # draw each line of text into text image
+        for line in line_dimensions:
             
-        Returns:
-            :obj:bool - true for successful update"""
-        if update:
-            try:
-                self.text = update
-            except Exception as e:
-                logging.error(f'failed to update: {e}')
-                return False
-            return True
+            # handle h-centering text
+            if self.hcenter:
+                line_x = int((self.area[0] - line['dim'][0])/2)
+            draw.text((line_x, line_y), line['text'], font=self.font, fill=self.fill)
+            line_y += line['dim'][1]
+        
+        
+        # calculate the ratio resized ratio for positioning math
+        x_ratio = 1
+        y_ratio = 1
+        if self.padding > 0:
+            text_image.thumbnail(size=self.padded_area, resample=Image.LANCZOS)
+            x_ratio = text_image.width/self.area[0]
+            y_ratio = text_image.height/self.area[1]
+            logging.debug('scaling image to fit in padded area')
+            
+        # handle v-centering text
+        if self.vcenter:
+            paste_y = int((self.area[1] - y_total*y_ratio)/2)
+            logging.debug(f'paste_y: {paste_y}')
+            
+        if self.rand:
+            if self.hcenter:
+                logging.warning('horizontally centered text may not always layout correctly when using random placement')
+            if self.vcenter:
+                logging.warning('`rand` overrides vcenter')
+            x_range = int(self.area[0] - x_max - self.padding)
+            y_range = int(self.area[1] - y_total)
+            
+            
+            # choose random placement
+            paste_x = randrange(self.padding, x_range-self.padding, 1)
+            paste_y = randrange(self.padding, y_range-self.padding, 1)            
+        
+        # combine images
+        image.paste(text_image, [paste_x, paste_y])
+        
+        return image
         
     def print_chardist(self, chardist=None):
         """Print supported character distributions
@@ -610,98 +628,134 @@ class TextBlock(Block):
             
             for i in char_dict:
                 print(f'{i}:     {char_dict[i]:.5f}')
-                
+        
 
 
 
 
-# In[ ]:
+
+
+# t = TextBlock(area=(800, 600), font='../fonts/Font.ttc', font_size=88, max_lines=3,
+#              padding=2, inverse=False, hcenter=False, vcenter=False, rand=True, mode='L', bkground=0, fill=120)
+# t.text = 'The Quick Brown Fox Jumps Over the Lazy Dog'
+
+# t.inverse = not t.inverse
+# t.update('The five boxing wizards jump quickly')
+# t.image
+
+
+
+
 
 
 class ImageBlock(Block):
+    """Constructor for TextBlock Class
     
+    Child class of Block
+    
+    Individual image block used in assembling composite epdlib.Screen images 
+    when writing to a WaveShare ePaper display.
+    
+    ImageBlock objects are aware of their dimensions, absolute coordinates, and 
+    contain an 1 bit or 8 bit PIL.Image object of the specified area.
+    
+    Format options include scaling, inverting and horizontal/vertical centering and
+    random placement of the image within the area.
+    
+    Overrides:
+        image (:obj:`PIL.Image` or str): PIL image object or string path to image file
+        update (method): update contents of ImageBlock"""    
     def __init__(self, area, *args, image=None, **kwargs):
+        '''Initializes ImageBlock
+        
+        Args:
+            area(tuple of int): area of block in x/y
+            image(PIL.Image, pathlib.Path or similar): image to place in block'''
+        
         super().__init__(area, *args, **kwargs)
         
-        self.area = area
-        logging.info('Image Block Created')
-        logging.debug(f'image={image}')
+        
         self.image = image
-
+        
     @property
     def image(self):
+        '''PIL.Image: image object with size equal to area of block
+        
+        Raises:
+            BlockError(unusable or missing image file)'''
+        
         return self._image
-
+    
     @image.setter
     def image(self, image):
-        image_area = Image.new('L', self.area, self.bkground)
-        logging.debug(f'block area: {self.area}')
+
+        image_area = Image.new(self.mode, self.area, self.bkground)
+    
         if not image:
-            logging.debug(f'no image provided, setting to blank image: {self.area}')
+            logging.debug(f'no image set; setting to blank image with area: {self.area}')
             self._image = image_area
-            return
 
-        # use the smallest dimension of the area use for scaling thumbnails
-        thumbnail_min = min(self.area)-self.padding*2
-        logging.debug(f'max dimension of thumbnail: {thumbnail_min}')
+        if image:
+            if isinstance(image, (str, Path)):
+                try:
+                    im = Image.open(image)
 
-        # handle image files
-        if isinstance(image, (str, Path)):
-            logging.debug(f'using image file: {image}')
-            try:
-                im = Image.open(image)
-                logging.debug(f'creating thumbnail of image to fit in min dimension : {thumbnail_min}')
-                im.thumbnail((thumbnail_min, thumbnail_min))
-            except (PermissionError, FileNotFoundError, OSError) as e:
-                logging.warning(f'could not open image file {image}')
-                logging.warning(f'error: {e}')
-                logging.warning(f'using empty image')
-                self._image = image_area
+                except (PermissionError, FileNotFoundError, OSError) as e:
+                    raise BlockError(f'Could not open file "{image}": {e}')
+            elif isinstance(image, Image.Image):
+                im = image
+            else:
+                raise BlockError('unusable image format')
 
-        elif isinstance(image, Image.Image):
-            logging.debug(f'using PIL image')
-            im = image
-            if max(im.size) > thumbnail_min:
-                logging.debug(f'creating thumbnail of image to fit in min dimension : {thumbnail_min}')
-                im.thumbnail((thumbnail_min, thumbnail_min))
+                
+            if max(im.size) > max(self.area):
+                resize = [self.area[0] - self.padding*2, self.area[1] - self.padding*2]
+                im.thumbnail(resize, Image.BICUBIC)
+                logging.debug('resizing image to fit in area')
+                
+            if self.inverse:
+                im = ImageOps.invert(im)
+   
+            paste_x = self.padding
+            paste_y = self.padding
 
-        self.dimensions = im.size
-        logging.debug(f'final dimensions of resized image: {self.dimensions}')
-
-        x_pos = self.padding
-        y_pos = self.padding
-        
-        logging.debug(f'starting with x: {x_pos}, y: {y_pos}')
-
-        if self._rand:
-            # pick random coordinates for the image within the area
-            logging.debug('using random coordinates for image within area')
-            x_range = self.area[0] - self.dimensions[0] - self.padding*2
-            y_range = self.area[1] - self.dimensiosn[1] - self.padding*2
-            x_pos = randrange(x_range)+padding
-            y_pos = randrange(y_range)+padding
-
-        # h/v center is mutually exclusive to random
-        else:
             if self.hcenter:
-                logging.debug('h-center image')
-                x_pos = round((self.area[0]-self.dimensions[0])/2)
+                paste_x = int((self.area[0] - im.width)/2)
+
             if self.vcenter:
-                logging.debug('v-center image')
-                y_pos = round((self.area[1]-self.dimensions[1])/2)
-        if self.inverse:
-            im = ImageOps.invert(im)
+                paste_y = int((self.area[1] - im.height)/2) 
 
-        logging.debug(f'pasting image into area at {x_pos}, {y_pos}')
-        image_area.paste(im, [x_pos, y_pos])
+            if self.rand:
+                if self.hcenter:
+                    logging.warning('`rand` overrides hcenter')
+                if self.vcenter:
+                    logging.warning('`rand` overrides vcenter')
+                x_range = int(self.area[0] - im.width - self.padding)
+                y_range = int(self.area[1] - im.height - self.padding)
+                logging.debug(f'x_range: {x_range}, y_range: {y_range}')
 
-        self._image = image_area
-        
+
+
+                # choose random placement
+                try:
+                    paste_x = randrange(self.padding, x_range-self.padding, 1)
+                except ValueError as e:
+                    logging.info('x image dimension is too large for random placement')
+                
+                try:
+                    paste_y = randrange(self.padding, y_range-self.padding, 1)  
+                except ValueError as e:
+                    logging.info('y image dimension is too large for random placement')
+
+            image_area.paste(im, (paste_x, paste_y))
+            
+            self._image = image_area
+    
     def update(self, update=None):
         """Update image data including coordinates (overrides base class)
         
         Args:
-            update (str): text to format and use
+            update(PIL or Path): image to use in update
             
         Returns:
             :obj:bool on success"""        
@@ -714,12 +768,23 @@ class ImageBlock(Block):
             return True
         else:
             logging.warn('update called with no arguments, no action taken')
-            return False
+            return False        
 
 
 
 
-# In[ ]:
+
+
+# i = ImageBlock(area=(900, 800), mode='L', 
+#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=200)
+# i.update('../portrait-pilot_SW0YN0Z5T0.jpg')
+# i.update('../hubble.jpg')
+
+# i.image
+
+
+
+
 
 
 def dir2dict(obj):
@@ -731,7 +796,6 @@ def dir2dict(obj):
 
 
 
-# In[ ]:
 
 
 def compare_obj(a, b):
@@ -746,7 +810,6 @@ def compare_obj(a, b):
 
 
 
-# In[ ]:
 
 
 # logger = logging.getLogger(__name__)
