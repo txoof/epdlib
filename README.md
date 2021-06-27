@@ -58,19 +58,24 @@ Python Modules:
 *Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0)`
 
 ### Properties
-* `area` (2-tuple of int): area of block in pixles - required
-* `hcenter` (bool): True - horizontally center image within block, center justify text
-    - Default: False
-* `vcenter` (bool): True - vertically center text within block
-    - Default: False
-* `rand` (bool): True - randomly place text within area of block (mutually exclusive of hcenter and vcenter)
-    - Default: False
-* `inverse` (bool): True - invert colors (black becomes white, white becomes black)
-    - Default: False
-* `abs_coordinates` (tuple): X, Y coordinates of upper left corner of image block within a larger layout
-    - Default: (0, 0)
-* `padding` (int): padding to add around text/image and edge of block
-    - Default: 0
+        
+Parent class for other types of blocks
+
+Args [default value]: 
+ * `area`(list/tuple): x and y integer values for dimensions of block area
+ *  `hcenter`(bool): True: horizontally center contents [False]
+ *  `vcenter`(bool): True: vertically center contents [False]
+ *  `rand`(bool): True: randomly place contents in area [False]
+ *  `inverse`(bool): True: invert pixel values [False]
+ *  `abs_coordinates`(list/tuple): x, y integer coordinates of this block area
+    within a larger image 
+ *  `padding`(int): number of pixels to pad around edge of contents [0]
+ *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 (black)]
+ *  `bkground`(int): 0-255 8 bit value for background color [255 (white)]\
+ *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
+
+Properties:
+ *  `image`: None - overridden in child classes'''
 
 ### Methods
 `update(update)`
@@ -337,7 +342,7 @@ update = {
 }
 
 # update the layout with the data in the dictionary
-myLayout.update_contents = update
+myLayout.update_contents(update)
 
 # join all the sub images into one complete image
 myImg = myLayout.concat()
@@ -370,8 +375,11 @@ https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65
 
 
 ```python
-!jupyter-nbconvert --to markdown --stdout > README.md
+!jupyter-nbconvert --to markdown --stdout readme_inprogress.ipynb > README.md
 ```
+
+    [NbConvertApp] Converting notebook readme_inprogress.ipynb to markdown
+
 
 
 ```python
