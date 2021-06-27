@@ -90,6 +90,9 @@ class Layout:
     'font': (str):                 # Path to font file (relative paths are acceptable)
     'font_size': (None/int)        # None - calculate the font size, int - size in points
     'inverse': (bool)              # True: use black background, white fill
+    'mode': (str)                  # '1': 1 bit color, 'L': 8 bit color (1bit default)
+    'fill': (int)                  # 0-255 color for text fill, lines, etc. (0 default black)
+    'bkground': (int)              # 0-255 color for background color (255 default white)
 
     
     Layouts are defined using any name and can be updated by calling the update() method with 
@@ -205,11 +208,28 @@ class Layout:
             return None
         
         # required values that will be used in calculating the layout
-        values = {'image': None, 'max_lines': 1, 'padding': 0, 'width': 1, 'height': 1, 
-                  'abs_coordinates': (None, None), 'hcenter': False, 'vcenter': False, 
-                  'rand': False, 'inverse': False, 'relative': False, 'font': None, 
-                  'font_size': None, 'maxchar': None, 'dimensions': None,
-                  'scale_x': None, 'scale_y': None}               
+        # only these values from the layout will be used when setting up the blocks
+        # values here are default if none are provided in layout section
+        values = {'image': None, 
+                  'max_lines': 1, 
+                  'padding': 0, 
+                  'width': 1, 
+                  'height': 1, 
+                  'abs_coordinates': (None, None), 
+                  'hcenter': False, 
+                  'vcenter': False, 
+                  'rand': False, 
+                  'inverse': False, 
+                  'relative': False, 
+                  'font': None, 
+                  'font_size': None, 
+                  'maxchar': None, 
+                  'dimensions': None,
+                  'scale_x': None, 
+                  'scale_y': None,
+                  'mode': '1',
+                  'fill': 0,
+                  'bkground': 255}               
         
         for section in self.layout:
             logging.debug(f'*****{section}*****')
@@ -326,7 +346,7 @@ class Layout:
         for sec in layout:
             logging.debug(f'***{sec}***)')
             section = layout[sec]
-            # any section with max lines accepts text
+            # any section without an image declared is considered a text block
             if not section['image']: # ['max_lines']:
                 logging.info(f'set text block: {sec}')
                 blocks[sec] = Block.TextBlock(area=section['dimensions'], 
@@ -339,7 +359,10 @@ class Layout:
                                               vcenter=section['vcenter'], 
                                               inverse=section['inverse'], 
                                               rand=section['rand'], 
-                                              abs_coordinates=section['abs_coordinates'])
+                                              abs_coordinates=section['abs_coordinates'],
+                                              fill=section['fill'],
+                                              bkground=section['bkground'],
+                                              mode=section['mode'])
             if section['image']:
                 logging.info(f'set image block {sec}')
                 blocks[sec] = Block.ImageBlock(image=None, 
@@ -349,7 +372,10 @@ class Layout:
                                                inverse=section['inverse'], 
                                                vcenter=section['vcenter'], 
                                                padding=section['padding'], 
-                                               rand=section['rand'])
+                                               rand=section['rand'],
+                                               fill=section['fill'],
+                                               bkground=section['bkground'],
+                                               mode=section['mode'])
                 
         self.blocks = blocks
     
@@ -417,5 +443,115 @@ class Layout:
 
 # logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
+
+
+
+
+
+
+# # create the layout object
+# myLayout = Layout(resolution=(1200, 825))
+
+# l = { # basic two row layout
+#     'weather_img': {                
+#             'image': True,               # image block
+#             'padding': 1,               # pixels to padd around edge
+#             'width': 1/4,                # 1/4 of the entire width
+#             'height': 1/4,               # 1/4 of the entire height
+#             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
+#             'hcenter': True,             # horizontally center image
+#             'vcenter': True,             # vertically center image
+#             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
+#             'mode': 'L',
+#             'bkground': 128
+#         },
+#     'temperature': { 
+#                 'image': None,           # set to None if this is a text block
+#                 'max_lines': 1,          # maximum lines of text to use when wrapping text
+#                 'padding': 10,           # padding around all edges (in pixles)
+#                 'width': 1/4,            # proportion of the entire width
+#                 'height': 1/4,           # proprtion of the entire height
+#                 'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
+#                                               # coordinates that are relative to other blocks and will be calculated
+#                 'hcenter': True,         # horizontal-center the text and the resulting image
+#                 'vcenter': True,         # vertically-center the text within the block
+#                 'relative': ['weather_img', 'temperature'], # blocks to which THIS block's coordinates are relative to
+#                                                             # -- in this case X: `weather_img` and Y: `temperature`
+#                                                             # the width of the block `weather` will be used to
+#                                                             # to calculate the X value of this block and the Y value
+#                                                             # specified within the `temperature` block will be used 
+#                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf', # TTF Font face to use; relative paths are OK
+#                 'font_size': None         # set this to None to automatically scale the font to the size of the block
+#     },
+#     'wind': { 
+#                 'image': None,
+#                 'max_lines': 3,
+#                 'padding': 0,
+#                 'width': 1/4,
+#                 'height': 1/4,
+#                 'abs_coordinates': (None, 0),
+#                 'hcenter': True,
+#                 'vcenter': True,
+#                 'relative': ['temperature', 'wind'],
+#                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
+#                 'font_size': None
+#     },
+#     'rain': { 
+#                 'image': None,
+#                 'max_lines': 3,
+#                 'padding': 0,
+#                 'width': 1/4,
+#                 'height': 1/4,
+#                 'abs_coordinates': (None, 0),
+#                 'hcenter': True,
+#                 'vcenter': True,
+#                 'relative': ['wind', 'rain'],
+#                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
+#                 'font_size': None
+#     },    
+#     'forecast': {
+#                 'image': None,
+#                 'max_lines': 7,
+#                 'padding': 10,
+#                 'width': 1,
+#                 'height': 3/4,
+#                 'abs_coordinates': (0, None),
+#                 'hcenter': False,
+#                 'vcenter': True,
+#                 'relative': ['forecast', 'temperature'],
+#                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
+#                 'font_size': None,
+#                 'scale_y': .85
+#     }
+
+# }
+
+# # apply the layout instructions to the layout object
+# myLayout.layout = l
+
+
+# update = {
+#     'weather_img': '../portrait-pilot_SW0YN0Z5T0.jpg',      # weather_img block will recieve a .png
+#     'temperature': '15C',                     # temperature block will receive `15C`
+#     'wind': 'Wind East 3m/s',                 # wind block will recieve this text
+#     'rain': 'Rain: 0%',                       # rain block
+#     'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, low of 12 overnight. Tomorrow: temperatures falling to 15 with an increased chance of rain'
+# }
+# myLayout.update_contents(update)
+
+# # join all the sub images into one complete image
+# myImg = myLayout.concat()
+
+# # write the image out to a file
+# # myImg.save('./my_forecast.png')
+
+# myImg
+
+
+
+
+
+
+
 
 
