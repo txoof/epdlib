@@ -1,15 +1,16 @@
 [[source]]
-name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
-
-[dev-packages]
+name = "pypi"
 
 [packages]
 ipykernel = "*"
-spidev = "*"
-"RPi.GPIO"="*"
+it8951 = {editable = true, ref = "master", git = "https://github.com/GregDMeyer/IT8951.git"}
+"rpi.gpio" = "*"
 pillow = "*"
+waveshare-epd = {subdirectory = "RaspberryPi_JetsonNano/python", editable = true, git = "https://github.com/waveshare/e-Paper.git"}
+
+[dev-packages]
 
 [requires]
 python_version = "3.7"
