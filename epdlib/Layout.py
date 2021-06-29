@@ -153,6 +153,7 @@ class Layout:
         
         logging.debug('creating layout')           
         self.resolution = resolution
+        self.image = None
         self.layout = layout
         self.screen = None
         
