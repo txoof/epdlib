@@ -183,14 +183,14 @@ class Update:
 
 
 class Screen():
-    def __init__(self, epd='None', rotation=0, mode='1', vcom=0.0):
+    def __init__(self, epd=None, rotation=0, mode='1', vcom=0.0):
         self.vcom = vcom
         self.one_bit_display = True
         self.constants = None
         self.mode = mode
         self.image = None
         self.hd = False
-        self.resolution = []
+        self.resolution = [1, 1]
         self.HD = False
         self.epd = epd
         self.rotation = rotation
@@ -217,6 +217,10 @@ class Screen():
     @rotation.setter
     @strict_enforce(int)
     def rotation(self, rotation):
+        if not self.epd:
+            self._rotation = rotation
+            return
+        
         if rotation not in [-90, 0, 90, 180, 270]:
             raise ValueError(f'valid rotation values are [-90, 0, 90, 180, 270]')
         
@@ -241,8 +245,12 @@ class Screen():
         return self._epd
 
     @epd.setter
-    @strict_enforce(str)
+    @strict_enforce((type(None), str))
     def epd(self, epd):
+        if not epd:
+            self._epd = None
+            return
+        
         myepd = None
         if epd=='HD':
             if not self.vcom:
@@ -366,7 +374,7 @@ class Screen():
      '''
         
         self.epd.frame_buf = mylayout_hd.image
-        s.epd.draw_partial(s.constants.DisplayModes.DU)
+        self.epd.draw_partial(self.constants.DisplayModes.DU)
     
     def _full_writeEPD_hd(self, image):
         '''redraw entire screen, no partial update with waveform GC16
@@ -382,7 +390,7 @@ class Screen():
 
         self.initEPD()
         logging.debug('writing to display using GC16 (full display update)')
-        self.epd.draw_full(s.constants.DisplayModes.GC16)
+        self.epd.draw_full(self.constants.DisplayModes.GC16)
             
         return True
         
