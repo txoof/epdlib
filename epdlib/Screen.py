@@ -6,12 +6,13 @@
 
 
 
+
+
 import logging
-from PIL import Image, ImageDraw, ImageFont
-import time
+from PIL import Image, ImageDraw
 from datetime import datetime
 from pathlib import Path
-import inspect
+import time
 
 
 
@@ -22,9 +23,9 @@ def strict_enforce(*types):
     """strictly enforce type compliance within classes
     
     Usage:
-        @strict_enforce(type1, type2, (type3, type4))
-        def foo(val1, val2, val3):
-            ...
+    @strict_enforce(type1, type2, (type3, type4))
+    def foo(val1, val2, val4):
+        ...
     """
     def decorator(f):
         def new_f(self, *args, **kwds):
@@ -118,6 +119,14 @@ class ScreenShot:
 
 
 
+class ScreenError(Exception):
+    pass
+
+
+
+
+
+
 class Update:
     """Class for creating a montotonicaly aware object that records passage of time
     
@@ -173,204 +182,277 @@ class Update:
 
 
 
-class Screen:
-    '''Class for interfacing with WaveShare EPD Screens
-    
-    `Screen` creates an object that provides methods for writing images
-    and updating a WaveShare EPD.
-    '''
-    
-    def __init__(self, epd=None, rotation=0):
-        '''constructor for Screen class
-        
-        Properties:
-            resolution(`tuple` of `int`): resolution of screen (defaults to landscape orientation)
-            blank_image(`Pil` Image): white image
-        
-
-        
-        Args:
-            epd(`waveshare EPD class`): imported waveshare epd class
-            rotation(`int`): 0, 90, -90, 180 rotation of screen
-
-        Examples:
-        * Create a screen object:
-            ```
-            import waveshare_epd
-            s = Screen()
-            s.epd = wavehsare_epd.epd5in83
-            ```
-        * Create and write a composite image from a layout object
-            - See `help(Layout)` for more information
-            ```
-            # create layout object using a predefined layout
-            import Layout
-            import layouts
-            l = Layout(resolution=(s.epd.EPD_WIDTH, s.epd.EPD_HEIGHT), layout=layouts.splash)
-            # update the layout information
-            u = {'version': 'version 0.2.1', 'url': 'https://github.com/txoof/slimpi_epd', 'app_name': 'slimpi'}\
-            l.update_contents(u)
-            # update the screen object with the layout block values
-            s.elements = l.blocks.values()
-            # create a composite imate from all the blocks
-            l.concat()
-            # init and write the composite to the EPD
-            s.writeEPD(l.image)
-        
-        '''
+class Screen():
+    def __init__(self, epd='None', rotation=0, mode='1', vcom=0.0):
+        self.vcom = vcom
+        self.one_bit_display = True
+        self.constants = None
+        self.mode = mode
+        self.image = None
+        self.hd = False
+        self.resolution = []
+        self.HD = False
         self.epd = epd
         self.rotation = rotation
-        self.update = Update()
         
-    
+        
     @property
-    def epd(self):
-        '''epd type'''
-        return self._epd
-    
-    @epd.setter
-    def epd(self, epd):
-        if epd:
-            self._epd = epd.EPD()
-            resolution = [epd.EPD_HEIGHT, epd.EPD_WIDTH]
-            resolution.sort(reverse=True)
-            self.resolution = resolution
-            # set a blank image as default
-            self.image = Image.new('L', self.resolution, 255)
-            # create an empty buffer for using with two color screens
-            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
-            
-            # set kwargs for screens that expect `color` and `mode` arguments
-            clear_args_spec = inspect.getfullargspec(self._epd.Clear)
-            self.clear_args = {}
-            if 'color' in clear_args_spec.args:
-                self.clear_args['color'] = 0xFF
-            if 'mode' in clear_args_spec.args:
-                self.clear_args['mode'] = 0
-                
-            display_args_spec = inspect.getfullargspec(self._epd.display)
-            if len(display_args_spec.args) > 2:
-                self._one_bit_display = False
-            else:
-                self._one_bit_display = True
-        else: 
-            self._epd = None
-            self.resolution = (1, 1)
+    def vcom(self):
+        return self._vcom
 
-    @property 
+    @vcom.setter
+    @strict_enforce(float)
+    def vcom(self, vcom):
+        if vcom==0:
+            self._vcom = None
+        elif vcom > 0:
+            raise ValueError(f'vcom must be a negative float value: {vcom}')
+        else:
+            self._vcom = vcom
+
+    @property
     def rotation(self):
         return self._rotation
     
     @rotation.setter
+    @strict_enforce(int)
     def rotation(self, rotation):
-        '''
-        set the display rotation
-        Sets or resets properties:
-            rotation(`int`): [0, 90, -90, 180]
-            resolution: sets resolution to match rotation (width/height)
-            image: empty `PIL.Image`
-            buffer_no_image: empty `epd.getbuffer(Image)` to support colored screens that require an additional image 
-        '''
-            
-        if rotation not in [0, 90, -90, 180]:
-            raise ValueError('value must be type `int` and [0, 90, -90, 180]')
-        self._rotation = rotation
-        logging.debug(f'Screen rotation set to: {self._rotation}')
-        if rotation == 90 or rotation == -90:
-                
-            resolution = self.resolution
-            # set short dimension first
-            resolution.sort()
-            # set resolution
-            self.resolution = resolution
-            # set a new clearscreen image
-            self.image = Image.new('L', self.resolution, 255)
-            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
-    
-    def blank_image(self):
-        return Image.new('L', self.resolution, 255)
+        if rotation not in [-90, 0, 90, 180, 270]:
+            raise ValueError(f'valid rotation values are [-90, 0, 90, 180, 270]')
         
+        if rotation in [90, -90, 270]:
+            resolution = self.resolution
+            resolution.sort()
+            self.resolution = resolution
+        else:
+            resolution = self.resolution
+            resolution.sort(reverse=True)
+            self.resolution = resolution
+            
+        self.image = Image.new('L', self.resolution, 255)
+        if not self.HD:
+            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
+
+        self._rotation = rotation
+        logging.debug(f'rotation={rotation}, resolution={self.resolution}')
+            
+    @property
+    def epd(self):
+        return self._epd
+
+    @epd.setter
+    @strict_enforce(str)
+    def epd(self, epd):
+        myepd = None
+        if epd=='HD':
+            if not self.vcom:
+                raise ScreenError('no vcom value is set (see the cable on your display for a vcom value)')
+            self.HD = True
+            myepd = self._epd_hd(epd)
+            
+        elif epd == 'None':
+            myepd = None
+        else:
+            myepd = self._epd_non_hd(epd)
+
+        if myepd:
+            # set the resolution 
+            self._epd = myepd['epd']
+            resolution = myepd['resolution']
+            resolution.sort(reverse=True)
+            self.resolution = resolution
+            self.clear_args = myepd['clear_args']
+            self.constants = myepd['constants']
+            self.one_bit_display = myepd['one_bit_display']
+            
+            logging.debug(f'epd configuration: {myepd}')
+            
+            # set a blank image as default
+            self.image = Image.new('L', self.resolution, 255)
+            if self.HD:
+                self.buffer_no_image = []
+            else:
+                self.buffer_no_image = self.epd.getbuffer(self.blank_image())
+        else:
+            logging.warning('no valid epd is currently configured')
+            
     def initEPD(self):
         '''init the EPD for writing'''
         if not self.epd:
             raise UnboundLocalError('no epd object has been assigned')
-        try:
-            self.epd.init()
-        except Exception as e:
-            logging.error(f'failed to init epd: {e}')
+            
+        if self.HD:
+            self._epd.epd.run()
         else:
-            logging.info(f'{self.epd} initialized')
-        return True
-    
+            try:
+                self.epd.init()
+            except FileNotFoundError as e:
+                raise ScreenError('failed to open SPI bus - is spi enabled in raspi-config?')
+#                 logging.error(f'failed to init epd: {e}: error: {type(e)}')
+
+        logging.info(f'epd initialized')
+            
+        return True            
+
     def clearEPD(self):
-        '''clear the epd screen
-        
-        inits the screen and then sets it to blank (all white)'''
-        
-        if not self.epd:
-            raise UnboundLocalError('no epd object has been assigned')
-        try:
-            self.initEPD()
-            self.epd.Clear(**self.clear_args)
-        except Exception as e:
-            logging.error(f'failed to clear epd: {e}')
-            return False
+        if self.HD:
+            self._epd.epd.run()
+            self._epd.clear()
+        else:
+            try:
+                self.initEPD()
+                self.epd.Clear(**self.clear_args)
+            # FIXME -- more explicit output here on failure
+            except Exception as e:
+                logging.error(f'failed to clear epd: {e}')
+                return False
         return True
+        
     
-    def writeEPD(self, image=None, sleep=True):
-        '''write an image to EPD
+    def blank_image(self):
+        '''generate PIL image that is entirely blank'''
+        return Image.new(self.mode, self.resolution, 255)
+            
+            
+
+    def writeEPD(self, image=None, sleep=True, partial=False):
+        '''write an image to the screen after clearing previous
+        
+            Non-hd screens should be put to sleep after writing to prevent
+            damage to the panel.
         
         Args:
-        image(Pil image or Image file): image to display
-        sleep(bool): put the display to sleep after writing (default True)'''
-        logging.debug('preparing to write to EPD')
-        if not self.epd:
-            raise UnboundLocalError('no epd object has been assigned')
-        
-        ret_val = False
-        
-        if self.rotation == 180 or self.rotation == -90:
-            if image:
-                try:
-                    image = image.rotate(180)
-                except AttributeError as e:
-                    logging.info(f'image is unset, cannot rotate, skipping')
-        
-        if image:
-            try:
-                image_buffer = self.epd.getbuffer(image)
-            except AttributeError as e:
-                logging.warning(f'{e} - this does not appear to be an image object')
-                logging.warning('setting image to blank image')
-                image_buffer = self.epd.getbuffer(self.blank_image())
+            image(PIL image): image to display
+            sleep(bool) Put display to sleep after updating
             
+            '''
+        if not image:
+            raise ScreenError('No image provided')
+            
+        if not self.epd:
+            raise UnboundLocalError('no epd has been assigned')
         
-            try:
-                logging.debug('init and write to EPD')
-                if self.initEPD():
-                    if self._one_bit_display:
-                        self.epd.display(image_buffer)
-                    else:
-                        # send a blank image for the colored layer
-                        self.epd.display(image_buffer, self.buffer_no_image)
-                    self.update.update()
-                    ret_val = True
-                else:
-                    logging.warning('initEPD failed')
-                    ret_val = False
-            except Exception as e:
-                logging.error(f'{e} - failed to write to epd')
-            finally:
-                if sleep:
-                    self.epd.sleep()
+        image = image.rotate(self.rotation, expand=True)
+#         if self.rotation in [180, -90]:
+#             image = image.rotate(180)
+        
+        # init epd
+        self.initEPD()
+    
+        if partial:
+            if self.HD:
+                self._partial_writeEPD_hd(image)
+            else:
+                logging.warning('partial update not available on non-hd displays')
+                self._full_writeEPD_non_hd(image)
                     
         else:
-            logging.warning('no image provided -- no epd write attempted')
-            
-        return ret_val
-            
-            
+            if self.HD:
+                self._full_writeEPD_hd(image)
+            else:
+                self._full_writeEPD_non_hd(image)
+                
+        if sleep:
+            logging.debug('putting display to sleep')
+            if self.HD:
+                self.epd.epd.sleep()
+            else:
+                self.epd.sleep()                
+                
+    def _partial_writeEPD_hd(self, image):
+        '''partial update, affects only changed black and white pixels with no flash
         
+            uses waveform DU see: see: https://www.waveshare.net/w/upload/c/c4/E-paper-mode-declaration.pdf for display modes
+     '''
+        
+        self.epd.frame_buf = mylayout_hd.image
+        s.epd.draw_partial(s.constants.DisplayModes.DU)
+    
+    def _full_writeEPD_hd(self, image):
+        '''redraw entire screen, no partial update with waveform GC16
+        
+            see: https://www.waveshare.net/w/upload/c/c4/E-paper-mode-declaration.pdf for display modes'''
+        # create a blank buffer image to write into
+        self.epd.frame_buf.paste(0xFF, box=(0, 0, self.resolution[0], self.resolution[1]))
+        
+        self.epd.frame_buf.paste(image, [0,0])
+
+
+        self.epd.frame_buf.paste(image, [0, 0])
+
+        self.initEPD()
+        logging.debug('writing to display using GC16 (full display update)')
+        self.epd.draw_full(s.constants.DisplayModes.GC16)
+            
+        return True
+        
+    def _full_writeEPD_non_hd(self, image):
+        '''redraw entire screen'''
+        image_buffer = self.epd.getbuffer(image)
+        self.initEPD()
+        if self.one_bit_display:
+            self.epd.display(image_buffer)
+        else:
+            # send a blank image to colored layer
+            self.epd.display(image_buffer, self.buffer_no_image)
+        
+        return True
+    
+    def _epd_hd(self, epd):
+        from IT8951.display import AutoEPDDisplay
+        from IT8951 import constants as constants_HD
+        myepd = AutoEPDDisplay(vcom=self.vcom)
+        resolution = list(myepd.display_dims)
+        clear_args = {}
+        one_bit_display = False
+        
+        return {'epd': myepd, 
+                'resolution': resolution, 
+                'clear_args': clear_args, 
+                'one_bit_display': one_bit_display,
+                'constants': constants_HD}    
+                    
+    def _epd_non_hd(self, epd):
+        import waveshare_epd
+        import pkgutil
+        import inspect
+        from importlib import import_module
+        non_hd = []
+        for i in pkgutil.iter_modules(waveshare_epd.__path__):
+            non_hd.append(i.name)
+
+        if epd in non_hd:
+            myepd = import_module(f'waveshare_epd.{epd}')
+            resolution = [myepd.EPD_HEIGHT,myepd.EPD_WIDTH]
+            
+            # set kwargs for screens that expect color or mode arguments to the clear function
+            try:
+                clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
+            except AttributeError:
+                raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
+            clear_args = {}
+            if 'color' in clear_args_spec:
+                clear_args['color'] = 0xFF
+                
+            try:
+                display_args_spec = inspect.getfullargspec(myepd.EPD.display)
+            except AttributeError:
+                raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
+            
+            logging.debug(f'args_spec: {display_args_spec.args}')
+            if len(display_args_spec.args) <= 2:
+                one_bit_display = True
+            else:
+                one_bit_display = False
+            
+        else:
+            raise ScreenError(f'invalid waveshare module: {epd}')
+            
+        return {'epd': myepd.EPD(), 
+                'resolution': resolution, 
+                'clear_args': clear_args,
+                'one_bit_display': one_bit_display,
+                'constants': None}
 
 
 
@@ -378,63 +460,217 @@ class Screen:
 
 
 def main():
-    # set your screent type here
+    '''run a demo/test of attached EPD screen showing rotations and basic writing'''
+    import pkgutil
+    import sys
+    # import importlib
+    # import inspect
+
+    import waveshare_epd
+    # from importlib import import_module
+    # get a list of waveshare non-hd models
+    panels = []
+    for i in pkgutil.iter_modules(waveshare_epd.__path__):
+        panels.append(i.name)
+    panels.append('All IT8951 Based Panels')
+    
+    print('Choose a pannel to test:')
+    for idx, i in enumerate(panels):
+        print(f'  {idx}. {i}')
+        
+    choice = input('Enter the number of your choice: ')
+    
     try:
-        import sys
-        from waveshare_epd import epd5in83 as my_epd
-    except FileNotFoundError as e:
-        logging.error(f''''Error loading waveshare_epd module: {e}
-        This is typically due to SPI not being enabled, or the current user is 
-        not a member of the SPI group.
-        "$ sudo raspi-config nonint get_spi" will return 0 if SPI is enabled
-        Exiting...''')
+        choice = int(choice)
+    except ValueError as e:
+        print(f'"{choice}" does not appear to be an valid choice. Exiting.')
         return
+    myepd = panels[choice]
+    
+    if choice > len(panels)+1:
+        print(f'"{choice}" is not a valid panel option. Exiting.')
+        return
+    
+    if 'IT8951' in myepd:
+        myepd = 'HD'
+        voltage = input('Enter the vcom voltage for this panel (check the ribbon cable): ')
+        try:
+            voltage = float(voltage)
+        except ValueError as e:
+            print('vcom voltage must be a negative float. Exiting')
+            return
+        if voltage > 0:
+            print('vcom voltage must be a negative float. Exiting.')
+            return
+    else:
+        voltage = 0.0
+    
     import Layout
     
     sys.path.append('../')
-    
+    myLayout = {
+            'title': {                       # text only block
+                'image': None,               # do not expect an image
+                'max_lines': 3,              # number of lines of text
+                'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
+                'height': 4/7,               # 1/3 of the entire height
+                'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
+                'hcenter': True,             # horizontally center text
+                'vcenter': True,             # vertically center text 
+                'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
+                'font': '../fonts/Font.ttc', # path to font file
+                'font_size': None            # Calculate the font size because none was provided
+            },
+
+            'artist': {
+                'image': None,
+                'max_lines': 2,
+                'width': 1,
+                'height': 3/7,
+                'abs_coordinates': (0, None),   # X = 0, Y will be calculated
+                'hcenter': True,
+                'vcenter': True,
+                'font': '../fonts/Font.ttc',
+                'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
+                                               # calculate the y position based on the size of `title` block
+
+            }
+    }    
+
     for r in [0, 90, -90, 180]:
         print(f'setup for rotation: {r}')
-        s = Screen(epd=my_epd, rotation=r)
-        myLayout = {
-                'title': {                       # text only block
-                    'image': None,               # do not expect an image
-                    'max_lines': 3,              # number of lines of text
-                    'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
-                    'height': 4/7,               # 1/3 of the entire height
-                    'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
-                    'hcenter': True,             # horizontally center text
-                    'vcenter': True,             # vertically center text 
-                    'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-                    'font': '../fonts/Font.ttc', # path to font file
-                    'font_size': None            # Calculate the font size because none was provided
-                },
 
-                'artist': {
-                    'image': None,
-                    'max_lines': 2,
-                    'width': 1,
-                    'height': 3/7,
-                    'abs_coordinates': (0, None),   # X = 0, Y will be calculated
-                    'hcenter': True,
-                    'vcenter': True,
-                    'font': '../fonts/Font.ttc',
-                    'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
-                                                   # calculate the y position based on the size of `title` block
+        s = Screen(epd=myepd, rotation=r, vcom=voltage)
+        s.initEPD()
 
-                }
-        }    
         l = Layout.Layout(resolution=s.resolution)
         l.layout = myLayout
-        l.update_contents({'title': 'spam, spam, spam, spam & ham', 'artist': 'monty python'})
+        l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
-#         s.initEPD()
+    #         s.initEPD()
         s.writeEPD(l.concat(), sleep=False)
+        print('sleeping for 2 seconds')
+        time.sleep(2)
+
+
         print('refresh screen -- screen should flash and be refreshed')
-#         s.initEPD()
-#         s.writeEPD(s.clearScreen())
+    
+    print('clear screen')
     s.clearEPD()
-    return s
+
+
+
+
+
+
+# import Layout
+# l = {
+#     'text_a': {
+#         'image': None,
+#         'padding': 10, 
+#         'width': 1,
+#         'height': 1/4,
+#         'abs_coordinates': (0, 0),
+#         'mode': '1',
+#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
+#         'max_lines': 3,
+#         'fill': 0,
+#         'font_size': None},
+    
+#     'text_b': {
+#         'image': None,
+#         'padding': 10,
+#         'inverse': True,
+#         'width': 1,
+#         'height': 1/4,
+#         'abs_coordinates': (0, None),
+#         'relative': ['text_b', 'text_a'],
+#         'mode': '1',
+#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
+#         'max_lines': 3,
+#         'font_size': None},
+    
+#     'image_a': {
+#         'image': True,
+#         'width': 1/2,
+#         'height': 1/2,
+#         'mode': 'L',
+#         'abs_coordinates': (0, None),
+#         'relative': ['image_a', 'text_b'],
+#         'scale_x': 1,
+#         'hcenter': True,
+#         'vcenter': True,
+#         'inverse': True},
+    
+#     'image_b': {
+#         'image': True,
+#         'width': 1/2,
+#         'height': 1/2,
+#         'mode': 'L',
+#         'abs_coordinates': (None, None),
+#         'relative': ['image_a', 'text_b'],
+#         'bkground': 255,
+#         'vcenter': True,
+#         'hcenter': True},
+        
+# }
+
+# # full layout update
+# u1 = {'text_a': 'The quick brown fox jumps over the lazy dog.',
+#      'text_b': 'Pack my box with five dozen liquor jugs. Jackdaws love my big sphinx of quartz.',
+#      'image_a': '../images/PIA03519_small.jpg',
+#      'image_b': '../images/portrait-pilot_SW0YN0Z5T0.jpg'}
+
+# # partial layout update (only black/white portions)
+# u2 = {'text_a': 'The five boxing wizards jump quickly. How vexingly quick daft zebras jump!',
+#       'text_b': "God help the noble Claudio! If he have caught the Benedick, it will cost him a thousand pound ere a be cured."}
+
+
+
+
+
+
+# epd2in7 = Screen(epd='epd2in7', rotation=0)
+# mylayout_non = Layout.Layout(resolution=epd2in7.resolution, layout=l)
+
+# mylayout_non.update_contents(u1)
+# epd2in7.writeEPD(mylayout_non.concat())
+# time.sleep(5)
+# mylayout_non.update_contents(u2)
+# epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
+# mylaout_non.update_contents(u1)
+# time.sleep(5)
+# epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
+# time.sleep(5)
+# # epd2in7.clearEPD()
+
+
+
+
+
+
+# s = Screen(epd='HD', vcom=-1.93, mode='L', rotation=0)
+# mylayout_hd = Layout.Layout(resolution=s.resolution, layout=l)
+
+# mylayout_hd.update_contents(u1)
+# s.writeEPD(mylayout_hd.concat())
+# time.sleep(5)
+
+# mylayout_hd.update_contents(u2)
+# s.writeEPD(image=mylayout_hd.concat(), partial=True)
+# time.sleep(5)
+# mylayout_hd.update_contents(u1)
+# s.writeEPD(image=mylayout_hd.concat(), partial=True)
+# time.sleep(5)
+# s.clearEPD()
+
+
+
+
+
+
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
 
 
 
