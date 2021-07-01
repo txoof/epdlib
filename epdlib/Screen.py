@@ -638,11 +638,11 @@ def main():
 # time.sleep(5)
 # mylayout_non.update_contents(u2)
 # epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
-# mylaout_non.update_contents(u1)
+# mylayout_non.update_contents(u1)
 # time.sleep(5)
 # epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
 # time.sleep(5)
-# # epd2in7.clearEPD()
+# epd2in7.clearEPD()
 
 
 
