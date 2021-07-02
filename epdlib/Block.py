@@ -130,7 +130,6 @@ class Block:
             abs_coordinates(list/tuple): x, y integer coordinates of this block area
                 within a larger image 
             padding(int): number of pixels to pad around edge of contents [0]
-            scale(bool): True: scale the contents to fit inside the padded area [False]
             fill(int): 0-255 8 bit value for fill color for text/images [0 (black)]
             bkground(int): 0-255 8 bit value for background color [255 (white)]\
             mode(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
@@ -727,9 +726,9 @@ class ImageBlock(Block):
 
             if self.rand:
                 if self.hcenter:
-                    logging.warning('`rand` overrides hcenter')
+                    logging.info('`rand` overrides hcenter')
                 if self.vcenter:
-                    logging.warning('`rand` overrides vcenter')
+                    logging.info('`rand` overrides vcenter')
                 x_range = int(self.area[0] - im.width - self.padding)
                 y_range = int(self.area[1] - im.height - self.padding)
                 logging.debug(f'x_range: {x_range}, y_range: {y_range}')
