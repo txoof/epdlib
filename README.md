@@ -1,5 +1,33 @@
-# epdlib 
+# epdlib v0.4
 EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
+
+## Changes
+**Screen**
+
+* now supports IT9851 based panels
+* `Screen.epd` object is now supplied as a string, not an object
+    - use `epdlib.Screen.list_compatible_modules()` to show compatible waveshare_epd panels
+    - use `Screen(epd='HD', vcom=[your IT9851 vcom (see ribon cable)]` for IT8951 based panels
+* `Screen.writeEPD()` now supports partial refresh on IT9851 panels for partial refresh of black & white pixels
+    - use `writeEPD(image, partial=True)`
+    - partial refresh does not affect gray pixels
+
+
+**Block**
+
+* now supports 8 bit grayscale images, text and background on IT8951 based panels
+    - previously 8 bit images were downscaled to dithered 1 bit images; this is still the case on 1 bit panels
+    - use `Block.mode = "L"` for 8 bit support within a block
+* now supports 8 bit fill and background on IT8951 panels
+    - use `Block.background=[0-255]` and `Block.fill=[0-255]` 0 is black, 255 is fully white
+* padding now fully supported in all block types
+    - previosuly only worked properly on `ImageBlock` objects
+
+**Layout**
+* now supports the following features when specified in the layout dictionary:
+    - `'fill': 0-255` specify text fill (8 bit gray 0 is black)
+    - `'bkground: 0-255` specify background color (8 bit gray 0 is black)
+    - `'mode': "L"/"1"` specify block image mode "L" 8 bit, "1" 1 bit
 
 ## Dependencies
 Python Modules:
@@ -337,27 +365,6 @@ pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_ep
 The IT8951 library is provided only as a git repo. Try the following ot install it:
 ```
 pipenv install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
-```
-
-
-```python
-import epdlib
-s = epdlib.Screen()
-```
-
-
-```python
-s.vcom = -1.93
-```
-
-
-```python
-s.epd = "HD"
-```
-
-
-```python
-
 ```
 
 getting ready for pypi:
