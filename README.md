@@ -10,49 +10,20 @@ Python Modules:
 * RPi.GPIO
 * spidev
     - ensure SPI is enabled on the pi
-* waveshare-epd 
+* waveshare-epd (Non IT8951 based panels)
     - this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
+    - see [notes](#Notes) below for installation instructions
+* IT8951 (IT8951 based panels)
     - see [notes](#Notes) below for installation instructions
 
 
 
 **Modules:**
-* Block - image and text blocks that can be assembed into a final layout
-* Layout - generate dynamic layouts from Blocks
-* Screen - simple interface for waking and writing to WaveShare EPD devices
+* [Block](#Block) - image and text blocks that can be assembed into a final layout
+* [Layout](#Layout) - generate dynamic layouts from Blocks
+* [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
 
-- [epdlib](#epdlib)
-  * [Block Module](#block-module)
-    + [Properties](#properties)
-    + [Methods](#methods)
-  * [Block.TextBlock](#blocktextblock)
-    + [Properties](#properties-1)
-    + [Functions](#functions)
-    + [Methods](#methods-1)
-  * [Block.ImageBlock](#blockimageblock)
-    + [Properties](#properties-2)
-  * [Layout Module](#layout-module)
-  * [Scaling Example](#scaling-example)
-    + [Properties](#properties-3)
-    + [Methods](#methods-2)
-    + [Functions](#functions-1)
-  * [Screen Module](#screen-module)
-    + [Properties](#properties-4)
-    + [Methods](#methods-3)
-    + [Example](#example)
-  * [Screen.Update](#screenupdate)
-    + [Properties](#properties-5)
-    + [Methods](#methods-4)
-    + [Example](#example-1)
-  * [Screen.ScreenShot](#screenscreenshot)
-    + [Properties](#properties-6)
-    + [Methods](#methods-5)
-  * [Quick-Start Recipe](#quick-start-recipe)
-    + [Creating a Layout Image](#creating-a-layout-image)
-
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
-
+<a name="Block"></a>
 ## Block Module
 `Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
 *Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0)`
@@ -62,16 +33,16 @@ Python Modules:
 Parent class for other types of blocks
 
 Args [default value]: 
- * `area`(list/tuple): x and y integer values for dimensions of block area
+ *  `area`(list/tuple): x and y integer values for dimensions of block area
  *  `hcenter`(bool): True: horizontally center contents [False]
  *  `vcenter`(bool): True: vertically center contents [False]
  *  `rand`(bool): True: randomly place contents in area [False]
  *  `inverse`(bool): True: invert pixel values [False]
  *  `abs_coordinates`(list/tuple): x, y integer coordinates of this block area
-    within a larger image 
+    within a larger image [(0, 0)]
  *  `padding`(int): number of pixels to pad around edge of contents [0]
- *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 (black)]
- *  `bkground`(int): 0-255 8 bit value for background color [255 (white)]\
+ *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 black]
+ *  `bkground`(int): 0-255 8 bit value for background color [255 white]
  *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
 
 Properties:
@@ -126,6 +97,7 @@ All properties of the parent class are inherited.
 ### Properties
 * `image` (:obj:PIL.Image or :obj:str) - `Pillow` image or path provided as a `str` to an image file; relative paths are acceptable
 
+<a name="Layout"></a>
 ## Layout Module
 `Layout` objects support scaling images and dynamically scaling [TTF](https://en.wikipedia.org/wiki/TrueType) font-size for different screen sizes. 
 
@@ -134,7 +106,7 @@ Font sizes are set based on each individual font and scaled to fit within text b
 *Class* `Layout(resolution, layout=None)`
 
 ## Scaling Example
-epdlib `Layout` objects can be scaled to any resolution while maintaining internally consistent ratios.
+epdlib `Layout` objects can be scaled to any (reasonable) resolution while maintaining internally consistent ratios.
 
 **500x500 Layout**
 
@@ -151,16 +123,13 @@ epdlib `Layout` objects can be scaled to any resolution while maintaining intern
 * `image` (Pil.Image): concatination of all blocks into single image
 
 ### Methods
-    - see example below in Quick-Start Recipe
-* `concat()` : join all blocks into a single image
-    - sets '
-
-### Functions
+* `concat()`: join all blocks into a single image
+    - sets `image` property
 * `update_contents(updates=None)` - update the contents of each block
     - updates (dict)
         - dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
 
-
+<a name="Screen"></a>
 ## Screen Module
 `Screen` objects provide a method for waking and writing to a WaveShare E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
 
@@ -169,25 +138,31 @@ epdlib `Layout` objects can be scaled to any resolution while maintaining intern
 ### Properties
 * `resolution` (2 tuple of int): resolution in pixels 
     - this is overriden by the epd object resolution when it is set
-* `epd` (WaveShare EPD module)
-    - the waveshare library that will be used for the actual writing of data to the screen
+* `epd` (epd object)
+    - waveshare epd object used for interfacing with the display
 * `update` (obj:Screen.Update): monotonicly aware object that tracks time since last update
+* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen 
+* `mode`(str): '1' for 1 bit screens, 'L' for screens capable of 8 bit grayscale
+* `vcom`(float): vcom voltage for HD IT8951 based screens (not needed & ignored for non-HD screens)
 
 
 ### Methods
-* `clearScreen()` - Set a blank image screen
-* `clearEPD()` - send the clear signal to the EPD to wipe all contents and set to "white"
-* `writeEPD(image, sleep=True)` - and write `image` to the EPD. 
+* `clearScreen()`: Set a blank image screen
+* `clearEPD()`: send the clear signal to the EPD to wipe all contents and set to "white"
+* `writeEPD(image, sleep=True, partial=False)`: write `image` to the EPD. 
     - resets update timer
-    - Defaults to putting the display to low power mode
+    - sleep: put the display to low power mode (default: True)
+    - partial: update only chaged portions of the screen (faster, but only works with black and white pixles) (default: False)
 * `intiEPD()` - initializes the EPD for writing
+* `blank_image():` produces a blank PIL.Image in of `mode` type of `resolution` dimensions
+* `list_compatible_modules()`: print a list of all waveshare_epd panels that are compatible with paperpi
 
 ### Example
 ```
 import Screen
 import waveshare_epd
 myScreen = Screen()
-myScreen.epd = waveshare_epd.5in83
+myScreen.epd = "epd5in83"
 myScreen.initEPD()
 myScreen.writeEPD('./my_image.png')
 ```
@@ -249,16 +224,15 @@ scrnShot.save(spam)
 ## Quick-Start Recipe
 The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
 
-### Creating a Layout Image
+### Creating an Image from a Layout
 ```
 import epdlib
 
-# create the layout object
-myLayout = epdlib.Layout(resolution=(640, 400))
+# create the layout object - adjust the resolution to match the display area
+layout_obj = epdlib.Layout(resolution=(640, 400))
 
-# define a layout
 l = { # basic two row layout
-    'weather_img': {                
+    'tux_img': {                
             'image': True,               # image block
             'padding': 10,               # pixels to padd around edge
             'width': 1/4,                # 1/4 of the entire width
@@ -267,107 +241,123 @@ l = { # basic two row layout
             'hcenter': True,             # horizontally center image
             'vcenter': True,             # vertically center image
             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
+            'mode': 'L',                 # treat this image as an 8bit gray-scale image
         },
-    'temperature': { 
+    'pangram_a': { 
                 'image': None,           # set to None if this is a text block
-                'max_lines': 1,          # maximum lines of text to use when wrapping text
+                'max_lines': 3,          # maximum lines of text to use when wrapping text
                 'padding': 10,           # padding around all edges (in pixles)
-                'width': 1/4,            # proportion of the entire width
+                'width': 3/4,            # proportion of the entire width
                 'height': 1/4,           # proprtion of the entire height
                 'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
                                               # coordinates that are relative to other blocks and will be calculated
-                'hcenter': True,         # horizontal-center the text and the resulting image
+                'hcenter': False,         # horizontal-center the text and the resulting image
                 'vcenter': True,         # vertically-center the text within the block
-                'relative': ['weather_img', 'temperature'], # blocks to which THIS block's coordinates are relative to
+                'relative': ['tux_img', 'pangram_a'], # blocks to which THIS block's coordinates are relative to
                                                             # -- in this case X: `weather_img` and Y: `temperature`
                                                             # the width of the block `weather` will be used to
                                                             # to calculate the X value of this block and the Y value
                                                             # specified within the `temperature` block will be used 
-                'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf', # TTF Font face to use; relative paths are OK
+                'font': './fonts/Open_Sans/OpenSans-Regular.ttf', # TTF Font face to use; relative paths are OK
                 'font_size': None         # set this to None to automatically scale the font to the size of the block
     },
-    'wind': { 
+    'pangram_b': { 
                 'image': None,
-                'max_lines': 3,
+                'max_lines': 2,
                 'padding': 0,
-                'width': 1/4,
+                'width': 1,
                 'height': 1/4,
-                'abs_coordinates': (None, 0),
+                'abs_coordinates': (0, None),
                 'hcenter': True,
                 'vcenter': True,
-                'relative': ['temperature', 'wind'],
-                'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-                'font_size': None
+                'relative': ['pangram_b', 'tux_img'],
+                'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
+                'font_size': None,
+                'inverse': True
     },
-    'rain': { 
+    'pangram_c': { 
                 'image': None,
                 'max_lines': 3,
                 'padding': 0,
-                'width': 1/4,
+                'width': 1,
                 'height': 1/4,
-                'abs_coordinates': (None, 0),
+                'abs_coordinates': (0, None),
                 'hcenter': True,
-                'vcenter': True,
-                'relative': ['wind', 'rain'],
-                'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-                'font_size': None
+                'vcenter': False,
+                'relative': ['pangram_c', 'pangram_b'],
+                'font': './fonts/Open_Sans/OpenSans-BoldItalic.ttf',
+                'font_size': None,
+                'inverse': False,
     },    
-    'forecast': {
+    'text': {
                 'image': None,
-                'max_lines': 7,
+                'max_lines': 3,
                 'padding': 10,
                 'width': 1,
-                'height': 3/4,
+                'height': 1/4,
                 'abs_coordinates': (0, None),
                 'hcenter': False,
                 'vcenter': True,
-                'relative': ['forecast', 'temperature'],
+                'relative': ['text', 'pangram_c'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
                 'font_size': None,
-                'scale_y': .85
+                'inverse': True
     }
 
 }
 
 # apply the layout instructions to the layout object
-myLayout.layout = l
+layout_obj.layout = l
 
 # create a dictionary with the values that will be pushed to each block
 update = {
-    'weather_img': './docs/Avatar_cloud.png',      # weather_img block will recieve a .png
-    'temperature': '15C',                     # temperature block will receive `15C`
-    'wind': 'Wind East 3m/s',                 # wind block will recieve this text
-    'rain': 'Rain: 0%',                       # rain block
-    'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, low of 12 overnight. Tomorrow: temperatures falling to 15 with an increased chance of rain'
-}
+    'tux_img': './images/tux.png',      
+    'pangram_a': 'The quick brown fox jumps over the lazy dog.',  
+    'pangram_b': 'Pack my box with five jugs of liquor.',          
+    'pangram_c': 'Jackdaws love my big sphinx of quartz.',                    
+    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. '}
 
-# update the layout with the data in the dictionary
-myLayout.update_contents(update)
+# update the layout with the data in the dictionary and send each item to the proper block
+layout_obj.update_contents(update)
 
 # join all the sub images into one complete image
-myImg = myLayout.concat()
-
+myImg = layout_obj.concat()
 # write the image out to a file
-myImg.save('./my_forecast.png')
+myImg.save('sample.jpg')
 
 ```
 <a name="Notes"></a>
 ## Notes
-The Waveshare-epd library is not provided in an easily usable format. As of 1 Oct 2020, it cannot be directly installed with `pip` or `pipenv`. The package maintainers have used a literal '&' character in the subdirectory for the library making it extra difficult to use. Try the following to install it:
+The Waveshare-epd library is provided only as a git repo. Try the following to install it:
 
 ```
-pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi\&JetsonNano/python"
+pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
 ```
 
-This will likely result in a heap of errors. The library is not installed, but it does fetch the source.
+The IT8951 library is provided only as a git repo. Try the following ot install it:
 ```
-    ERROR: Error [Errno 2] No such file or directory: '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi': '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi' while executing command python setup.py egg_info
-ERROR: Could not install packages due to an EnvironmentError: [Errno 2] No such file or directory: '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi': '/home/pi/.local/share/virtualenvs/epdlib-AIMLabQa/src/waveshare-epd/RaspberryPi
+pipenv install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
 
-Finally install the library with:
+
+```python
+import epdlib
+s = epdlib.Screen()
 ```
-MYVENV=$(pipenv --venv) pipenv install -e $MYVENV/src/waveshare-epd/RaspberryPi\&JetsonNano/python
+
+
+```python
+s.vcom = -1.93
+```
+
+
+```python
+s.epd = "HD"
+```
+
+
+```python
+
 ```
 
 getting ready for pypi:
@@ -376,12 +366,4 @@ https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65
 
 ```python
 !jupyter-nbconvert --to markdown --stdout readme_inprogress.ipynb > README.md
-```
-
-    [NbConvertApp] Converting notebook readme_inprogress.ipynb to markdown
-
-
-
-```python
-
 ```
