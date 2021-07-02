@@ -365,7 +365,8 @@ class Screen():
             if self.HD:
                 self.epd.epd.sleep()
             else:
-                self.epd.sleep()                
+                self.epd.sleep()
+        return True
                 
     def _partial_writeEPD_hd(self, image):
         '''partial update, affects only changed black and white pixels with no flash
@@ -407,6 +408,10 @@ class Screen():
         return True
     
     def _epd_hd(self, epd):
+        '''configure & init IT8951 Screens
+        
+        Args:
+            epd(str): ignored; used for consistency for non-HD init'''
         from IT8951.display import AutoEPDDisplay
         from IT8951 import constants as constants_HD
         myepd = AutoEPDDisplay(vcom=self.vcom)
@@ -421,6 +426,11 @@ class Screen():
                 'constants': constants_HD}    
                     
     def _epd_non_hd(self, epd):
+        '''configure and init non IT8951 Screens
+        
+        Args:
+            epd(str): name of waveshare EPD module
+                see '''
         import waveshare_epd
         import pkgutil
         import inspect
@@ -467,6 +477,72 @@ class Screen():
 
 
 
+def list_compatible_modules(print_modules=True):
+    '''list compatible waveshare EPD modules
+    
+        This list includes only modules provided by the waveshare-epd git repo
+        and does **NOT** include HD IT8951 based panels'''
+    import pkgutil
+    import waveshare_epd
+    import inspect
+    from importlib import import_module
+    
+
+    panels = []
+    for i in pkgutil.iter_modules(waveshare_epd.__path__):
+        supported = True
+        display_args = []
+        clear_args = []
+        reason = []
+        if not 'epd' in i.name:
+            continue
+
+        try:
+            myepd = import_module(f'waveshare_epd.{i.name}')                
+        except ModuleNotFoundError:
+            reason.append(f'ModuleNotFound: {i.name}')
+        
+        try:
+            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
+            clear_args = clear_args_spec.args
+            if len(clear_args) > 2:
+                supported = False
+                reason.append('unsupported `EPD.Clear()` function')
+        except AttributeError:
+            supported = False
+            reason.append('AttributeError: module does not support `EPD.Clear()`')
+            
+        try:
+            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
+            display_args = display_args_spec.args
+        except AttributeError:
+            supported = False
+            reason.append('AttributeError: module does not support `EPD.display()`')
+            
+        
+
+
+        panels.append({'name': i.name, 
+                       'clear_args': clear_args, 
+                       'display_args': display_args,
+                       'supported': supported,
+                       'reason': reason})
+    
+#     return panels
+    if print_modules:
+        for idx, i in enumerate(panels):
+            print(f"{idx:02d}. {i['name']:<12s} supported: {i['supported']}")
+            if not i['supported']:
+                for j in i['reason']:
+                    print(f" * {j}")
+                
+    return panels
+
+
+
+
+
+
 def main():
     '''run a demo/test of attached EPD screen showing rotations and basic writing'''
     import pkgutil
@@ -478,13 +554,16 @@ def main():
     # from importlib import import_module
     # get a list of waveshare non-hd models
     panels = []
-    for i in pkgutil.iter_modules(waveshare_epd.__path__):
-        panels.append(i.name)
-    panels.append('All IT8951 Based Panels')
+#     for i in pkgutil.iter_modules(waveshare_epd.__path__):
+#         panels.append(i.name)
+#     panels.append('All IT8951 Based Panels')
     
-    print('Choose a pannel to test:')
-    for idx, i in enumerate(panels):
-        print(f'  {idx}. {i}')
+#     print('Choose a pannel to test:')
+#     for idx, i in enumerate(panels):
+#         print(f'  {idx}. {i}')
+    panels = list_compatible_modules()
+    panels.append({'name': 'All IT8951 Based Panels'})
+    print(f"{len(panels)-1}. {panels[-1]['name']}")
         
     choice = input('Enter the number of your choice: ')
     
@@ -493,7 +572,7 @@ def main():
     except ValueError as e:
         print(f'"{choice}" does not appear to be an valid choice. Exiting.')
         return
-    myepd = panels[choice]
+    myepd = panels[choice]['name']
     
     if choice > len(panels)+1:
         print(f'"{choice}" is not a valid panel option. Exiting.')
@@ -687,5 +766,12 @@ def main():
 
 if __name__ == '__main__':
     e= main()
+
+
+
+
+
+
+
 
 
