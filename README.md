@@ -1,376 +1,157 @@
-# epdlib v0.4
-EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
+This application is used to convert notebook files (*.ipynb) to various other
+formats.
+
+WARNING: THE COMMANDLINE INTERFACE MAY CHANGE IN FUTURE RELEASES.
+
+Options
+=======
+The options below are convenience aliases to configurable class-options,
+as listed in the "Equivalent to" description-line of the aliases.
+To see all configurable class-options for some <cmd>, use:
+    <cmd> --help-all
+
+--debug
+    set log level to logging.DEBUG (maximize logging output)
+    Equivalent to: [--Application.log_level=10]
+--generate-config
+    generate default config file
+    Equivalent to: [--JupyterApp.generate_config=True]
+-y
+    Answer yes to any questions instead of prompting.
+    Equivalent to: [--JupyterApp.answer_yes=True]
+--execute
+    Execute the notebook prior to export.
+    Equivalent to: [--ExecutePreprocessor.enabled=True]
+--allow-errors
+    Continue notebook execution even if one of the cells throws an error and include the error message in the cell output (the default behaviour is to abort conversion). This flag is only relevant if '--execute' was specified, too.
+    Equivalent to: [--ExecutePreprocessor.allow_errors=True]
+--stdin
+    read a single notebook file from stdin. Write the resulting notebook with default basename 'notebook.*'
+    Equivalent to: [--NbConvertApp.from_stdin=True]
+--stdout
+    Write notebook output to stdout instead of files.
+    Equivalent to: [--NbConvertApp.writer_class=StdoutWriter]
+--inplace
+    Run nbconvert in place, overwriting the existing notebook (only 
+    relevant when converting to notebook format)
+    Equivalent to: [--NbConvertApp.use_output_suffix=False --NbConvertApp.export_format=notebook --FilesWriter.build_directory=]
+--clear-output
+    Clear output of current file and save in place, 
+    overwriting the existing notebook.
+    Equivalent to: [--NbConvertApp.use_output_suffix=False --NbConvertApp.export_format=notebook --FilesWriter.build_directory= --ClearOutputPreprocessor.enabled=True]
+--no-prompt
+    Exclude input and output prompts from converted document.
+    Equivalent to: [--TemplateExporter.exclude_input_prompt=True --TemplateExporter.exclude_output_prompt=True]
+--no-input
+    Exclude input cells and output prompts from converted document. 
+    This mode is ideal for generating code-free reports.
+    Equivalent to: [--TemplateExporter.exclude_output_prompt=True --TemplateExporter.exclude_input=True]
+--allow-chromium-download
+    Whether to allow downloading chromium if no suitable version is found on the system.
+    Equivalent to: [--WebPDFExporter.allow_chromium_download=True]
+--log-level=<Enum>
+    Set the log level by value or name.
+    Choices: any of [0, 10, 20, 30, 40, 50, 'DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']
+    Default: 30
+    Equivalent to: [--Application.log_level]
+--config=<Unicode>
+    Full path of a config file.
+    Default: ''
+    Equivalent to: [--JupyterApp.config_file]
+--to=<Unicode>
+    The export format to be used, either one of the built-in formats
+    ['asciidoc', 'custom', 'html', 'html_ch', 'html_embed', 'html_toc',
+    'html_with_lenvs', 'html_with_toclenvs', 'latex', 'latex_with_lenvs',
+    'markdown', 'notebook', 'pdf', 'python', 'rst', 'script', 'selectLanguage',
+    'slides', 'slides_with_lenvs', 'webpdf'] or a dotted object name that
+    represents the import path for an `Exporter` class
+    Default: ''
+    Equivalent to: [--NbConvertApp.export_format]
+--template=<Unicode>
+    Name of the template to use
+    Default: ''
+    Equivalent to: [--TemplateExporter.template_name]
+--template-file=<Unicode>
+    Name of the template file to use
+    Default: None
+    Equivalent to: [--TemplateExporter.template_file]
+--writer=<DottedObjectName>
+    Writer class used to write the  results of the conversion
+    Default: 'FilesWriter'
+    Equivalent to: [--NbConvertApp.writer_class]
+--post=<DottedOrNone>
+    PostProcessor class used to write the results of the conversion
+    Default: ''
+    Equivalent to: [--NbConvertApp.postprocessor_class]
+--output=<Unicode>
+    overwrite base name use for output files. can only be used when converting
+    one notebook at a time.
+    Default: ''
+    Equivalent to: [--NbConvertApp.output_base]
+--output-dir=<Unicode>
+    Directory to write output(s) to. Defaults to output to the directory of each
+    notebook. To recover previous default behaviour (outputting to the current
+    working directory) use . as the flag value.
+    Default: ''
+    Equivalent to: [--FilesWriter.build_directory]
+--reveal-prefix=<Unicode>
+    The URL prefix for reveal.js (version 3.x). This defaults to the reveal CDN,
+    but can be any url pointing to a copy  of reveal.js.
+    For speaker notes to work, this must be a relative path to a local  copy of
+    reveal.js: e.g., "reveal.js".
+    If a relative path is given, it must be a subdirectory of the current
+    directory (from which the server is run).
+    See the usage documentation
+    (https://nbconvert.readthedocs.io/en/latest/usage.html#reveal-js-html-
+    slideshow) for more details.
+    Default: ''
+    Equivalent to: [--SlidesExporter.reveal_url_prefix]
+--nbformat=<Enum>
+    The nbformat version to write. Use this to downgrade notebooks.
+    Choices: any of [1, 2, 3, 4]
+    Default: 4
+    Equivalent to: [--NotebookExporter.nbformat_version]
+
+Examples
+--------
+
+    The simplest way to use nbconvert is
+    
+    > jupyter nbconvert mynotebook.ipynb --to html
+    
+    Options include ['asciidoc', 'custom', 'html', 'html_ch', 'html_embed', 'html_toc', 'html_with_lenvs', 'html_with_toclenvs', 'latex', 'latex_with_lenvs', 'markdown', 'notebook', 'pdf', 'python', 'rst', 'script', 'selectLanguage', 'slides', 'slides_with_lenvs', 'webpdf'].
+    
+    > jupyter nbconvert --to latex mynotebook.ipynb
+    
+    Both HTML and LaTeX support multiple output templates. LaTeX includes
+    'base', 'article' and 'report'.  HTML includes 'basic' and 'full'. You
+    can specify the flavor of the format used.
+    
+    > jupyter nbconvert --to html --template lab mynotebook.ipynb
+    
+    You can also pipe the output to stdout, rather than a file
+    
+    > jupyter nbconvert mynotebook.ipynb --stdout
+    
+    PDF is generated via latex
+    
+    > jupyter nbconvert mynotebook.ipynb --to pdf
+    
+    You can get (and serve) a Reveal.js-powered slideshow
+    
+    > jupyter nbconvert myslides.ipynb --to slides --post serve
+    
+    Multiple notebooks can be given at the command line in a couple of 
+    different ways:
+    
+    > jupyter nbconvert notebook*.ipynb
+    > jupyter nbconvert notebook1.ipynb notebook2.ipynb
+    
+    or you can specify the notebooks list in a config file, containing::
+    
+        c.NbConvertApp.notebooks = ["my_notebook.ipynb"]
+    
+    > jupyter nbconvert --config mycfg.py
+
+To see all available configurables, use `--help-all`.
 
-## Changes
-**Screen**
-
-* now supports IT9851 based panels
-* `Screen.epd` object is now supplied as a string, not an object
-    - use `epdlib.Screen.list_compatible_modules()` to show compatible waveshare_epd panels
-    - use `Screen(epd='HD', vcom=[your IT9851 vcom (see ribon cable)]` for IT8951 based panels
-* `Screen.writeEPD()` now supports partial refresh on IT9851 panels for partial refresh of black & white pixels
-    - use `writeEPD(image, partial=True)`
-    - partial refresh does not affect gray pixels
-
-
-**Block**
-
-* now supports 8 bit grayscale images, text and background on IT8951 based panels
-    - previously 8 bit images were downscaled to dithered 1 bit images; this is still the case on 1 bit panels
-    - use `Block.mode = "L"` for 8 bit support within a block
-* now supports 8 bit fill and background on IT8951 panels
-    - use `Block.background=[0-255]` and `Block.fill=[0-255]` 0 is black, 255 is fully white
-* padding now fully supported in all block types
-    - previosuly only worked properly on `ImageBlock` objects
-
-**Layout**
-* now supports the following features when specified in the layout dictionary:
-    - `'fill': 0-255` specify text fill (8 bit gray 0 is black)
-    - `'bkground: 0-255` specify background color (8 bit gray 0 is black)
-    - `'mode': "L"/"1"` specify block image mode "L" 8 bit, "1" 1 bit
-
-## Dependencies
-Python Modules:
-* Pillow
-    - System dependencies for Pillow:
-        * libopenjp2-7
-        * libtiff5
-* RPi.GPIO
-* spidev
-    - ensure SPI is enabled on the pi
-* waveshare-epd (Non IT8951 based panels)
-    - this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
-    - see [notes](#Notes) below for installation instructions
-* IT8951 (IT8951 based panels)
-    - see [notes](#Notes) below for installation instructions
-
-
-
-**Modules:**
-* [Block](#Block) - image and text blocks that can be assembed into a final layout
-* [Layout](#Layout) - generate dynamic layouts from Blocks
-* [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
-
-<a name="Block"></a>
-## Block Module
-`Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
-*Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0)`
-
-### Properties
-        
-Parent class for other types of blocks
-
-Args [default value]: 
- *  `area`(list/tuple): x and y integer values for dimensions of block area
- *  `hcenter`(bool): True: horizontally center contents [False]
- *  `vcenter`(bool): True: vertically center contents [False]
- *  `rand`(bool): True: randomly place contents in area [False]
- *  `inverse`(bool): True: invert pixel values [False]
- *  `abs_coordinates`(list/tuple): x, y integer coordinates of this block area
-    within a larger image [(0, 0)]
- *  `padding`(int): number of pixels to pad around edge of contents [0]
- *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 black]
- *  `bkground`(int): 0-255 8 bit value for background color [255 white]
- *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
-
-Properties:
- *  `image`: None - overridden in child classes'''
-
-### Methods
-`update(update)`
-Place holder method for child classes.
- 
-
-## Block.TextBlock
-Child class of `Block` that contains formatted text. `TextBlock` objects can do basic formatting of strings. Text is always rendered as a 1 bit image (black on white or white on black). Text can be horizontally justified and centered and vertically centered within the area of the block. 
-
-All properties of the parent class are inherited.
-
-*Class* `Block.TextBlock(font, area, text='NONE', font_size=0, max_lines=1, maxchar=None, chardist=None)`
-
-`TextBlock` objects will attempt to calculate the appropriate number of characters to render on each line given an area, font face and character distribution. Each font face renders characters at a different width and each TTF character uses a different X width (excluding fixed-width fonts). Each language favors certain characters over others. 
-
-### Properties
-* `font` (str): path to TTF font face - relative paths are acceptable
-* `area` (2-tuple of int): area of block in pixles - required
-* `text` (str): string to format 
-    - Default: 'NONE'
-* `font_size` (int): font size in points
-    - Default: 0
-* `max_lines` (int): maximum number of lines to use when wrapping text
-    - Default: 1
-* `maxchar` (int): maximum number of characters to fit on a line
-    - if set to `None`, the text block will calculate this value based on the font face and specified `chardist`
-    - Default: None
-* `chardist` (dict): statistical character distribution for a supported language to use for a specified font
-    - dictionary of letter and float representing fractional distribution (see `print_chardist`)
-* `image` (PIL.Image): resultant image generated of formatted text
-
-### Functions
-* `print_chardist(chardist=None)` - print supported character distrubtions
-    - chardist (str)
-        - `chardist='USA_CHARDIST'` print the character distribution for USA English
-
-### Methods
-* `update(update=None)` - Update the text string with a new string and sets `image` property
-    - update (str)
-
-## Block.ImageBlock
-Child class of `Block` that contains formated images. `ImageBlock` objects do basic formatting of color, centering and scaling. All `ImageBlock` images are 8 bit grayscale `Pillow.Image(mode='L')`. Images that are too large for the area are rescaled using the `Pillow.Image.thumbnail()` strageies to limit distortion. Images that are smaller than the set area will **not** be resized.
-
-All properties of the parent class are inherited.
-
-*Class* `Block.ImageBlock(area, image=None)`
-
-### Properties
-* `image` (:obj:PIL.Image or :obj:str) - `Pillow` image or path provided as a `str` to an image file; relative paths are acceptable
-
-<a name="Layout"></a>
-## Layout Module
-`Layout` objects support scaling images and dynamically scaling [TTF](https://en.wikipedia.org/wiki/TrueType) font-size for different screen sizes. 
-
-Font sizes are set based on each individual font and scaled to fit within text blocks using the maximum number of lines specified in the layout. Text is line-broken using the python [textwrap logic](https://docs.python.org/3.7/library/textwrap.html).
-
-*Class* `Layout(resolution, layout=None)`
-
-## Scaling Example
-epdlib `Layout` objects can be scaled to any (reasonable) resolution while maintaining internally consistent ratios.
-
-**500x500 Layout**
-
-![500x500 weather image](./docs/weather_5x5.png)
-
-**300x200 Layout**
-![300x200 weather_image](./docs/weather_3x2.png)
-
-
-### Properties
-* `resolution` (2-tuple of int): resolution of the entire screen in pixles
-* `layout` (dict): dictionary containing layout paramaters for each block
-    - see example below in Quick-Start Recipe
-* `image` (Pil.Image): concatination of all blocks into single image
-
-### Methods
-* `concat()`: join all blocks into a single image
-    - sets `image` property
-* `update_contents(updates=None)` - update the contents of each block
-    - updates (dict)
-        - dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
-
-<a name="Screen"></a>
-## Screen Module
-`Screen` objects provide a method for waking and writing to a WaveShare E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
-
-*Class* `Screen(resolution=None, epd=None)`
-
-### Properties
-* `resolution` (2 tuple of int): resolution in pixels 
-    - this is overriden by the epd object resolution when it is set
-* `epd` (epd object)
-    - waveshare epd object used for interfacing with the display
-* `update` (obj:Screen.Update): monotonicly aware object that tracks time since last update
-* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen 
-* `mode`(str): '1' for 1 bit screens, 'L' for screens capable of 8 bit grayscale
-* `vcom`(float): vcom voltage for HD IT8951 based screens (not needed & ignored for non-HD screens)
-
-
-### Methods
-* `clearScreen()`: Set a blank image screen
-* `clearEPD()`: send the clear signal to the EPD to wipe all contents and set to "white"
-* `writeEPD(image, sleep=True, partial=False)`: write `image` to the EPD. 
-    - resets update timer
-    - sleep: put the display to low power mode (default: True)
-    - partial: update only chaged portions of the screen (faster, but only works with black and white pixles) (default: False)
-* `intiEPD()` - initializes the EPD for writing
-* `blank_image():` produces a blank PIL.Image in of `mode` type of `resolution` dimensions
-* `list_compatible_modules()`: print a list of all waveshare_epd panels that are compatible with paperpi
-
-### Example
-```
-import Screen
-import waveshare_epd
-myScreen = Screen()
-myScreen.epd = "epd5in83"
-myScreen.initEPD()
-myScreen.writeEPD('./my_image.png')
-```
-
-
-## Screen.Update
-Create a monotonically aware object that records the passage of time.
-
-*Class* `Screen.Update()`
-
-### Properties
-* `age` (float): age in seconds since creation
-* `now` (float): time in [CLOCK_MONOTONIC](https://linux.die.net/man/3/clock_gettime) time
-* `last_updated` (float): time in seconds since last updated
-* `update` (bool): True - trigger resets last_updated time
-
-### Methods
-* `update(update=True)` - reset last_updated timer to zero
-
-### Example
-```
-import Screen
-u = Update()
-u.now
->>> 357147.118559987
-u.age
->>> 37.449310125026386
-u.last_updated
->>> 62.2587232599617
-u.update = True
-u.last_updated
->>> 0.00021347898291423917
-```
-
-## Screen.ScreenShot
-Capture a rolling set of screenshots. When the total number of screenshots exceeds `n` the oldest is deleted. Images are stored as .png.
-
-This is useful for debugging over time.
-
-*Class* `Screen.ScreenShot(path='./', n=2, prefix=None)`
-
-### Properties
-* `total` (int): total number of screenshots to keep
-* `prefix` (str): prefix to add to filenames
-* `time` (str): time in format: %y-%m-%d_%H%M.%S - 2020-02-29_1456.39
-* `img_array` (list): list of files stored in `path`
-
-### Methods
-* `delete(img)`: delete `img` file
-* `save(img)`: save `img` to `path`
-    - img: PIL.Image
-```
-import Screen
-scrnShot = Screen.ScreenShot(path='/temp/', n=20)
-spam = PIL.Image.new(mode='L', size=(100, 100), color=0)
-scrnShot.save(spam)
-```
-
-## Quick-Start Recipe
-The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
-
-### Creating an Image from a Layout
-```
-import epdlib
-
-# create the layout object - adjust the resolution to match the display area
-layout_obj = epdlib.Layout(resolution=(640, 400))
-
-l = { # basic two row layout
-    'tux_img': {                
-            'image': True,               # image block
-            'padding': 10,               # pixels to padd around edge
-            'width': 1/4,                # 1/4 of the entire width
-            'height': 1/4,               # 1/4 of the entire height
-            'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
-            'hcenter': True,             # horizontally center image
-            'vcenter': True,             # vertically center image
-            'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-            'mode': 'L',                 # treat this image as an 8bit gray-scale image
-        },
-    'pangram_a': { 
-                'image': None,           # set to None if this is a text block
-                'max_lines': 3,          # maximum lines of text to use when wrapping text
-                'padding': 10,           # padding around all edges (in pixles)
-                'width': 3/4,            # proportion of the entire width
-                'height': 1/4,           # proprtion of the entire height
-                'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
-                                              # coordinates that are relative to other blocks and will be calculated
-                'hcenter': False,         # horizontal-center the text and the resulting image
-                'vcenter': True,         # vertically-center the text within the block
-                'relative': ['tux_img', 'pangram_a'], # blocks to which THIS block's coordinates are relative to
-                                                            # -- in this case X: `weather_img` and Y: `temperature`
-                                                            # the width of the block `weather` will be used to
-                                                            # to calculate the X value of this block and the Y value
-                                                            # specified within the `temperature` block will be used 
-                'font': './fonts/Open_Sans/OpenSans-Regular.ttf', # TTF Font face to use; relative paths are OK
-                'font_size': None         # set this to None to automatically scale the font to the size of the block
-    },
-    'pangram_b': { 
-                'image': None,
-                'max_lines': 2,
-                'padding': 0,
-                'width': 1,
-                'height': 1/4,
-                'abs_coordinates': (0, None),
-                'hcenter': True,
-                'vcenter': True,
-                'relative': ['pangram_b', 'tux_img'],
-                'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
-                'font_size': None,
-                'inverse': True
-    },
-    'pangram_c': { 
-                'image': None,
-                'max_lines': 3,
-                'padding': 0,
-                'width': 1,
-                'height': 1/4,
-                'abs_coordinates': (0, None),
-                'hcenter': True,
-                'vcenter': False,
-                'relative': ['pangram_c', 'pangram_b'],
-                'font': './fonts/Open_Sans/OpenSans-BoldItalic.ttf',
-                'font_size': None,
-                'inverse': False,
-    },    
-    'text': {
-                'image': None,
-                'max_lines': 3,
-                'padding': 10,
-                'width': 1,
-                'height': 1/4,
-                'abs_coordinates': (0, None),
-                'hcenter': False,
-                'vcenter': True,
-                'relative': ['text', 'pangram_c'],
-                'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
-                'font_size': None,
-                'inverse': True
-    }
-
-}
-
-# apply the layout instructions to the layout object
-layout_obj.layout = l
-
-# create a dictionary with the values that will be pushed to each block
-update = {
-    'tux_img': './images/tux.png',      
-    'pangram_a': 'The quick brown fox jumps over the lazy dog.',  
-    'pangram_b': 'Pack my box with five jugs of liquor.',          
-    'pangram_c': 'Jackdaws love my big sphinx of quartz.',                    
-    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. '}
-
-# update the layout with the data in the dictionary and send each item to the proper block
-layout_obj.update_contents(update)
-
-# join all the sub images into one complete image
-myImg = layout_obj.concat()
-# write the image out to a file
-myImg.save('sample.jpg')
-
-```
-<a name="Notes"></a>
-## Notes
-The Waveshare-epd library is provided only as a git repo. Try the following to install it:
-
-```
-pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
-```
-
-The IT8951 library is provided only as a git repo. Try the following ot install it:
-```
-pipenv install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
-```
-
-getting ready for pypi:
-https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65edc5fe9c56
-
-
-```python
-!jupyter-nbconvert --to markdown --stdout readme_inprogress.ipynb > README.md
-```
