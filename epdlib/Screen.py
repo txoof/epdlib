@@ -507,7 +507,7 @@ def list_compatible_modules(print_modules=True):
             clear_args = clear_args_spec.args
             if len(clear_args) > 2:
                 supported = False
-                reason.append('unsupported `EPD.Clear()` function')
+                reason.append('Non-standard, unsupported `EPD.Clear()` function')
         except AttributeError:
             supported = False
             reason.append('AttributeError: module does not support `EPD.Clear()`')
@@ -530,11 +530,14 @@ def list_compatible_modules(print_modules=True):
     
 #     return panels
     if print_modules:
+        print(f'NN. Board        Supported:')
+        print( '---------------------------')
         for idx, i in enumerate(panels):
-            print(f"{idx:02d}. {i['name']:<12s} supported: {i['supported']}")
+            print(f"{idx:02d}. {i['name']:<12s} {i['supported']}")
             if not i['supported']:
+                print(f'    Issues:')
                 for j in i['reason']:
-                    print(f" * {j}")
+                    print(f"     * {j}")
                 
     return panels
 
