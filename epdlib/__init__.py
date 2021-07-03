@@ -5,5 +5,5 @@ __all__ = ['Layout', 'Screen', 'Block']
 from .Block import TextBlock
 from .Block import ImageBlock
 from .Layout import Layout
-from .Screen import Screen, ScreenShot, Update
+from .Screen import Screen, ScreenShot, Update, list_compatible_modules
 
