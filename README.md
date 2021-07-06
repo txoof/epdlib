@@ -4,6 +4,7 @@ EpdLib is a library for creating dynamically scaled screen layouts for frame-buf
 ## Changes
 ### v0.4
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
+    - Assigning EPD object to screen has changed from directy assignment to using a the string that corresponds to the name.
 See the [ChangeLog](./changes.md) for details
 
 ## Dependencies
