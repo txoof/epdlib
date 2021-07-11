@@ -228,15 +228,16 @@ class Layout:
                   'dimensions': None,
                   'scale_x': None, 
                   'scale_y': None,
+                  'padding': 0,
                   'mode': '1',
                   'fill': 0,
                   'bkground': 255}               
         
         for section in self.layout:
-            logging.debug(f'*****{section}*****')
+            logging.info(f'*****{section}*****')
             this_section = self._check_keys(self.layout[section], values)
-            dimensions = (round(self.resolution[0]*this_section['width']),
-                          round(self.resolution[1]*this_section['height']))
+            dimensions = (round(self.resolution[0]*this_section['width'])-this_section['padding']*2,
+                          round(self.resolution[1]*this_section['height']-this_section['padding']*2))
                     
             this_section['dimensions'] = dimensions
             logging.debug(f'dimensions: {dimensions}')
@@ -277,7 +278,7 @@ class Layout:
                                                             lines=this_section['max_lines'],
                                                             maxchar=this_section['maxchar'])
                 
-    def _scalefont(self, font, dimensions, lines, maxchar, text="W W W "):
+    def _scalefont(self, font, dimensions, lines, maxchar, text="Ww Qq "):
         """Scale a font to fit the number of `lines` within `dimensions`
         
         Args:
@@ -285,9 +286,9 @@ class Layout:
             dimensions(:obj:`tuple` of :obj:`int`): dimensions of pixles         
             lines(int): number of lines of text to fit within the `dimensions`            
             maxchar(int): number of characters of `text` to use when calculating 
-                default is 'W W W ' -- W is a large character and spaces allow 
-                textwrap to work properly
-            text(str): string to use when calculating (default: 'W W W ')
+                default is 'Ww Qq' -- W and Q are large characters and have decenders;
+                spaces allow textwrap to work properly
+            text(str): string to use when calculating (default: 'Ww Qq ')
             
         Returns:
             :obj:int: font size as integer"""        
@@ -301,8 +302,8 @@ class Layout:
         
         # start calculating at size = 1
         fontsize = 1
-        x_fraction = .85 # fraction of x height to use
-        y_fraction = .75 # fraction of y width to use
+        x_fraction = 1 # fraction of x height to use
+        y_fraction = 1 # fraction of y width to use
         xtarget = dimensions[0]/x_fraction # target width of font
         ytarget = dimensions[1]/lines*y_fraction # target heigight of font
         
@@ -360,6 +361,7 @@ class Layout:
                                               vcenter=section['vcenter'], 
                                               inverse=section['inverse'], 
                                               rand=section['rand'], 
+                                              padding=section['padding'],
                                               abs_coordinates=section['abs_coordinates'],
                                               fill=section['fill'],
                                               bkground=section['bkground'],
@@ -394,8 +396,10 @@ class Layout:
             try:
                 dictionary[k]
             except KeyError as e:
-                logging.debug(f'adding key: {k}: {v}')
+#                 logging.debug(f'adding key: {k}: {v}')
                 dictionary[k] = v
+
+        logging.debug(f'layout keys: {dictionary}')
         return dictionary
     
     def update_contents(self, updates=None):
@@ -444,6 +448,7 @@ class Layout:
 
 # logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
+# logging.root.setLevel('DEBUG')
 
 
 
@@ -456,7 +461,7 @@ class Layout:
 # l = { # basic two row layout
 #     'weather_img': {                
 #             'image': True,               # image block
-#             'padding': 1,               # pixels to padd around edge
+#             'padding': 20,               # pixels to padd around edge
 #             'width': 1/4,                # 1/4 of the entire width
 #             'height': 1/4,               # 1/4 of the entire height
 #             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
@@ -474,7 +479,7 @@ class Layout:
 #                 'height': 1/4,           # proprtion of the entire height
 #                 'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
 #                                               # coordinates that are relative to other blocks and will be calculated
-#                 'hcenter': True,         # horizontal-center the text and the resulting image
+#                 'hcenter': False,         # horizontal-center the text and the resulting image
 #                 'vcenter': True,         # vertically-center the text within the block
 #                 'relative': ['weather_img', 'temperature'], # blocks to which THIS block's coordinates are relative to
 #                                                             # -- in this case X: `weather_img` and Y: `temperature`
@@ -482,7 +487,8 @@ class Layout:
 #                                                             # to calculate the X value of this block and the Y value
 #                                                             # specified within the `temperature` block will be used 
 #                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf', # TTF Font face to use; relative paths are OK
-#                 'font_size': None         # set this to None to automatically scale the font to the size of the block
+#                 'font_size': None,         # set this to None to automatically scale the font to the size of the block
+#                 'bkground': 128,
 #     },
 #     'wind': { 
 #                 'image': None,
@@ -522,7 +528,8 @@ class Layout:
 #                 'relative': ['forecast', 'temperature'],
 #                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
 #                 'font_size': None,
-#                 'scale_y': .85
+#                 'padding': 10,
+# #                 'scale_y': .85
 #     }
 
 # }
@@ -532,11 +539,12 @@ class Layout:
 
 
 # update = {
-#     'weather_img': '../portrait-pilot_SW0YN0Z5T0.jpg',      # weather_img block will recieve a .png
+#     'weather_img': '../images//portrait-pilot_SW0YN0Z5T0.jpg',      # weather_img block will recieve a .png
 #     'temperature': '15C',                     # temperature block will receive `15C`
 #     'wind': 'Wind East 3m/s',                 # wind block will recieve this text
 #     'rain': 'Rain: 0%',                       # rain block
-#     'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, low of 12 overnight. Tomorrow: temperatures falling to 15 with an increased chance of rain'
+# #     'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, low of 12 overnight. Tomorrow: temperatures falling to 15 with an increased chance of rain'
+#     'forecast': "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet."
 # }
 # myLayout.update_contents(update)
 
