@@ -30,27 +30,6 @@ except ImportError as e:
 
 
 
-# def check_num(func):
-#     """decorator function wrapper"""
-#     def func_wrapper(self, d, *args, **kwargs):
-#         """Check for positive integers
-#         Params:
-#             d(int): integer to check
-        
-#         Raises:
-#             ValueError - values that are negative, not integer"""
-#         if not isinstance(d, int):
-#             raise ValueError (f'{d} is not an integer')
-#         if d < 0:
-#             raise ValueError (f'{d} < 0 {func} only accepts values >= 0')
-#         return func(self, d, *args, **kwargs)
-#     return func_wrapper
-
-
-
-
-
-
 def strict_enforce(*types):
     """strictly enforce type compliance within classes
     
@@ -513,6 +492,7 @@ class TextBlock(Block):
         s_length = self.font.getsize(s)[0] # string length in Pixles
         # find average width of each character
         avg_width = s_length/len(s)
+        logging.debug(f'average character width: {avg_width}')
         maxchar = round(self.area[0]/avg_width)
         self._maxchar = maxchar
         logging.debug(f'maximum characters per line: {maxchar}')
@@ -532,7 +512,8 @@ class TextBlock(Block):
         Returns:
             :obj:`list` of :obj:`str`"""        
         logging.debug(f'formatting string: {self.text}')
-        wrapper = textwrap.TextWrapper(width=self.maxchar, max_lines=self.max_lines, placeholder='…')
+        wrapper = textwrap.TextWrapper(width=self.maxchar, max_lines=self.max_lines, placeholder='…',
+                                      break_long_words=True, )
         formatted = wrapper.wrap(self.text)
         logging.debug(f'formatted list:\n {formatted}')
         return(formatted)
@@ -597,12 +578,22 @@ class TextBlock(Block):
             if self.vcenter:
                 logging.warning('`rand` overrides vcenter')
             x_range = int(self.area[0] - x_max - self.padding)
-            y_range = int(self.area[1] - y_total)
+            y_range = int(self.area[1] - y_total - self.padding)
             
             
             # choose random placement
-            paste_x = randrange(self.padding, x_range-self.padding, 1)
-            paste_y = randrange(self.padding, y_range-self.padding, 1)            
+            logging.debug('random range:')
+            logging.debug(f'X: {self.padding}:{x_range}, 1')
+            logging.debug(f'Y: {self.padding}:{y_range}, 1')
+            try:
+                paste_x = randrange(self.padding, x_range, 1)
+            except ValueError:
+                paste_x = self.padding
+                
+            try:
+                paste_y = randrange(self.padding, y_range, 1)            
+            except ValueError:
+                paste_y = self.padding
         
         # combine images
         image.paste(text_image, [paste_x, paste_y])
@@ -634,12 +625,12 @@ class TextBlock(Block):
 
 
 
-# t = TextBlock(area=(800, 600), font='../fonts/Font.ttc', font_size=88, max_lines=3,
+# t = TextBlock(area=(800, 600), font='../fonts/Font.ttc', font_size=55, max_lines=8,
 #              padding=2, inverse=False, hcenter=False, vcenter=False, rand=True, mode='L', bkground=0, fill=120)
-# t.text = 'The Quick Brown Fox Jumps Over the Lazy Dog'
+# # t.text = 'The Quick Brown Fox Jumps Over the Lazy Dog'
 
-# t.inverse = not t.inverse
-# t.update('The five boxing wizards jump quickly')
+# # t.inverse = not t.inverse
+# t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
 # t.image
 
 
@@ -714,7 +705,7 @@ class ImageBlock(Block):
                 
             if self.inverse:
                 im = ImageOps.invert(im)
-   
+            logging.debug(f'padding: {self.padding}')
             paste_x = self.padding
             paste_y = self.padding
 
@@ -776,8 +767,8 @@ class ImageBlock(Block):
 
 # i = ImageBlock(area=(900, 800), mode='L', 
 #                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=200)
-# i.update('../portrait-pilot_SW0YN0Z5T0.jpg')
-# i.update('../hubble.jpg')
+# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
+# # i.update('../images/hubble.jpg')
 
 # i.image
 
