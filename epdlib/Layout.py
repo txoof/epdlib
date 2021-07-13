@@ -59,396 +59,195 @@ def strict_enforce(*types):
 
 
 class Layout:
-    """Class for defining layout of epd screen
-    
-    This class allows screen layouts to be declared in terms of image blocks within an area. 
-    Block placement is defined in terms of absolute or relative positions. Only one block 
-    with absolute coordinates is needed. Block size is calculated based on screen size making
-    it possible to define one layout that will work on screens of different dimensions.
-    
-    layouts are specified using the following key/value pairs. Those marked with a * are required
-    for all blocks
-    *'image': (None/True)          # None/False indicates this will NOT be an image block
-    'max_lines': (int)             # maximum number of lines of text this block can accomodate
-    'padding': (int)               # number of pixles to add around an image
-    *'widht': (int/real)           # fractional portion of screen width this block occupies e.g. 
-                                   # 1/2, 1, .25
-    *'height': (int/real)          # fractional portion of the screen height this block occupies
-    *'abs_coordinates': (tuple)    # tuple of X, Y coordinates where this block lies within the 
-                                   # larger screen area. EVERY layout must have at least one block
-                                   # that is defined ABSOLUTELY - typically: (0, 0)
-                                   # When a block is placed relative to another
-                                   # block use `None` to indicate that this is a calculated coordiante
-                                   # e.g. (0, None) - Use an absolute value of X=0 and Y=None(calculated)
-    'hcenter': (bool)              # horizontally center the text and image of the text in the block
-    'vcenter': (bool)              # vertically center the text within the image block
-    'rand' (bool)                  # True: randomply place the image within the area (overrides v/h center)
-    *'relative': (False/list)      # False for blocks with absolute position; use a list other blocks
-                                   # to use for calculating the position of this block e.g.
-                                   # ['coverart', title] - reference the block `coverart` for the 
-                                   # X position and `title` for the Y position of this block
-    'font': (str):                 # Path to font file (relative paths are acceptable)
-    'font_size': (None/int)        # None - calculate the font size, int - size in points
-    'inverse': (bool)              # True: use black background, white fill
-    'mode': (str)                  # '1': 1 bit color, 'L': 8 bit color (1bit default)
-    'fill': (int)                  # 0-255 color for text fill, lines, etc. (0 default black)
-    'bkground': (int)              # 0-255 color for background color (255 default white)
-
-    
-    Layouts are defined using any name and can be updated by calling the update() method with 
-    a parameter that includes a dictionary containing a key/value pair that matches the names
-    see the example below.
-    Sample Laout:
-    
-    myLayout = {
-            'title': {                       # text only block
-                'image': None,               # do not expect an image
-                'max_lines': 2,              # number of lines of text
-                'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
-                'height': 2/3,               # 1/3 of the entire height
-                'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
-                'hcenter': True,             # horizontally center text
-                'vcenter': True,             # vertically center text 
-                'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-                'font': './fonts/Font.ttc', # path to font file
-                'font_size': None            # Calculate the font size because none was provided
-            },
-
-            'artist': {
-                'image': None,
-                'max_lines': 1,
-                'width': 1,
-                'height': 1/3,
-                'abs_coordinates': (0, None),   # X = 0, Y will be calculated
-                'hcenter': True,
-                'vcenter': True,
-                'font': './fonts/Font.ttc',
-                'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
-                                               # calculate the y position based on the size of `title` block
-
-            }
-    }
-    
-    
-    Example creating and updating a layout:
-    layouts.threeRow has the sections: 'title', 'album', 'artist', 'mode', 'coverart'
-    # creates the object and calculates the positions based on the rules set 
-    # in the layouts file and screen size
-    l = Layout(resolution=(600, 448), layout=myLayout)
-    # update/add content to the layout object, applying formatting from layout file
-    l.update_contents({'title': 'Hannah Hunt', 'album': 'Modern Vampires of the City', 
-                       'artist': 'Vampire Weekend')
-                       
-    Example displaying layout:
-    """    
     def __init__(self, resolution, layout=None):
-        """Initializes layout object
+        '''init layout object
         
         Args:
-            resolution (:obj:`tuple` of :obj: `int`): X, Y screen resolution in pixles
-            layout: (dict): layout
+            resolution(tuple of int): X, Y screen resolution
+            layout(dict): layout rules
+            
         Attributes:
-            blocks (:obj:`dict` of :obj:`Block`): dictionary of ImageBlock and TextBlock objects
-            screen (:obj:PIL.Image): single image composed from all of the blocks defined in the layout"""
+            blocks(dict of Block obj): dictionary of ImageBlock and TextBlock objects
+            screen(PIL.Image): single image composed of all blocks defined in the layout
+            mode(str): "L" (8bit) or "1" (1bit) if any blocks are 8bit, this will be set to "L" '''
         
-        logging.debug('creating layout')           
         self.resolution = resolution
-        self.image = None
-        self.layout = layout
         self.screen = None
-        
+        self.mode = "1"
+        self.layout = layout
+        self._calculate_layout()
+        self._set_blocks()
+
     @property
     def resolution(self):
-        """:obj:tuple of :obj:int - resolution in pixles of entire layout area"""
+        '''tuple of int: absolute resolution of screen'''
         return self._resolution
-    
-    
+
     @resolution.setter
     @strict_enforce((list, tuple))
     def resolution(self, resolution):
-        for each in resolution:
-            if each < 0:
-                raise ValueError(f'resolution must be positive integers: {each}')
-        
+        for i in resolution:
+            if i < 0:
+                raise ValueError('resolution values must be positive integers')
+
+            if not isinstance(i, int):
+                raise ValueError('resolution values must be positive integers')
+
         self._resolution = resolution
-        
-    
+
     @property
     def layout(self):
-        """:obj:dict dictionary defnining layout
-        
-            missing and relative coordinates values are calculated and set here
-        
-        Properties set:
-            images(:obj:dict of :obj:PIL.Image)"""
         return self._layout
     
     @layout.setter
+    @strict_enforce((dict, type(None)))
     def layout(self, layout):
+        self._layout = layout
         
         if layout:
-            logging.debug(f'calculating layout for resolution {self.resolution}')
-        else:
-            self._layout = None
-            return
-        
-        self._layout = copy.deepcopy(layout)
-        logging.debug(f'layout id({id(self._layout)})')
-        self._calculate_layout()
-        self._set_images()
-        
-    def _calculate_layout(self):
-        """Calculate the size and position of each text block based on rules in layout
-        
-        Args:
-            layout(dict): dictionary containing the layout to be used
-        
-        Returns:
-            layout(dict): dictionary that includes rules and values for the layout"""
+            self._calculate_layout()
+            self._set_blocks()
+            
+    def _set_blocks(self):
+        '''create dictionary of all image blocks using the specified layout'''
         if not self.layout:
-            return None
+            return        
         
-        # required values that will be used in calculating the layout
-        # only these values from the layout will be used when setting up the blocks
-        # values here are default if none are provided in layout section
-        values = {'image': None, 
-                  'max_lines': 1, 
-                  'padding': 0, 
-                  'width': 1, 
-                  'height': 1, 
-                  'abs_coordinates': (None, None), 
-                  'hcenter': False, 
-                  'vcenter': False, 
-                  'rand': False, 
-                  'inverse': False, 
-                  'relative': False, 
-                  'font': None, 
-                  'font_size': None, 
-                  'maxchar': None, 
-                  'dimensions': None,
-                  'scale_x': None, 
-                  'scale_y': None,
-                  'padding': 0,
-                  'mode': '1',
-                  'fill': 0,
-                  'bkground': 255}               
+        blocks = {}
+        logging.info('setting blocks')
+        
+        mode_count = 0
         
         for section in self.layout:
-            logging.info(f'*****{section}*****')
-            this_section = self._check_keys(self.layout[section], values)
-            dimensions = (round(self.resolution[0]*this_section['width'])-this_section['padding']*2,
-                          round(self.resolution[1]*this_section['height']-this_section['padding']*2))
-                    
-            this_section['dimensions'] = dimensions
-            logging.debug(f'dimensions: {dimensions}')
+            logging.info(f'section: [{section:.^30}]')            
+            vals = self.layout[section]
+            if vals['mode'] == "L":
+                mode_count += 1
+                
+            if not vals['image']:
+                logging.info(f'set text block: {section}')
+                blocks[section] = Block.TextBlock(**vals)
             
-            # set the thumbnail_size for resizing images
+            if vals['image']:
+                logging.info(f'set image block: {section}')
+                blocks[section] = Block.ImageBlock(**vals)
+                
+        self.blocks = blocks
+        if mode_count > 0:
+            self.mode = 'L'
+        else:
+            self.mode = '1'
+    
+    
+    def _calculate_layout(self):
+        if not self.layout:
+            return
+        logging.debug('calculating layouts for sections')
+        for section in self.layout:
+            logging.info(f'section: [{section:.^30}]')
+            this_section = self.layout[section]
+            # add default values if they are missing
+            for key, value in constants.layout_defaults.items():
+                if not key in this_section:
+                    logging.debug(f'setting missing value to default: {key}: {value}')
+                    this_section[key] = value
+            
+            # absolute area in pixles
+            area = (round(self.resolution[0]*this_section['width']),
+                          round(self.resolution[1]*this_section['height']))
+            this_section['area'] = area
+            # usable area (absolute-x, y padding)
+            padded_area = (area[0] - this_section['padding']*2, 
+                                 area[1] - this_section['padding']*2)
+            this_section['padded_area'] = padded_area
+            
+            # set the thumbnail 
             if this_section['image']:
-                maxsize = min(this_section['dimensions'])
+                maxsize = min(area)
                 this_section['thumbnail_size'] = (maxsize, maxsize)
             
-            # calculate the relative position if either of the abs_coordinate X or Y is None
             if this_section['abs_coordinates'][0] is None or this_section['abs_coordinates'][1] is None:
-                logging.debug(f'section has calculated position')
-                pos = []
-                # check each value in relative section
+                logging.debug(f'calculating absolute position')
+                pos = [None, None]
                 for idx, r in enumerate(this_section['relative']):
                     if r == section:
-                        # use the value from this section
-                        pos.append(this_section['abs_coordinates'][idx])
+                        # use the coordinates from this section
+                        pos[idx] = this_section['abs_coordinates'][idx]
                     else:
-                        # use the value from another section
+                        # use the coordinates from another section
                         try:
-                            pos.append(self.layout[r]['dimensions'][idx] + self.layout[r]['abs_coordinates'][idx])
+                            pos[idx] = self.layout[r]['area'][idx] + self.layout[r]['abs_coordinates'][idx]
                         except KeyError as e:
-                            m = f'bad relative section value: "{r}" in section "{section}"'
-                            raise KeyError(m)
-                
-                # save the values as a tuple
-                this_section['abs_coordinates']=(pos[0], pos[1])
+                            raise KeyError(f'bad relative section value: "{r}" in section "{section}"')
+                this_section['abs_coordinates'] = (pos[0], pos[1])
             else:
-                logging.debug('section has absolute coordinates')
-                ac = this_section['abs_coordinates']
-            logging.debug(f'coordinates: {ac}')
-            
-            # calculate fontsize
-            if not this_section['font_size'] and not this_section['image']:
-                this_section['font_size'] = self._scalefont(font=this_section['font'], 
-                                                            dimensions=this_section['dimensions'],
-                                                            lines=this_section['max_lines'],
-                                                            maxchar=this_section['maxchar'])
+                logging.debug('absolute coordinates provided')
                 
-    def _scalefont(self, font, dimensions, lines, maxchar, text="Ww Qq "):
-        """Scale a font to fit the number of `lines` within `dimensions`
-        
-        Args:
-            font(str): path to true type font
-            dimensions(:obj:`tuple` of :obj:`int`): dimensions of pixles         
-            lines(int): number of lines of text to fit within the `dimensions`            
-            maxchar(int): number of characters of `text` to use when calculating 
-                default is 'Ww Qq' -- W and Q are large characters and have decenders;
-                spaces allow textwrap to work properly
-            text(str): string to use when calculating (default: 'Ww Qq ')
+            logging.debug(f'coordinates for this block: {this_section["abs_coordinates"]}')
             
-        Returns:
-            :obj:int: font size as integer"""        
-        if not maxchar:
-            maxchar = 6
+            if not this_section['image']:
+                this_section['font_size'] = self._scalefont(this_section)
+            
+    def _scalefont(self, this_section):
+        text = 'WwQq'
+        logging.debug('scaling font size')
+        x_target, y_target = this_section['padded_area']
         
-        font = str(Path(font).resolve())
+        y_target = y_target/this_section['max_lines']
+        font = this_section['font']
         
-        logging.debug(f'calculating maximum font size for area: {dimensions}')
-        logging.debug(f'using font: {font}')
-        
-        # start calculating at size = 1
-        fontsize = 1
-        x_fraction = 1 # fraction of x height to use
-        y_fraction = 1 # fraction of y width to use
-        xtarget = dimensions[0]/x_fraction # target width of font
-        ytarget = dimensions[1]/lines*y_fraction # target heigight of font
-        
-        logging.debug(f'target X font dimension {xtarget}')
-        logging.debug(f'target Y font dimension {ytarget}')
-        
-        testfont = ImageFont.truetype(font, fontsize)
-        
-        fontdim = testfont.getsize(text)
         
         cont = True
-        
+        fontsize = 0
         while cont:
             fontsize += 1
             testfont = ImageFont.truetype(font, fontsize)
             
             fontdim = testfont.getsize(text)
-            if fontdim[0] > xtarget:
-                cont = False
-                logging.debug(f'X target reached')
-                
-            if fontdim[1] > ytarget:
-                cont = False
-                logging.debug(f'Y target reached')
-                
-        # back off one
-        fontsize -= 1
-        logging.debug(f'test string: {text}; pixel dimensions for fontsize {fontsize}: {fontdim}')
-        return fontsize
-        
-    
-        
-    def _set_images(self):
-        """create dictonary of all image blocks using the specified layout
-        
-         properties set:
-            blocks(:obj:dict): dictionary of :obj:`TextBlock`, :obj:`ImageBlock`"""
-                          
-        layout = self.layout
-        
-        blocks = {}
-        for sec in layout:
-            logging.debug(f'***{sec}***)')
-            section = layout[sec]
-            # any section without an image declared is considered a text block
-            if not section['image']: # ['max_lines']:
-                logging.info(f'set text block: {sec}')
-                blocks[sec] = Block.TextBlock(area=section['dimensions'], 
-                                              text='.', 
-                                              font=section['font'], 
-                                              font_size=section['font_size'], 
-                                              max_lines=section['max_lines'], 
-                                              maxchar=section['maxchar'],
-                                              hcenter=section['hcenter'], 
-                                              vcenter=section['vcenter'], 
-                                              inverse=section['inverse'], 
-                                              rand=section['rand'], 
-                                              padding=section['padding'],
-                                              abs_coordinates=section['abs_coordinates'],
-                                              fill=section['fill'],
-                                              bkground=section['bkground'],
-                                              mode=section['mode'])
-            if section['image']:
-                logging.info(f'set image block {sec}')
-                blocks[sec] = Block.ImageBlock(image=None, 
-                                               abs_coordinates=section['abs_coordinates'], 
-                                               area=section['dimensions'], 
-                                               hcenter=section['hcenter'],
-                                               inverse=section['inverse'], 
-                                               vcenter=section['vcenter'], 
-                                               padding=section['padding'], 
-                                               rand=section['rand'],
-                                               fill=section['fill'],
-                                               bkground=section['bkground'],
-                                               mode=section['mode'])
-                
-        self.blocks = blocks
-    
-    def _check_keys(self, dictionary, values):
-        """Check `dictionary` for missing key/value pairs specified in `values`
-        
-        Args:
-            dictionary(dict): dictionary to check
-            values(dict): dictionary of default key and value pairs
             
-        Returns:
-            dictionary(dict): dictionary with missing key/value pairs updated"""        
-        logging.debug('checking layout keys')
-        for k, v in values.items():
-            try:
-                dictionary[k]
-            except KeyError as e:
-#                 logging.debug(f'adding key: {k}: {v}')
-                dictionary[k] = v
-
-        logging.debug(f'layout keys: {dictionary}')
-        return dictionary
+            if fontdim[0] > x_target:
+                cont = False
+                logging.debug('x target size reached')
+            
+            if fontdim[1] > y_target:
+                cont = False
+                logging.debug('y target size reached')
+            
+        fontsize -= 1
+        logging.debug(f'calculated font size: {fontsize}')
+        return fontsize
     
-    def update_contents(self, updates=None):
-        """Update the contents of the layout
+
+    def update_contents(self, update=None):
+        if not update:
+            return
         
-        Args:
-            updates(dict): dictionary of keys and values that match keys in `blocks`
+        if not isinstance(update, dict):
+            raise TypeError('update must be of type `dict`')
         
-        Sets:
-            blocks """
-        logging.info('updating blocks')
-        if not updates:
-            logging.debug('nothing to do')
-        
-        for key, val in updates.items():
+        for key, val in update.items():
             if key in self.blocks:
-                logging.debug(f'updating block: {key}')
                 self.blocks[key].update(val)
             else:
-                logging.debug(f'ignoring block {key}')
+                logging.info(f'"{key}" is not a recognized block, skipping')
                 
     def concat(self):
-        """Concatenate multiple image block objects into a single composite image
-                
-        Sets:
-            image (:obj:`PIL.Image`): concatination of all image members of `elements`
-            
-        Property Set:
-            screen (:obj:`PIL.Image`): image composed of all blocks"""
-        
-        # create a blank image as a canvas 
         self.image = Image.new('L', self.resolution, 255)
         if self.blocks:
-            blocks = self.blocks
-            logging.debug('concating blocks into single image')
-            for b in blocks:
-                logging.debug(f'pasitng **{b}** image at: {blocks[b].abs_coordinates}')
-                self.image.paste(blocks[b].image, blocks[b].abs_coordinates)
+            for b in self.blocks:
+                self.image.paste(self.blocks[b].image, self.blocks[b].abs_coordinates)
         return self.image
-        
 
 
 
 
 
 
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
-# logging.root.setLevel('DEBUG')
+# ml = Layout(resolution=(800, 600))
+# ml.layout = l
+# ml.update_contents(update)
+
+# ml.concat()
 
 
 
@@ -456,12 +255,12 @@ class Layout:
 
 
 # # create the layout object
-# myLayout = Layout(resolution=(1200, 825))
+# # myLayout = Layout(resolution=(1200, 825))
 
 # l = { # basic two row layout
 #     'weather_img': {                
 #             'image': True,               # image block
-#             'padding': 20,               # pixels to padd around edge
+# #             'padding': 2,               # pixels to padd around edge
 #             'width': 1/4,                # 1/4 of the entire width
 #             'height': 1/4,               # 1/4 of the entire height
 #             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
@@ -479,7 +278,7 @@ class Layout:
 #                 'height': 1/4,           # proprtion of the entire height
 #                 'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
 #                                               # coordinates that are relative to other blocks and will be calculated
-#                 'hcenter': False,         # horizontal-center the text and the resulting image
+#                 'hcenter': True,         # horizontal-center the text and the resulting image
 #                 'vcenter': True,         # vertically-center the text within the block
 #                 'relative': ['weather_img', 'temperature'], # blocks to which THIS block's coordinates are relative to
 #                                                             # -- in this case X: `weather_img` and Y: `temperature`
@@ -488,7 +287,9 @@ class Layout:
 #                                                             # specified within the `temperature` block will be used 
 #                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf', # TTF Font face to use; relative paths are OK
 #                 'font_size': None,         # set this to None to automatically scale the font to the size of the block
-#                 'bkground': 128,
+#                 'bkground': 255,
+#                 'align': 'center',
+#                 'mode': 'L'
 #     },
 #     'wind': { 
 #                 'image': None,
@@ -529,32 +330,43 @@ class Layout:
 #                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
 #                 'font_size': None,
 #                 'padding': 10,
+#                 'align': 'left',
+#                 'mode': 'L'
 # #                 'scale_y': .85
 #     }
 
 # }
 
-# # apply the layout instructions to the layout object
-# myLayout.layout = l
+# # # apply the layout instructions to the layout object
+# # myLayout.layout = l
 
 
 # update = {
 #     'weather_img': '../images//portrait-pilot_SW0YN0Z5T0.jpg',      # weather_img block will recieve a .png
 #     'temperature': '15C',                     # temperature block will receive `15C`
-#     'wind': 'Wind East 3m/s',                 # wind block will recieve this text
+#     'wind': 'Wind: East 3m/s',                 # wind block will recieve this text
 #     'rain': 'Rain: 0%',                       # rain block
 # #     'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, low of 12 overnight. Tomorrow: temperatures falling to 15 with an increased chance of rain'
 #     'forecast': "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet."
 # }
-# myLayout.update_contents(update)
+# # myLayout.update_contents(update)
 
-# # join all the sub images into one complete image
-# myImg = myLayout.concat()
+# # # join all the sub images into one complete image
+# # myImg = myLayout.concat()
 
-# # write the image out to a file
-# # myImg.save('./my_forecast.png')
+# # # write the image out to a file
+# # # myImg.save('./my_forecast.png')
 
-# myImg
+# # myImg
+
+
+
+
+
+
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
+# logging.root.setLevel('DEBUG')
 
 
 

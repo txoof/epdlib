@@ -6,6 +6,28 @@
 
 #FONT = str(Path('./fonts/Open_Sans/OpenSans-Regular.ttf').resolve())
 
+layout_defaults = {'image': None, 
+                   'max_lines': 1, 
+                   'padding': 0, 
+                   'width': 1, 
+                   'height': 1, 
+                   'abs_coordinates': (None, None), 
+                   'hcenter': False, 
+                   'vcenter': False, 
+                   'rand': False, 
+                   'align': 'left',
+                   'inverse': False, 
+                   'relative': False, 
+                   'font': None, 
+                   'font_size': None, 
+                   'maxchar': None, 
+                   'dimensions': None,
+                   'padding': 0,
+                   'mode': '1',
+                   'fill': 0,
+                   'bkground': 255}
+
+
 # US English - Upper and lower case letters
 USA_CHARDIST = {
 'A': 0.0796394951934866,

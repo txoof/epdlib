@@ -95,7 +95,7 @@ class BlockError(Exception):
 
 class Block:
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
-                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1'):
+                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1', **kwargs):
         '''Create a Block object
         
         Parent class for other types of blocks
@@ -361,6 +361,7 @@ class TextBlock(Block):
         
         Properties:
             text_formatted('str'): text with line breaks according to maxchar and max_lines
+            image(PIL:Image): text rendered as an image
             
             """        
         super().__init__(area, *args, **kwargs)
@@ -561,10 +562,24 @@ class TextBlock(Block):
         # scratch image for measuring text 
         scratch_image = Image.new(mode=self.mode, size=(1, 1), color=self.bkground)
         draw = ImageDraw.Draw(scratch_image)
-        # measure text size
-        textsize = draw.multiline_textsize(text=self.text_formatted, font=self.font, )
-        text_bbox = draw.textbbox((0, 0), text=self.text_formatted, font=self.font, align=self.align)        
-        logging.debug(f'text size: {textsize}')
+        
+        # height offset from top of character to top of bounding box 
+        y_offset = draw.textbbox((0, 0), 
+                                 text=self.text_formatted, 
+                                 font=self.font, 
+                                 align=self.align)[1] * -1
+
+        # text_mlbbox[1]*-1 is the total height from assent to decender (anchor with ld -- left decender
+        # text_mlbbox[2] is the total x length
+        text_mlbbox = draw.multiline_textbbox((0, 0), 
+                                              text=self.text_formatted, 
+                                              font=self.font, 
+                                              align=self.align, 
+                                              anchor='ld')
+        
+        textsize = (text_mlbbox[2], text_mlbbox[1]*-1)
+        logging.debug(f'text size: {textsize}')        
+        
         
         if textsize[0] > self.padded_area[0] or textsize[1] > self.padded_area[1]:
             logging.info('the text will spill outside of padded area using these values')
@@ -572,7 +587,7 @@ class TextBlock(Block):
         # create a new image based on textsize
         text_image = Image.new(mode=self.mode, size=textsize, color=self.bkground)
         draw = ImageDraw.Draw(text_image)
-        draw.multiline_text((0, text_bbox[1]*-1), 
+        draw.multiline_text((0, y_offset), 
                                 text=self.text_formatted, 
                                 font=self.font, 
                                 align=self.align,
@@ -643,10 +658,10 @@ class TextBlock(Block):
 
 
 
-# t = TextBlock(area=(800, 600), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=55, max_lines=5,
-#              padding=60, inverse=False, hcenter=False, vcenter=False, rand=False, mode='L', align='left')
+# t = TextBlock(area=(800, 600), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=55, max_lines=7,
+#              padding=60, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='left')
 # t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
-# t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
+# # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
 # t.update()
 # t.image
 
@@ -698,9 +713,10 @@ class ImageBlock(Block):
 
         image_area = Image.new(self.mode, self.area, self.bkground)
     
-        if not image:
+        if not image or image==True:
             logging.debug(f'no image set; setting to blank image with area: {self.area}')
             self._image = image_area
+            return
 
         if image:
             if isinstance(image, (str, Path)):

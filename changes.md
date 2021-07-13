@@ -1,3 +1,26 @@
+## 0.4.3
+rework of `Block` and `Layout` modules to fix padding and text scaling
+
+**Block**
+
+* parent `Block` class now consumes any unknown `kwargs`
+  - this makes it much easier to pass any values from a `Layout.layout` obj.
+* rewrite of text scaling to provide a cleaner image and crisper font rendering
+* add `align` argument to `Block.TextBlock` for aligning text
+* fixed various padding issues (again)
+* Switched to using `multiline_text()` method of ImageDraw for better leading and line spacing
+
+**Layout**
+
+* Remove scale_x, scale_y from layouts
+    - this feature was not as useful as it appeared and is a pain to maintain   
+* update private methods:
+  - `_set_image` now `_set_blocks` 
+  - removed `_check_keys`
+  - `_scalefont` minor updates
+* default values for expected/necessary `Layout` and `Block` kwargs are now stored in `constants.layout_defaults`
+* add property `mode` "L" when *any* block is 8bit "1" when all blocks are 1bit
+
 ## 0.4.2
 **Screen**
 
@@ -25,6 +48,7 @@
     - `'bkground: 0-255` specify background color (8 bit gray 0 is black)
     - `'mode': "L"/"1"` specify block image mode "L" 8 bit, "1" 1 bit
 ## 0.1.1
+
 **Screen.Screen()** 
 
 * add property: rotation(`int`): rotate the output image by 0, 90, -90 or 180 degrees
