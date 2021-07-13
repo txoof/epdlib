@@ -229,7 +229,7 @@ class Layout:
             if key in self.blocks:
                 self.blocks[key].update(val)
             else:
-                logging.info(f'"{key}" is not a recognized block, skipping')
+                logging.debug(f'"{key}" is not a recognized block, skipping')
                 
     def concat(self):
         self.image = Image.new('L', self.resolution, 255)
