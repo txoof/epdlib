@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-__version__ = "0.4.3.5"
 __all__ = ['Layout', 'Screen', 'Block']
 #from . import constants
 #from .Block import *
