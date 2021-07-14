@@ -6,14 +6,6 @@
 
 
 
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
-
-
-
-
-
-
 import logging
 import textwrap
 from random import randrange
@@ -24,6 +16,14 @@ try:
     from . import constants
 except ImportError as e:
     import constants
+
+
+
+
+
+
+logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
 
 
 
@@ -451,7 +451,8 @@ class TextBlock(Block):
         if not maxchar:
             maxchar = None
         elif maxchar < 1:
-            raise ValueError(f'maxchar must be integer > 0: {maxchar}')
+#             raise ValueError(f'maxchar must be integer > 0: {maxchar}')
+            pass
             
             
         self._maxchar = maxchar
@@ -481,6 +482,7 @@ class TextBlock(Block):
     def text(self, text):
         if text:
             self._text = text
+
         self.text_formatted = self._text_formatter()
         self.image = self._text2image()
 
@@ -541,14 +543,16 @@ class TextBlock(Block):
         Returns:
             :obj:`list` of :obj:`str`"""        
         logging.debug(f'formatting string: {self.text}')
-#         wrapper = textwrap.TextWrapper(width=self.maxchar, max_lines=self.max_lines, placeholder='…',
-#                                       break_long_words=True, )
-#         formatted = wrapper.wrap(self.text)
-#         logging.debug(f'formatted list:\n {formatted}')
-        formatted = textwrap.fill(self.text, 
-                                  width=self.maxchar, 
-                                  max_lines=self.max_lines, 
-                                  placeholder='…')
+
+        try:
+            formatted = textwrap.fill(self.text, 
+                                      width=self.maxchar, 
+                                      max_lines=self.max_lines, 
+                                      placeholder='…')
+        except (TypeError, ValueError) as e:
+            logging.critical(f'it is not possible to wrap text into this area with the current font settings; returning an empty string: {e}')
+            formatted = ''
+
         return(formatted)
     
     def _text2image(self):
@@ -577,7 +581,7 @@ class TextBlock(Block):
                                               align=self.align, 
                                               anchor='ld')
         
-        textsize = (text_mlbbox[2], text_mlbbox[1]*-1)
+        textsize = (int(text_mlbbox[2]), int(text_mlbbox[1]*-1))
         logging.debug(f'text size: {textsize}')        
         
         
@@ -658,8 +662,8 @@ class TextBlock(Block):
 
 
 
-# t = TextBlock(area=(800, 600), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=55, max_lines=7,
-#              padding=60, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='left')
+# t = TextBlock(area=(2, 4), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=55, max_lines=7,
+#              padding=60, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right')
 # t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
 # # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
 # t.update()

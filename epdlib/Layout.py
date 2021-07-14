@@ -109,7 +109,11 @@ class Layout:
             self._set_blocks()
             
     def _set_blocks(self):
-        '''create dictionary of all image blocks using the specified layout'''
+        '''create dictionary of all image blocks using the specified layout
+        
+        Sets:
+            blocks(dict of Block): dictionary of all the blocks from the layout
+            mode(str): "L" if any single block is 8bit mode, "1" if all blocks are 1bit'''
         if not self.layout:
             return        
         
@@ -130,6 +134,7 @@ class Layout:
             
             if vals['image']:
                 logging.info(f'set image block: {section}')
+                logging.debug(f'vals: {vals}')
                 blocks[section] = Block.ImageBlock(**vals)
                 
         self.blocks = blocks
@@ -142,7 +147,7 @@ class Layout:
     def _calculate_layout(self):
         if not self.layout:
             return
-        logging.debug('calculating layouts for sections')
+        logging.debug('## calculating layouts for sections ##')
         for section in self.layout:
             logging.info(f'section: [{section:.^30}]')
             this_section = self.layout[section]
@@ -243,8 +248,12 @@ class Layout:
 
 
 
-# ml = Layout(resolution=(800, 600))
-# ml.layout = l
+# # use deep copy to ensure the original is not modified
+# from copy import deepcopy
+# use_layout = deepcopy(l)
+
+# ml = Layout(resolution=(8, 12))
+# ml.layout = use_layout
 # ml.update_contents(update)
 
 # ml.concat()
@@ -255,12 +264,10 @@ class Layout:
 
 
 # # create the layout object
-# # myLayout = Layout(resolution=(1200, 825))
-
 # l = { # basic two row layout
 #     'weather_img': {                
 #             'image': True,               # image block
-# #             'padding': 2,               # pixels to padd around edge
+#             'padding': 2,               # pixels to padd around edge
 #             'width': 1/4,                # 1/4 of the entire width
 #             'height': 1/4,               # 1/4 of the entire height
 #             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
@@ -268,6 +275,7 @@ class Layout:
 #             'vcenter': True,             # vertically center image
 #             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
 #             'mode': 'L',
+#             'align': 'center',
 #             'bkground': 128
 #         },
 #     'temperature': { 
@@ -330,7 +338,7 @@ class Layout:
 #                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
 #                 'font_size': None,
 #                 'padding': 10,
-#                 'align': 'left',
+#                 'align': 'right',
 #                 'mode': 'L'
 # #                 'scale_y': .85
 #     }
