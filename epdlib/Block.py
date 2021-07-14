@@ -734,11 +734,12 @@ class ImageBlock(Block):
             else:
                 raise BlockError('unusable image format')
 
-                
-            if max(im.size) > max(self.area):
-                resize = [self.area[0] - self.padding*2, self.area[1] - self.padding*2]
+            if max(im.size) > min(self.padded_area):
+                logging.debug(f'resizing image to fit area: {self.padded_area}')
+                max_size = min(self.padded_area)
+                resize = [max_size, max_size]
                 im.thumbnail(resize, Image.BICUBIC)
-                logging.debug('resizing image to fit in area')
+                logging.debug(f'new image size: {im.size}')
                 
             if self.inverse:
                 im = ImageOps.invert(im)
@@ -802,11 +803,14 @@ class ImageBlock(Block):
 
 
 
-# i = ImageBlock(area=(900, 800), mode='L', 
-#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=200)
-# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
-# # i.update('../images/hubble.jpg')
-
+# i = ImageBlock(area=(400, 800), mode='L', 
+#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=240)
+# # i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
+# i.update('../images/hubble.jpg')
+# # i.update('../tux.png')
+# # i.update('../PIA03519_small.jpg')
+# # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
+# # i.update(q)
 # i.image
 
 
@@ -841,5 +845,12 @@ def compare_obj(a, b):
 
 # logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
+
+
+
+
+
+
+
 
 

@@ -252,7 +252,7 @@ class Layout:
 # from copy import deepcopy
 # use_layout = deepcopy(l)
 
-# ml = Layout(resolution=(8, 12))
+# ml = Layout(resolution=(1200, 800))
 # ml.layout = use_layout
 # ml.update_contents(update)
 
