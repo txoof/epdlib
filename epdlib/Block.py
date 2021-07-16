@@ -736,9 +736,9 @@ class ImageBlock(Block):
 
             if max(im.size) > min(self.padded_area):
                 logging.debug(f'resizing image to fit area: {self.padded_area}')
-                max_size = min(self.padded_area)
-                resize = [max_size, max_size]
-                im.thumbnail(resize, Image.BICUBIC)
+#                 max_size = min(self.padded_area)
+#                 resize = [max_size, max_size]
+                im.thumbnail(self.padded_area, Image.BICUBIC)
                 logging.debug(f'new image size: {im.size}')
                 
             if self.inverse:
@@ -803,10 +803,10 @@ class ImageBlock(Block):
 
 
 
-# i = ImageBlock(area=(400, 800), mode='L', 
+# i = ImageBlock(area=(1600, 2700), mode='L', 
 #                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=240)
-# # i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
-# i.update('../images/hubble.jpg')
+# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
+# # i.update('../images/hubble.jpg')
 # # i.update('../tux.png')
 # # i.update('../PIA03519_small.jpg')
 # # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
