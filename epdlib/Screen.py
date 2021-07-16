@@ -20,7 +20,7 @@ import time
 
 
 def strict_enforce(*types):
-    """strictly enforce type compliance within classes
+    """decorator: strictly enforce type compliance within classes
     
     Usage:
     @strict_enforce(type1, type2, (type3, type4))
@@ -120,6 +120,7 @@ class ScreenShot:
 
 
 class ScreenError(Exception):
+    '''general exception for Screen obj errors'''
     pass
 
 
@@ -143,6 +144,9 @@ class Update:
     Update the object:
         myObj.update = True"""
     
+    def __repr__(self):
+        return str(self.age)
+    
     def __init__(self):
         '''constructor for Update class
         
@@ -153,7 +157,10 @@ class Update:
             
         self.start = self.now
         self.update()
-        
+    
+    def __str__(self):
+        return str(f'{self.last_updated:.2f} seconds old')
+    
     @property
     def age(self):
         """age of the object in seconds since created"""
@@ -183,35 +190,152 @@ class Update:
 
 
 class Screen():
-    def __init__(self, epd=None, rotation=0, mode='1', vcom=0.0):
-        self.vcom = vcom
-        self.one_bit_display = True
-        self.constants = None
-        self.mode = mode
-        self.image = None
-        self.hd = False
+    '''WaveShare E-Paper screen object for standardizing init, write and clear functions.
+    Most WaveShare SPI screens including HD IT8951 base screens are supported.
+    Use `Screen().list_compatible()` to show all compatible screens.
+    
+    Screen() objects are aware of:
+        * attached screen resolution
+        * pixel depth (1 or 8 bit) -- bi-color screens are only supported in 1 bit mode (no color)
+        * age since creation (monotonic time)
+        * time since last updated with write or clear (monotonic time)
+    '''
+    def __init__(self, epd=None, rotation=0, vcom=None):
+        '''create Screen() object
+        
+        Args:
+            epd(str): name of epd (use Screen().list_compatible() to view a list)
+            rotation(int): 0, -90, 90, 180 rotation of screen
+            vcom(float): negative float vcom value from panel ribon cable
+            
+        Properties:
+            resolution(list): X x Y pixels
+            clear_args(dict): kwargs dict of any additional kwargs that are needed for clearing a display
+            buffer_no_image(PIL:Image): "blank" image for clearing bi-color panels (empty for all others)
+            vcom(float): negative vcom voltage from panel ribon cable
+            HD(bool): True for IT8951 panels
+            rotatio(int): rotation of screen (0, -90, 90, 180)
+            update(obj:Update): monotoic time aware update timer'''
         self.resolution = [1, 1]
+        self.clear_args  = {}
+        self.buffer_no_image = []
+        self.vcom = vcom
+        self.constants = None
+        self.mode = None
         self.HD = False
         self.epd = epd
         self.rotation = rotation
+        self.update = Update()
         
+        
+    def _spi_handler(func):
+        '''manage SPI file handles and wake/sleep displays
+        
+        for IT8951 HD displays, wake the driver board, run the passed function, sleep the driver
+        
+        for non-IT8951 displays, init the SPI bus, run the passed function, sleep and close SPI handles
+        
+        Args:
+            func(function): function to be run'''
+        def wrapper(*args, **kwargs):
+            # self
+            obj = args[0]
+            if not obj.epd:
+                raise UnboundLocalError('no epd is configured')
+
+            logging.debug('initing display')
+            # open the SPI file objects
+            if not obj.HD:
+                logging.debug('Non HD display')
+                try:
+                    obj.epd.init()
+                except Exception as e:
+                    raise ScreenError(f'failed to init display: {e}')
+
+                # run the SPI read/write command here
+                func(*args, **kwargs)
+                obj.update.update()    
+
+                logging.debug('sleeping display')
+
+                # close the SPI file objects
+                try:
+                    obj.epd.sleep()
+                except Exception as e:
+                    raise ScreenError(f'failed to sleep display: {e}')
+                    
+            if obj.HD:
+                logging.debug('HD display')
+                try:
+                    obj.epd.epd.run()
+                except Exception as e:
+                    raise ScreenError(f'failed to init display')
+                func(*args, **kwargs)
+                
+                logging.debug('sleeping display')
+                try:
+                    obj.epd.epd.sleep()
+                except Exception as e:
+                    raise ScreenError(f'failed to sleep display: {e}')
+        # update monotonic clock 
+        return wrapper
         
     @property
-    def vcom(self):
-        return self._vcom
-
-    @vcom.setter
-    @strict_enforce(float)
-    def vcom(self, vcom):
-        if vcom==0:
-            self._vcom = None
-        elif vcom > 0:
-            raise ValueError(f'vcom must be a negative float value: {vcom}')
+    def epd(self):
+        return self._epd
+    
+    @epd.setter
+    @strict_enforce((type(None), str))
+    def epd(self, epd):
+        '''configures epd display for use
+        
+        use `Screen().list_compatible_modules()` to see a list of supported non IT8951 screens
+        use "HD" for IT8951 screens
+        
+        Args:
+            epd(str): name of waveshare module, or "HD" for IT8951 based screens
+        
+        Sets:
+            epd(obj): epd read/write object
+            resolution(list): resolution of screen
+            clear_args(dict): arguments required for clearing the screen
+            constants(namespace): constants required for read/write of IT8951 screens
+            HD(bool): True for IT8951 based screens
+            mode(str): "1" or "L" (note this does not override the mode if already set)'''
+        
+        if not epd or epd.lower == 'none':
+            self._epd = None
+            return
+        
+        myepd = None
+        
+        if epd == 'HD' and self.vcom:
+            self.HD = True
+            myepd = self._load_hd(epd)
         else:
-            self._vcom = vcom
-
+            self.HD = False
+            myepd = self._load_non_hd(epd)
+            
+        if not myepd:
+            self._epd = None
+            return
+        
+        self._epd = myepd['epd']
+        self.resolution = myepd['resolution']
+        self.clear_args = myepd['clear_args']
+        self.constants = myepd['constants']
+        self.one_bit_display = myepd['one_bit_display']
+        self.mode = myepd['mode']
+        
+        logging.debug(f'epd configuration {myepd}')
+        
+        
+        
     @property
     def rotation(self):
+        '''rotation of screen
+        
+        Valid values are 0, 90, 180, 270, -90'''
         return self._rotation
     
     @rotation.setter
@@ -233,187 +357,34 @@ class Screen():
             resolution.sort(reverse=True)
             self.resolution = resolution
             
-        self.image = Image.new('L', self.resolution, 255)
+        self.image = Image.new(self.mode, self.resolution, 255)
         if not self.HD:
             self.buffer_no_image = self.epd.getbuffer(self.blank_image())
 
         self._rotation = rotation
-        logging.debug(f'rotation={rotation}, resolution={self.resolution}')
-            
-    @property
-    def epd(self):
-        return self._epd
+        logging.debug(f'rotation={rotation}, resolution={self.resolution}')        
 
-    @epd.setter
-    @strict_enforce((type(None), str))
-    def epd(self, epd):
-        if not epd:
-            self._epd = None
-            return
-        
-        myepd = None
-        if epd=='HD':
-            if not self.vcom:
-                raise ScreenError('no vcom value is set (see the cable on your display for a vcom value)')
-            self.HD = True
-            myepd = self._epd_hd(epd)
-            
-        elif epd == 'None':
-            myepd = None
-        else:
-            myepd = self._epd_non_hd(epd)
-
-        if myepd:
-            # set the resolution 
-            self._epd = myepd['epd']
-            resolution = myepd['resolution']
-            resolution.sort(reverse=True)
-            self.resolution = resolution
-            self.clear_args = myepd['clear_args']
-            self.constants = myepd['constants']
-            self.one_bit_display = myepd['one_bit_display']
-            
-            logging.debug(f'epd configuration: {myepd}')
-            
-            # set a blank image as default
-            self.image = Image.new('L', self.resolution, 255)
-            if self.HD:
-                self.buffer_no_image = []
-            else:
-                self.buffer_no_image = self.epd.getbuffer(self.blank_image())
-        else:
-            logging.warning('no valid epd is currently configured')
-            
-    def initEPD(self):
-        '''init the EPD for writing'''
-        if not self.epd:
-            raise UnboundLocalError('no epd object has been assigned')
-            
-        if self.HD:
-            self._epd.epd.run()
-        else:
-            try:
-                self.epd.init()
-            except FileNotFoundError as e:
-                raise ScreenError('failed to open SPI bus - is spi enabled in raspi-config?')
-#                 logging.error(f'failed to init epd: {e}: error: {type(e)}')
-
-        logging.info(f'epd initialized')
-            
-        return True            
-
-    def clearEPD(self):
-        if self.HD:
-            self._epd.epd.run()
-            self._epd.clear()
-        else:
-            try:
-                self.initEPD()
-                self.epd.Clear(**self.clear_args)
-            # FIXME -- more explicit output here on failure
-            except Exception as e:
-                logging.error(f'failed to clear epd: {e}')
-                return False
-        return True
-        
-    
-    def blank_image(self):
-        '''generate PIL image that is entirely blank'''
-        return Image.new(self.mode, self.resolution, 255)
-            
-            
-
-    def writeEPD(self, image=None, sleep=True, partial=False):
-        '''write an image to the screen after clearing previous
-        
-            Non-hd screens should be put to sleep after writing to prevent
-            damage to the panel.
+    def _load_hd(self, epd):
+        '''configure IT8951 (HD) SPI epd 
         
         Args:
-            image(PIL image): image to display
-            sleep(bool) Put display to sleep after updating
-            
-            '''
-        if not image:
-            raise ScreenError('No image provided')
-            
-        if not self.epd:
-            raise UnboundLocalError('no epd has been assigned')
+            epd(str): ignored; used for consistency in _load_non_hd config
         
-        image = image.rotate(self.rotation, expand=True)
-#         if self.rotation in [180, -90]:
-#             image = image.rotate(180)
-        
-        # init epd
-        self.initEPD()
-    
-        if partial:
-            if self.HD:
-                self._partial_writeEPD_hd(image)
-            else:
-                logging.warning('partial update not available on non-hd displays')
-                self._full_writeEPD_non_hd(image)
-                    
-        else:
-            if self.HD:
-                self._full_writeEPD_hd(image)
-            else:
-                self._full_writeEPD_non_hd(image)
-                
-        if sleep:
-            logging.debug('putting display to sleep')
-            if self.HD:
-                self.epd.epd.sleep()
-            else:
-                self.epd.sleep()
-        return True
-                
-    def _partial_writeEPD_hd(self, image):
-        '''partial update, affects only changed black and white pixels with no flash
-        
-            uses waveform DU see: see: https://www.waveshare.net/w/upload/c/c4/E-paper-mode-declaration.pdf for display modes
-     '''
-        
-        self.epd.frame_buf = mylayout_hd.image
-        self.epd.draw_partial(self.constants.DisplayModes.DU)
-    
-    def _full_writeEPD_hd(self, image):
-        '''redraw entire screen, no partial update with waveform GC16
-        
-            see: https://www.waveshare.net/w/upload/c/c4/E-paper-mode-declaration.pdf for display modes'''
-        # create a blank buffer image to write into
-        self.epd.frame_buf.paste(0xFF, box=(0, 0, self.resolution[0], self.resolution[1]))
-        
-        self.epd.frame_buf.paste(image, [0,0])
-
-
-        self.epd.frame_buf.paste(image, [0, 0])
-
-        self.initEPD()
-        logging.debug('writing to display using GC16 (full display update)')
-        self.epd.draw_full(self.constants.DisplayModes.GC16)
-            
-        return True
-        
-    def _full_writeEPD_non_hd(self, image):
-        '''redraw entire screen'''
-        image_buffer = self.epd.getbuffer(image)
-        self.initEPD()
-        if self.one_bit_display:
-            self.epd.display(image_buffer)
-        else:
-            # send a blank image to colored layer
-            self.epd.display(image_buffer, self.buffer_no_image)
-        
-        return True
-    
-    def _epd_hd(self, epd):
-        '''configure & init IT8951 Screens
-        
-        Args:
-            epd(str): ignored; used for consistency for non-HD init'''
+        Returns:
+            dict:
+                epd: epd object, 
+                resolution: [int, int],
+                clear_args: [arg1: val, arg2: val],
+                constants: None            
+        '''
         from IT8951.display import AutoEPDDisplay
         from IT8951 import constants as constants_HD
+        
+        logging.debug('configuring IT8951 epd')
+        
+        if not self.vcom:
+            raise ScreenError('`vcom` property must be provided when using "HD" epd type')
+        
         myepd = AutoEPDDisplay(vcom=self.vcom)
         resolution = list(myepd.display_dims)
         clear_args = {}
@@ -423,54 +394,214 @@ class Screen():
                 'resolution': resolution, 
                 'clear_args': clear_args, 
                 'one_bit_display': one_bit_display,
-                'constants': constants_HD}    
-                    
-    def _epd_non_hd(self, epd):
-        '''configure and init non IT8951 Screens
+                'constants': constants_HD,
+                'mode': 'L'}    
+        
+
+    def _load_non_hd(self, epd):
+        '''configure non IT8951 SPI epd
+        
+        For a complete list see the list_compatible_modules() functon
         
         Args:
-            epd(str): name of waveshare EPD module
-                see '''
+            epd(str): name of EPD module to load
+            
+        Returns:
+            dict:
+                epd: epd object, 
+                resolution: [int, int],
+                clear_args: [arg1: val, arg2: val],
+                constants: None
+                '''
+        
         import waveshare_epd
         import pkgutil
         import inspect
         from importlib import import_module
+        
+        logging.debug(f'configuring waveshare_epd.{epd}')
+        
         non_hd = []
         for i in pkgutil.iter_modules(waveshare_epd.__path__):
             non_hd.append(i.name)
-
+        
         if epd in non_hd:
-            myepd = import_module(f'waveshare_epd.{epd}')
-            resolution = [myepd.EPD_HEIGHT,myepd.EPD_WIDTH]
-            
-            # set kwargs for screens that expect color or mode arguments to the clear function
             try:
-                clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
-            except AttributeError:
-                raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
-            clear_args = {}
-            if 'color' in clear_args_spec:
-                clear_args['color'] = 0xFF
-                
-            try:
-                display_args_spec = inspect.getfullargspec(myepd.EPD.display)
-            except AttributeError:
-                raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
-            
-            logging.debug(f'args_spec: {display_args_spec.args}')
-            if len(display_args_spec.args) <= 2:
-                one_bit_display = True
-            else:
-                one_bit_display = False
-            
+                myepd = import_module(f'waveshare_epd.{epd}')
+            except ModuleNotFoundError as e:
+                raise ScreenError(f'failed to load {epd} with error: {e}')
         else:
-            raise ScreenError(f'invalid waveshare module: {epd}')
+            raise ScreenError(f'unrecongized waveshare module: {epd}')
+
+        # check specs
+        # check for supported `Clear()` function
+        try:
+            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
+        except AttributeError:
+            raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
+        clear_args = {}
+        if 'color' in clear_args_spec:
+            clear_args['color'] = 0xFF
+        
+        # check for "standard" `display()` function
+        try:
+            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
+        except AttributeError:
+            raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
+
+        logging.debug(f'args_spec: {display_args_spec.args}')
+        if len(display_args_spec.args) <= 2:
+            one_bit_display = True
+        else:
+            one_bit_display = False
             
+        resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
+        
+        
         return {'epd': myepd.EPD(), 
                 'resolution': resolution, 
                 'clear_args': clear_args,
                 'one_bit_display': one_bit_display,
-                'constants': None}
+                'constants': None,
+                'mode': '1'}
+    
+    def initEPD(self, *args, **kwargs):
+        '''**DEPRICATED** init EPD for wirting
+        
+        For non IT8951 boards use `epd.init()` at your own risk -- SPI file handles are NOT automatically closed
+        '''
+        logging.warning('this method is depricated and does nothing. If you really know what you are doing, use `epd.init()` at your own risk')
+    
+    def blank_image(self):
+        '''retrun a PIL image that is entirely blank that matches the resolution of the screen'''
+        return Image.new(self.mode, self.resolution, 255)     
+    
+    @_spi_handler
+    def clearEPD(self):
+        '''wipe epd screen entirely'''
+        logging.debug('clearing screen')
+        if self.HD:
+            clear_function = self._clearEPD_hd
+        else:
+            clear_function = self._clearEPD_non_hd
+        
+        return clear_function()
+        
+    
+    def _clearEPD_hd(self):
+        '''clear IT8951 screens entirely'''
+        status = False
+        try:
+            self.epd.clear()
+        except Exception as e:
+            raise ScreenError(f'failed to clear screen: {e}')
+        return status
+    
+    def _clearEPD_non_hd(self):
+        '''clear non IT8951 screens'''
+        status = False
+        try:
+            self.epd.Clear(**self.clear_args)
+            status = True
+        except Exception as e:
+            raise ScreenError(f'failed to clear screen: {e}')
+        return status
+        
+        
+    
+    @_spi_handler
+    def writeEPD(self, image, sleep=True, partial=False):
+        '''write an image to the screen 
+        
+        Args:
+            image(PIL image): image to display
+            sleep(bool): put the display to sleep after writing () (Depricated kwarg)
+            partial(bool): attempt to do a partial refresh -- for 1bit pixels on HD Screens only'''
+
+        image = image.rotate(self.rotation, expand=True)
+        
+        if partial:
+            if self.HD:
+                write_function = self._partial_writeEPD_hd
+            else:
+                logging.warning('partial update is not available on non-hd displays')
+                write_function = self._full_writeEPD_non_hd
+                
+        else:
+            if self.HD:
+                write_function = self._full_writeEPD_hd
+            else:
+                write_function = self._full_writeEPD_non_hd
+
+        
+        write_function(image)
+        if sleep==False:
+            logging.warning('`sleep` kwarg is depricated and no longer used; display will be put to sleep after write')
+        
+        return True
+    
+    def _full_writeEPD_hd(self, image):
+        '''redraw entire screen, no partial update with waveform GC16
+        
+            see: https://www.waveshare.net/w/upload/c/c4/E-paper-mode-declaration.pdf for display modes'''
+        # create a blank buffer image to write into
+        try:
+            self.epd.frame_buf.paste(0xFF, box=(0, 0, self.resolution[0], self.resolution[1]))
+
+            self.epd.frame_buf.paste(image, [0,0])
+
+
+            self.epd.frame_buf.paste(image, [0, 0])
+            logging.debug('writing to display using GC16 (full display update)')
+            self.epd.draw_full(self.constants.DisplayModes.GC16)
+        except Exception as e:
+            raise ScreenError(f'failed to write image to display: {e}')
+            
+    
+    def _full_writeEPD_non_hd(self, image):
+        '''wipe screen and write an image'''
+        image_buffer = self.epd.getbuffer(image)
+        
+        try:
+            if self.one_bit_display:
+                self.epd.display(image_buffer)
+            else:
+                self.epd.display(image_buffer, self.buffer_no_image)
+        except Exception as e:
+            raise ScreenError(f'failed to write image to display: {e}')
+
+    def _partial_writeEPD_hd(self, image):
+        '''partial update, affects only those changed black and white pixels with no flash/wipe
+
+        uses waveform DU see: see: https://www.waveshare.net/w/upload/c/c4/E-paper-mode-declaration.pdf for display modes
+        '''
+        try:
+            pass
+        except Exception as e:
+            raise ScreenError(f'failed to write partial update to display: {e}')
+        self.epd.frame_buf = image
+        self.epd.draw_partial(self.constants.DisplayModes.DU)
+    
+    @staticmethod
+    def list_compatible():
+        list_compatible_modules()
+        
+    def close_spi(self):
+        '''close the most recently opened SPI file handles'''
+        if self.HD:
+            try:
+                self.epd.epd.spi.__del__()
+            except OSError:
+                logging.info('there are no handles that are closable')
+        else:
+            self.epd.sleep()
+
+
+
+
+
+
+# !lsof |grep spidev0 |wc -l
 
 
 
@@ -527,6 +658,11 @@ def list_compatible_modules(print_modules=True):
                        'display_args': display_args,
                        'supported': supported,
                        'reason': reason})
+        
+    panels.append({'name': 'HD IT8951 Based Screens',
+                   'display_args': {},
+                   'supported': True,
+                   'reason': []})
     
 #     return panels
     if print_modules:
@@ -565,7 +701,7 @@ def main():
 #     for idx, i in enumerate(panels):
 #         print(f'  {idx}. {i}')
     panels = list_compatible_modules()
-    panels.append({'name': 'All IT8951 Based Panels'})
+#     panels.append({'name': 'All IT8951 Based Panels'})
     print(f"{len(panels)-1}. {panels[-1]['name']}")
         
     choice = input('Enter the number of your choice: ')
@@ -603,7 +739,7 @@ def main():
                 'image': None,               # do not expect an image
                 'max_lines': 3,              # number of lines of text
                 'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
-                'height': 4/7,               # 1/3 of the entire height
+                'height': .6,               # 1/3 of the entire height
                 'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
                 'hcenter': True,             # horizontally center text
                 'vcenter': True,             # vertically center text 
@@ -616,7 +752,7 @@ def main():
                 'image': None,
                 'max_lines': 2,
                 'width': 1,
-                'height': 3/7,
+                'height': .4,
                 'abs_coordinates': (0, None),   # X = 0, Y will be calculated
                 'hcenter': True,
                 'vcenter': True,
@@ -627,18 +763,18 @@ def main():
             }
     }    
 
+    s = Screen(epd=myepd, vcom=voltage)
+    
     for r in [0, 90, -90, 180]:
         print(f'setup for rotation: {r}')
-
-        s = Screen(epd=myepd, rotation=r, vcom=voltage)
-        s.initEPD()
+        s.rotation = r
 
         l = Layout.Layout(resolution=s.resolution)
         l.layout = myLayout
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
-    #         s.initEPD()
-        s.writeEPD(l.concat(), sleep=False)
+
+        s.writeEPD(l.concat())
         print('sleeping for 2 seconds')
         time.sleep(2)
 
@@ -659,7 +795,7 @@ def main():
 #         'image': None,
 #         'padding': 10, 
 #         'width': 1,
-#         'height': 1/4,
+#         'height': .25,
 #         'abs_coordinates': (0, 0),
 #         'mode': '1',
 #         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
@@ -672,7 +808,7 @@ def main():
 #         'padding': 10,
 #         'inverse': True,
 #         'width': 1,
-#         'height': 1/4,
+#         'height': .25,
 #         'abs_coordinates': (0, None),
 #         'relative': ['text_b', 'text_a'],
 #         'mode': '1',
@@ -720,6 +856,28 @@ def main():
 
 
 
+# s = Screen(epd='HD', vcom=-1.93, rotation=0)
+# mylayout_hd = Layout.Layout(resolution=s.resolution, layout=l)
+
+# mylayout_hd.update_contents(u1)
+# s.writeEPD(mylayout_hd.concat())
+# time.sleep(5)
+
+# mylayout_hd.update_contents(u2)
+# s.writeEPD(image=mylayout_hd.concat(), partial=True)
+# time.sleep(5)
+# mylayout_hd.update_contents(u1)
+# s.writeEPD(image=mylayout_hd.concat(), partial=True)
+# time.sleep(5)
+# s.clearEPD()
+# # clean up the open SPI handles
+# s.epd.epd.spi.__del__()
+
+
+
+
+
+
 # epd2in7 = Screen(epd='epd2in7', rotation=0)
 # mylayout_non = Layout.Layout(resolution=epd2in7.resolution, layout=l)
 
@@ -739,27 +897,7 @@ def main():
 
 
 
-# s = Screen(epd='HD', vcom=-1.93, mode='L', rotation=0)
-# mylayout_hd = Layout.Layout(resolution=s.resolution, layout=l)
-
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(mylayout_hd.concat())
-# time.sleep(5)
-
-# mylayout_hd.update_contents(u2)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# s.clearEPD()
-
-
-
-
-
-
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
 
 
@@ -769,5 +907,12 @@ def main():
 
 if __name__ == '__main__':
     e= main()
+
+
+
+
+
+
+
 
 
