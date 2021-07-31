@@ -1,3 +1,13 @@
+## 0.4.4 - 2021.07.31
+rewrite of `Screen` module to fix unclosed SPI file handles
+**Screen**
+* `initEPD()` method is now depricated and no longer needed; this can be removed from the code 
+    - displays are automatically woken prior to write/clear and put to sleep after write/clear
+    - at your own risk, use `writeEPD(sleep=True)` to keep display awake after write. For non-IT8951 boards, you **must** manually call `epd.sleep()` prior to the next write/clear event to ensure the SPI file handle is properly closed.
+* `writeEPD()` and `clearEPD()` methods now handle all init, write and sleep operations automatically
+    - it is no longer necessary to call 
+* added convenience static method `list_compatible()` to print list of non-IT8951 boards 
+
 ## 0.4.3
 rework of `Block` and `Layout` modules to fix padding and text scaling
 
