@@ -686,22 +686,27 @@ def main():
     '''run a demo/test of attached EPD screen showing rotations and basic writing'''
     import pkgutil
     import sys
-    # import importlib
-    # import inspect
 
     import waveshare_epd
-    # from importlib import import_module
-    # get a list of waveshare non-hd models
-    panels = []
-#     for i in pkgutil.iter_modules(waveshare_epd.__path__):
-#         panels.append(i.name)
-#     panels.append('All IT8951 Based Panels')
     
-#     print('Choose a pannel to test:')
-#     for idx, i in enumerate(panels):
-#         print(f'  {idx}. {i}')
+    print('loading Layout module')
+    try:
+        from epdlib import Layout
+        from epdlib import constants
+    except ModuleNotFoundError:
+        try:
+            print('trying alternative module')
+            from Layout import Layout
+            import constants
+        except ModuleNotFoundError:
+            sys.exit('failed to import')
+      
+    
+    
+    
+    panels = []
     panels = list_compatible_modules()
-#     panels.append({'name': 'All IT8951 Based Panels'})
+
     print(f"{len(panels)-1}. {panels[-1]['name']}")
         
     choice = input('Enter the number of your choice: ')
@@ -731,9 +736,11 @@ def main():
     else:
         voltage = 0.0
     
-    import Layout
+
+        
     
-    sys.path.append('../')
+#     sys.path.append('../')
+    
     myLayout = {
             'title': {                       # text only block
                 'image': None,               # do not expect an image
@@ -744,7 +751,7 @@ def main():
                 'hcenter': True,             # horizontally center text
                 'vcenter': True,             # vertically center text 
                 'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-                'font': '../fonts/Font.ttc', # path to font file
+                'font': str(constants.absolute_path/'../fonts/Font.ttc'), # path to font file
                 'font_size': None            # Calculate the font size because none was provided
             },
 
@@ -756,20 +763,21 @@ def main():
                 'abs_coordinates': (0, None),   # X = 0, Y will be calculated
                 'hcenter': True,
                 'vcenter': True,
-                'font': '../fonts/Font.ttc',
+                'font': str(constants.absolute_path/'../fonts/Font.ttc'),
                 'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
                                                # calculate the y position based on the size of `title` block
 
             }
     }    
-
+    
+    print(f"using font: {myLayout['title']['font']}")
     s = Screen(epd=myepd, vcom=voltage)
     
     for r in [0, 90, -90, 180]:
         print(f'setup for rotation: {r}')
         s.rotation = r
 
-        l = Layout.Layout(resolution=s.resolution)
+        l = Layout(resolution=s.resolution)
         l.layout = myLayout
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
