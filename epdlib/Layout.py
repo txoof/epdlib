@@ -33,6 +33,13 @@ except ImportError as e:
 
 
 
+logger = logging.getLogger(__name__)
+
+
+
+
+
+
 def strict_enforce(*types):
     """strictly enforce type compliance within classes
     
@@ -59,19 +66,22 @@ def strict_enforce(*types):
 
 
 class Layout:
-    def __init__(self, resolution, layout=None):
+    def __init__(self, resolution, layout=None, force_onebit=False):
         '''init layout object
         
         Args:
             resolution(tuple of int): X, Y screen resolution
             layout(dict): layout rules
+            force_onebit(bool): override the mode setting of any block and force to 1bit mode
+                This can improve the appearnce of anti-aliased fonts on 1bit screens
             
         Attributes:
             blocks(dict of Block obj): dictionary of ImageBlock and TextBlock objects
             screen(PIL.Image): single image composed of all blocks defined in the layout
-            mode(str): "L" (8bit) or "1" (1bit) if any blocks are 8bit, this will be set to "L" '''
+            mode(str): "L" (8bit) or "1" (1bit) if any blocks are 8bit, this will be set to "L"'''
         
         self.resolution = resolution
+        self.force_onebit = force_onebit
         self.screen = None
         self.mode = "1"
         self.layout = layout
@@ -125,8 +135,10 @@ class Layout:
         for section in self.layout:
             logging.info(f'section: [{section:.^30}]')            
             vals = self.layout[section]
-            if vals['mode'] == "L":
-                mode_count += 1
+            
+            if self.force_onebit:
+                vals['mode'] = '1'
+                logging.debug('forcing block mode to 1bit')
                 
             if not vals['image']:
                 logging.info(f'set text block: {section}')
@@ -136,6 +148,10 @@ class Layout:
                 logging.info(f'set image block: {section}')
                 logging.debug(f'vals: {vals}')
                 blocks[section] = Block.ImageBlock(**vals)
+                
+            if vals['mode'] == "L":
+                mode_count += 1
+                
                 
         self.blocks = blocks
         if mode_count > 0:
@@ -252,7 +268,7 @@ class Layout:
 # from copy import deepcopy
 # use_layout = deepcopy(l)
 
-# ml = Layout(resolution=(1200, 800))
+# ml = Layout(resolution=(1200, 800), force_onebit=True)
 # ml.layout = use_layout
 # ml.update_contents(update)
 
@@ -335,7 +351,7 @@ class Layout:
 #                 'hcenter': False,
 #                 'vcenter': True,
 #                 'relative': ['forecast', 'temperature'],
-#                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
+#                 'font': './fonts/Open_Sans/OpenSans-Italic.ttf',
 #                 'font_size': None,
 #                 'padding': 10,
 #                 'align': 'right',

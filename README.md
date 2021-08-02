@@ -29,6 +29,9 @@ Python Modules:
 * [Layout](#Layout) - generate dynamic layouts from Blocks
 * [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
 
+
+
+
 <a name="Block"></a>
 ## Block Module
 `Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
@@ -109,7 +112,7 @@ All properties of the parent class are inherited.
 
 Font sizes are set based on each individual font and scaled to fit within text blocks using the maximum number of lines specified in the layout. Text is line-broken using the python [textwrap logic](https://docs.python.org/3.7/library/textwrap.html).
 
-*Class* `Layout(resolution, layout=None)`
+*Class* `Layout(resolution, layout=None, force_onebit=False)`
 
 ## Scaling Example
 epdlib `Layout` objects can be scaled to any (reasonable) resolution while maintaining internally consistent ratios.
@@ -127,6 +130,7 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 * `layout` (dict): dictionary containing layout paramaters for each block
     - see example below in Quick-Start Recipe
 * `image` (Pil.Image): concatination of all blocks into single image
+* `force_onebit` (bool): force all blocks within a layout to `mode='1'`
 
 ### Methods
 * `concat()`: join all blocks into a single image
@@ -227,10 +231,15 @@ spam = PIL.Image.new(mode='L', size=(100, 100), color=0)
 scrnShot.save(spam)
 ```
 
-## Quick-Start Recipe
-The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+## Quick-Start Recipes
+### Quick Demo
+The demo creates a very basic layout and displays some text in four orientations. This is an easy way to test your panel and confirm that it is working properly.
+
+`python3 -m epdlib.Screen`
 
 ### Creating an Image from a Layout
+The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+
 ```
 import epdlib
 
@@ -332,17 +341,50 @@ myImg = layout_obj.concat()
 myImg.save('sample.jpg')
 
 ```
+
+### Write an image to a Screen
+The following code will create an interface for writing images to the EPD
+*Requirements*
+* Waveshare EPD module or IT8951 library (see Notes below)
+
+```
+from epdlib import Screen
+from PIL import Image
+## non IT8951 screens
+my_epd = "epd2in7" 
+my_vcom = None
+## IT8951 screens
+# my_epd = "HD"
+# my_vcom = -1.8
+
+# create screen object
+my_screen = Screen(epd=my_epd, vcom=my_vcom)
+
+my_resolution = my_screen.resolution
+
+# open image, convert to 1 bit and scale
+my_img = Image.open('path/to/image.jpg')
+my_img = my_img.convert("1")
+my_img.thumbail(my_resolution)
+
+# write image to screen
+my_screen.writeEPD(my_img)
+
+# clear screen
+my_screen.clearEPD()
+```
+
 <a name="Notes"></a>
 ## Notes
 The Waveshare-epd library is provided only as a git repo. Try the following to install it:
 
 ```
-pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
+pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
 ```
 
 The IT8951 library is provided only as a git repo. Try the following ot install it:
 ```
-pipenv install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
+pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
 
 getting ready for pypi:

@@ -1,3 +1,9 @@
+## 0.4.5.0 - 2021.08.02
+Add option to force all blocks in a layout to 1bit mode. TT Fonts are rendered with anti-aliasing in all modes except for 1bit mode. Anti-aliased fonts display poorly on 1bit screens with extremely jagged edges.
+**Layout**
+* `Layout` objects now support boolean property `force_onebit` 
+    - When set to `True` all blocks are forced to `mode = '1'`
+
 ## 0.4.4 - 2021.07.31
 rewrite of `Screen` module to fix unclosed SPI file handles
 **Screen**
