@@ -216,10 +216,10 @@ class Screen():
             HD(bool): True for IT8951 panels
             rotatio(int): rotation of screen (0, -90, 90, 180)
             update(obj:Update): monotoic time aware update timer'''
+        self.vcom = vcom        
         self.resolution = [1, 1]
         self.clear_args  = {}
         self.buffer_no_image = []
-        self.vcom = vcom
         self.constants = None
         self.mode = None
         self.HD = False
@@ -309,7 +309,7 @@ class Screen():
         
         myepd = None
         
-        if epd == 'HD' and self.vcom:
+        if epd == 'HD':
             self.HD = True
             myepd = self._load_hd(epd)
         else:
@@ -329,7 +329,19 @@ class Screen():
         
         logging.debug(f'epd configuration {myepd}')
         
-        
+    @property 
+    def vcom(self):
+        return self._vcom
+    
+    @vcom.setter
+    @strict_enforce((int, float, type(None)))
+    def vcom(self, vcom):
+        if not vcom:
+            self._vcom = None
+        elif 0 < vcom or vcom < -5 :
+            raise ValueError('vcom must between 0 and -5')
+        else:
+            self._vcom = vcom
         
     @property
     def rotation(self):
@@ -384,8 +396,10 @@ class Screen():
         
         if not self.vcom:
             raise ScreenError('`vcom` property must be provided when using "HD" epd type')
-        
-        myepd = AutoEPDDisplay(vcom=self.vcom)
+        try:
+            myepd = AutoEPDDisplay(vcom=self.vcom)
+        except ValueError as e:
+            raise ScreenError(f'invalid vcom value: {e}')
         resolution = list(myepd.display_dims)
         clear_args = {}
         one_bit_display = False
@@ -601,6 +615,7 @@ class Screen():
 
 
 
+
 # !lsof |grep spidev0 |wc -l
 
 
@@ -664,7 +679,6 @@ def list_compatible_modules(print_modules=True):
                    'supported': True,
                    'reason': []})
     
-#     return panels
     if print_modules:
         print(f'NN. Board        Supported:')
         print( '---------------------------')
@@ -707,7 +721,7 @@ def main():
     panels = []
     panels = list_compatible_modules()
 
-    print(f"{len(panels)-1}. {panels[-1]['name']}")
+#     print(f"{len(panels)-1}. {panels[-1]['name']}")
         
     choice = input('Enter the number of your choice: ')
     
