@@ -6,6 +6,8 @@
 
 
 
+
+
 import logging
 import textwrap
 from random import randrange
@@ -300,6 +302,181 @@ class Block:
             raise ValueError(f'area should be a list-like object with length 2: {abs_coordinates}')
                 
         self._abs_coordinates = abs_coordinates
+
+
+
+
+
+
+class DrawBlock(Block):
+    '''constructor for DrawBlock Class
+    
+    Child class of Block 
+    
+    Individual image block used in assembling composite epdlib.Layout images. 
+    
+    DrawBlocks provide basic drawing elements such as rectangles and ovals. For 
+    more complex drawing tasks it may be better to create the image externally 
+    and use an ImageBlock.
+    '''
+    
+    def __init__(self, area, *args, shape=None, halign='center', valign='center', **kwargs):
+        """Intializes TextBlock object
+        
+        Args:
+            area(tuple of int): area of block in pixels
+            shape(str): shape to draw (see DrawBlock.list_shapes())
+            halign(str): horizontal alignment of drawing; 'center', 'left', 'right' 
+            valign(str): vertical alignment of drawing; 'center', 'top', 'bottom'
+            
+        Properties:
+            image(PIL:Image): text rendered as an image
+            
+            """        
+        super().__init__(area, *args, **kwargs)
+        self.image = None
+        self.shape = shape
+        self.halign = halign
+        self.valign = valign
+
+    @property
+    def image(self):
+        return self._image
+    
+    @image.setter
+    def image(self, image):
+        if image:
+            self._image = image
+        else:
+            self._image = Image.new(size=(self.area), color=self.bkground, mode=self.mode)
+    
+    @property
+    def shape(self):
+        '''Pillow.ImageDraw shape function to use for drawing
+        
+        see DrawBlock().list_shapes() for a list of supported shapes
+        
+        See the Pillow docs for complete informatoin and supported kwargs for 
+        each shape: https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html'''
+        return self._shape
+    
+    @shape.setter
+    def shape(self, shape):
+        if shape and shape not in constants.DRAW_SHAPES:
+            raise AttributeError(f'"DrawBlock" object has no shape attribute "{shape}"')
+        
+#         if shape:
+#             self._draw_func = getattr(ImageDraw.Draw(self.image), shape)
+#         else:
+#             self._draw_func = None
+        
+        self._shape = shape
+    
+    @property
+    def halign(self):
+        '''horizontal alignment setting (x postion)'''        
+        return self._halign
+    
+    @halign.setter
+    def halign(self, halign):
+        if halign in constants.H_ALIGNMENT:
+            self._halign = halign
+        else:
+            raise ValueError(f'"{halign}" is not a valid horizontal alignment value')
+    
+    @property
+    def valign(self):
+        '''vertical alignment setting (y position)'''
+        return self._valign
+    
+    @valign.setter
+    def valign(self, valign):
+        if valign in constants.V_ALIGNMENT:
+            self._valign = valign
+        else:
+            raise ValueError(f'"{valign}" is not a valid vertical alignment value')
+    
+    @staticmethod
+    def list_shapes():
+        '''static method to show available DrawBlock shapes'''
+        return constants.DRAW_SHAPES
+        
+            
+    def update(self, size, no_clip=True, **kwargs):
+        """Update image data including coordinates (overrides base class)
+        
+        Args:
+            size(tuple of float): (%x, %y) of block area to use for drawing shape
+            no_clip(bool): when True, ensure that shape fits entirely within block area
+            kwargs: any keyword arguments required for the PIL drawing function
+                The following kwargs are passed from the class:
+                * fill -- providing 'fill' kwarg will override the value from the parent
+            
+        Returns:
+            :obj:bool - true for successful update"""        
+        
+        if not isinstance(size, (tuple, list)):
+            raise TypeError('"size" value must be a list-like object')
+        
+        if 'fill' not in kwargs:
+            kwargs['fill'] = self.fill
+            
+        for i in size:
+            if not 0 < i <= 1:
+                raise ValueError(f'"size" values must be: 0 < size <= 1 {i}')
+        
+        print(kwargs)
+        for i in kwargs:
+            print(i, kwargs[i])
+          
+        pixel_size = (int(self.area[0]*size[0])-2*self.padding, int(self.area[1]*size[1])-2*self.padding)
+#         pixel_size = (int(self.padded_area[0] * size[0])+self.padding, int(self.padded_area[1] * size[1])+self.padding)
+        logging.debug(f'pixel_size: {pixel_size}')
+        
+        # left, top
+        x1 = self.padding
+        y1 = self.padding
+        x2 = pixel_size[0] + self.padding
+        y2 = pixel_size[1] + self.padding
+        
+        logging.debug(f'alignment: h={self.halign}, v={self.valign}')
+
+        if self.halign == 'center':
+            x1 = int((self.area[0] - pixel_size[0])/2)
+            x2 = x1 + pixel_size[0]
+            
+        if self.valign == 'center':
+            y1 = int((self.area[1] - pixel_size[1])/2)
+            y2 = y1 + pixel_size[1]
+
+            
+        if self.halign == 'right':
+            x1 = self.area[0] - self.padding - pixel_size[0]
+            x2 = self.area[0] - self.padding
+            
+            
+        if self.valign == 'bottom':
+            y1 = self.area[1] - self.padding - pixel_size[1]
+            y2 = self.area[1] - self.padding
+
+        
+        if no_clip:
+            logging.info('no_clip: forcing shape inside bounds of area if necessary')
+            if x2 >= self.area[0]:
+                x2 = self.area[0] - 1
+            if y2 >= self.area[1]:
+                y2 = self.area[1] - 1
+                
+        my_xy = [x1, y1, x2, y2]
+        logging.debug(f'box coordinates: {my_xy}')
+        
+        # clear the image
+        self.image = None
+        # create a draw context using the blank image
+        draw_func = getattr(ImageDraw.Draw(self.image), self.shape)
+        
+        draw_func(xy=my_xy, **kwargs)
+        return True
 
 
 
