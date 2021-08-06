@@ -9,27 +9,72 @@ from pathlib import Path
 absolute_path = Path(__file__).resolve().parent
 
 
-layout_defaults = {'image': None, 
-                   'max_lines': 1, 
-                   'padding': 0, 
-                   'width': 1, 
-                   'height': 1, 
-                   'abs_coordinates': (None, None), 
-                   'hcenter': False, 
-                   'vcenter': False, 
-                   'rand': False, 
-                   'align': 'left',
-                   'inverse': False, 
-                   'relative': False, 
-                   'font': None, 
-                   'font_size': None, 
-                   'maxchar': None, 
+LAYOUT_DEFAULTS = {'type': None,
+                   'image': None,
+                   'height': 1,
+                   'width': 1,
+                   'abs_coordinates': (None, None),
+                   'relative': False,
+                   'hcenter': False,
+                   'vcenter': False,
+                   'inverse': False,
                    'dimensions': None,
                    'padding': 0,
                    'mode': '1',
                    'fill': 0,
-                   'bkground': 255}
+                   'bkground': 255,
+                  }
+        
+                  
 
+
+
+LAYOUT_TEXTBLOCK_DEFAULTS = {'max_lines': 1,
+                        'font_size': None,
+                        'font': None,
+                        'maxchar': None,
+                       }
+
+LAYOUT_IMAGEBLOCK_DEFAULTS = {}
+
+LAYOUT_DRAWBLOCK_DEFAULTS = {'size': (1, 1),
+                             'draw_format': None,
+                             'shape': None,
+                             'valign': 'center',
+                             'halign': 'center',
+                             'no_clip': True,
+                            }
+                             
+# layout_defaults = {
+#                    'type': None,
+#                    'image': None, 
+#                    'max_lines': 1, 
+#                    'padding': 0, 
+#                    'width': 1, 
+#                    'height': 1, 
+#                    'abs_coordinates': (None, None), 
+#                    'hcenter': False, 
+#                    'vcenter': False, 
+#                    'rand': False, 
+#                    'align': 'left',
+#                    'inverse': False, 
+#                    'relative': False, 
+#                    'font': None, 
+#                    'font_size': None, 
+#                    'maxchar': None, 
+#                    'dimensions': None,
+#                    'padding': 0,
+#                    'mode': '1',
+#                    'fill': 0,
+#                    'bkground': 255}
+
+LAYOUT_SCALE_FONT_TEXT = 'WwQq'
+
+
+DRAW_SHAPES = ['rectangle', 'rounded_rectangle', 'ellipse']
+
+H_ALIGNMENT = ['center', 'left', 'right']
+V_ALIGNMENT = ['center', 'top', 'bottom']
 
 # US English - Upper and lower case letters
 USA_CHARDIST = {
