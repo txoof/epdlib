@@ -1,3 +1,22 @@
+## 0.5.0.0 - 2021.08.07
+Add new Block type "DrawBlock" and Layout support
+**Block**
+* add class "DrawBlock" for drawing `ImageDraw` basic shapes
+    - DrawBlock blocks are useful for creating horizontal and vertical rules in Layout displays
+    - supported shapes: `ellipse`, `rounded_rectangle`, `rectangle`
+    - DrawBlock shapes can be horizontally (center, left, right) and vertically (center, top, bottom) aligned
+    - all formatting paramaters can be used when drawing supported shapes
+* update docstrings
+* add dummy `update()` method to `Block` parent class for completness
+
+**Layout**
+* Layouts now support ImageBlock, TextBlock and DrawBlock objects
+    - DrawBlock objects are included similar to Text and Image blocks, but **MUST** include the key "type"
+        * 'type': 'DrawBlock'
+    - As of epdlib v0.6, all layout sections **MUST** include the key "type"
+        * Layout v0.5 attempts to guess the appropriate block type; this will be removed in v0.6
+* Small changes in logging output to decrease verbosity and make verbose output easier to follow
+
 ## 0.4.6.0 - 2021.08.05
 Fix issue #15 - "unknown module" when display = "HD" and no vcom value set
 
