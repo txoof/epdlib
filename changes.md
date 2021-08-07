@@ -1,5 +1,6 @@
 ## 0.5.0.0 - 2021.08.07
 Add new Block type "DrawBlock" and Layout support
+
 **Block**
 * add class "DrawBlock" for drawing `ImageDraw` basic shapes
     - DrawBlock blocks are useful for creating horizontal and vertical rules in Layout displays
@@ -22,6 +23,7 @@ Fix issue #15 - "unknown module" when display = "HD" and no vcom value set
 
 ## 0.4.5.0 - 2021.08.02
 Add option to force all blocks in a layout to 1bit mode. TT Fonts are rendered with anti-aliasing in all modes except for 1bit mode. Anti-aliased fonts display poorly on 1bit screens with extremely jagged edges.
+
 **Layout**
 * `Layout` objects now support boolean property `force_onebit` 
     - When set to `True` all blocks are forced to `mode = '1'`
@@ -60,6 +62,7 @@ rework of `Block` and `Layout` modules to fix padding and text scaling
 * add property `mode` "L" when *any* block is 8bit "1" when all blocks are 1bit
 
 ## 0.4.2
+
 **Screen**
 
 * now supports IT8951 based panels
