@@ -302,6 +302,12 @@ class Block:
             raise ValueError(f'area should be a list-like object with length 2: {abs_coordinates}')
                 
         self._abs_coordinates = abs_coordinates
+        
+    def update(self, *args, **kwargs):
+        '''method for updating content of block
+        
+        This method is overriden in child classes with methods that are specific to the type of block'''
+        pass
 
 
 
@@ -320,7 +326,7 @@ class DrawBlock(Block):
     and use an ImageBlock.
     '''
     
-    def __init__(self, area, *args, shape=None, size=(1, 1), 
+    def __init__(self, area, *args, shape=None, abs_x=None, abs_y=None, scale_x=1, scale_y=1, 
                  halign='center', valign='center', draw_format={}, 
                  no_clip=True, **kwargs):
         """Intializes TextBlock object
@@ -328,29 +334,38 @@ class DrawBlock(Block):
         Args:
             area(tuple of int): area of block in pixels
             shape(str): shape to draw (see DrawBlock.list_shapes())
-            size(tuple of float): (%x, %y) of area to use when drawing shape
+            abs_x(int): absolute x dimension in pixels of drawing (overrides scale_x)
+            abs_y(int): absolute y dimension in pixels of drawing (overrides scale_y)
+            scale_x(float): percentage of total x area (0..1) (abs_x overrides)
+            scale_y(float): percentage of total y area (0..1) (abs_y overrides)
             halign(str): horizontal alignment of drawing; 'center', 'left', 'right' 
             valign(str): vertical alignment of drawing; 'center', 'top', 'bottom'
             draw_format(dict): dict of kwargs for shape drawing function
             no_clip(bool): when True fit shapes completely within area
             
         Properties:
-            image(PIL:Image): text rendered as an image
-            
-            """        
+            image(PIL:Image): text rendered as an image"""        
         super().__init__(area, *args, **kwargs)
         self.image = None
         self.no_clip = no_clip
         self.draw_format = draw_format
-        self.size = size
+        self.abs_x = abs_x
+        self.abs_y = abs_y
+        self.scale_x = scale_x
+        self.scale_y = scale_y
         self.shape = shape
         self.halign = halign
         self.valign = valign
         self.draw_format = draw_format
+        if self.draw_format and self.shape:
+            self.draw_image()
+        else:
+            logging.debug('incomplete init, will not draw image')
 
 
     @property
     def image(self):
+        '''image created by this block'''
         return self._image
     
     @image.setter
@@ -385,13 +400,12 @@ class DrawBlock(Block):
         
         self._shape = shape
         
-    def draw_help(self):
-        '''print help for current drawing function'''
-        help(self.draw_func)
-    
+        
     @property
     def halign(self):
-        '''horizontal alignment setting (x postion)'''        
+        '''str: horizontal alignment setting (x postion)
+        
+        "center", "left", "right" '''        
         return self._halign
     
     @halign.setter
@@ -403,7 +417,9 @@ class DrawBlock(Block):
     
     @property
     def valign(self):
-        '''vertical alignment setting (y position)'''
+        '''str: vertical alignment setting (y position)
+        
+        "center", "top", "bottom"'''
         return self._valign
     
     @valign.setter
@@ -413,29 +429,74 @@ class DrawBlock(Block):
         else:
             raise ValueError(f'"{valign}" is not a valid vertical alignment value')
     
-    @staticmethod
-    def list_shapes():
-        '''static method to show available DrawBlock shapes'''
-        return constants.DRAW_SHAPES
-        
-    
     @property
-    def size(self):
-        return self._size
+    def abs_x(self):
+        '''int: absolute x dimension of drawing
+        
+        when set, this will override the "scale_x" value'''
+        return self._abs_x
     
-    @size.setter
-    def size(self, size):
-        if not isinstance(size, (tuple, list)):
-            raise TypeError('"size" value must be a list-like object')
-            
-        for i in size:
-            if not 0 < i <= 1:
-                raise ValueError(f'"size" values must be: 0 < size <= 1 {i}')
-        self._size = size
+    @abs_x.setter
+    @strict_enforce((int, type(None)))
+    def abs_x(self, abs_x):
+        if not abs_x:
+            pass
+        elif abs_x < 1:
+            raise ValueError('"abs_x" must be > 0')
+        
+        self._abs_x = abs_x
+
+    @property
+    def abs_y(self):
+        '''int: absolute y dimension of drawing
+        
+        when set, this will override the "scale_y" value '''
+        return self._abs_y
+    
+    @abs_y.setter
+    @strict_enforce((int, type(None)))
+    def abs_y(self, abs_y):
+        if not abs_y:
+            pass
+        elif abs_y < 1:
+            raise ValueError('"abs_y" must be > 0')
+        
+        self._abs_y = abs_y
+        
+    @property
+    def scale_x(self):
+        '''float: 0..1 percentage of x area to use for drawing
+        
+        this is overridden by "scale_x" when set'''
+        return self._scale_x
+    
+    @scale_x.setter
+    @strict_enforce((int, float))
+    def scale_x(self, scale_x):
+        if not 0 <= scale_x <= 1:
+            raise ValueError('"scale_x" must be between 0 and 1')
+        
+        self._scale_x = scale_x
+
+    @property
+    def scale_y(self):
+        '''float: 0..1 percentage of y area to use for drawing
+        
+        this is overridden by "scale_y" when set'''
+        return self._scale_y
+    
+    @scale_y.setter
+    @strict_enforce((int, float))
+    def scale_y(self, scale_y):
+        if not 0 <= scale_y <= 1:
+            raise ValueError('"scale_y" must be between 0 and 1')
+        
+        self._scale_y = scale_y
+    
     
     @property
     def draw_format(self):
-        '''kwargs that will be passed to draw_func
+        '''dict: kwargs that will be passed to draw_func
         
         see method `draw_help()` for valid kwargs that can be passed to the drawing function'''
         return self._draw_format
@@ -443,19 +504,45 @@ class DrawBlock(Block):
     @draw_format.setter
     def draw_format(self, draw_format):
         if not 'fill' in draw_format:
+            logging.debug(f'setting fill to: {self.fill}')
             draw_format['fill'] = self.fill
             
         self._draw_format = draw_format
-    
+
+    @staticmethod
+    def list_shapes():
+        '''static method to show available DrawBlock shapes'''
+        return constants.DRAW_SHAPES
+                                     
+    def draw_help(self):
+        '''print help for current drawing function'''
+        if self.draw_func:
+            help(self.draw_func)
+        else:
+            print('No drawing function selected')
     
     def draw_image(self):
+        '''update the image using the selected drawing function and "draw_format"'''
+        logging.debug('drawing image')
         self.image = None
         self.shape = self.shape
+                      
+        pixel_size = [0, 0]
+#         scale_size = [self.scale_x, self.scale_y]
         
+
+        for idx, val in enumerate([self.abs_x, self.abs_y]):
+            if val:
+                pixel_size[idx] = val
+                logging.debug(f'using absolute pixel size {idx}: {val}')
+            else:
+                pixel_size[idx] = int(self.area[idx] *[self.scale_x, self.scale_y][idx] - 2*self.padding)
+                logging.debug(f'using calculated pixel size {idx}: {pixel_size[idx]}')
+                
+                
+            if pixel_size[idx] > self.padded_area[idx]:
+                logging.warning(f'set size is larger than padded_area: {val} > {self.area[idx]}')
         
-        pixel_size = (int(self.area[0]*self.size[0])-2*self.padding, 
-                      int(self.area[1]*self.size[1])-2*self.padding)
-#         pixel_size = (int(self.padded_area[0] * size[0])+self.padding, int(self.padded_area[1] * size[1])+self.padding)
         logging.debug(f'pixel_size: {pixel_size}')
         
         # left, top
@@ -496,11 +583,14 @@ class DrawBlock(Block):
         logging.debug(f'box coordinates: {my_xy}')        
         
     
-        
+        logging.debug(f'drawing function: {str(self.draw_func.__func__.__name__)}(xy={my_xy}, {self.draw_format})')
         self.draw_func(xy=my_xy, **self.draw_format)
 
     def update(self, update=True):
         """Update image property
+        
+        DrawBlocks that re fully init'ed with a shape and format are automatcially updated. DrawBlocks
+        do not need to be updated again unless the properties are updated.
 
         Args:
             update(bool): when True redraw image
@@ -509,82 +599,6 @@ class DrawBlock(Block):
             :obj:bool - true for successful update"""
         if update:
             self.draw_image()
-
-#     def update(self, size, no_clip=True, **kwargs):
-#         """Update image data including coordinates (overrides base class)
-        
-#         Args:
-#             size(tuple of float): (%x, %y) of block area to use for drawing shape
-#             no_clip(bool): when True, ensure that shape fits entirely within block area
-#             kwargs: any keyword arguments required for the PIL drawing function
-#                 The following kwargs are passed from the class:
-#                 * fill -- providing 'fill' kwarg will override the value from the parent
-            
-#         Returns:
-#             :obj:bool - true for successful update"""        
-        
-# #         if not isinstance(size, (tuple, list)):
-# #             raise TypeError('"size" value must be a list-like object')
-        
-#         if 'fill' not in kwargs:
-#             kwargs['fill'] = self.fill
-            
-# #         for i in size:
-# #             if not 0 < i <= 1:
-# #                 raise ValueError(f'"size" values must be: 0 < size <= 1 {i}')
-        
-#         print(kwargs)
-#         for i in kwargs:
-#             print(i, kwargs[i])
-          
-#         pixel_size = (int(self.area[0]*size[0])-2*self.padding, int(self.area[1]*size[1])-2*self.padding)
-# #         pixel_size = (int(self.padded_area[0] * size[0])+self.padding, int(self.padded_area[1] * size[1])+self.padding)
-#         logging.debug(f'pixel_size: {pixel_size}')
-        
-#         # left, top
-#         x1 = self.padding
-#         y1 = self.padding
-#         x2 = pixel_size[0] + self.padding
-#         y2 = pixel_size[1] + self.padding
-        
-#         logging.debug(f'alignment: h={self.halign}, v={self.valign}')
-
-#         if self.halign == 'center':
-#             x1 = int((self.area[0] - pixel_size[0])/2)
-#             x2 = x1 + pixel_size[0]
-            
-#         if self.valign == 'center':
-#             y1 = int((self.area[1] - pixel_size[1])/2)
-#             y2 = y1 + pixel_size[1]
-
-            
-#         if self.halign == 'right':
-#             x1 = self.area[0] - self.padding - pixel_size[0]
-#             x2 = self.area[0] - self.padding
-            
-            
-#         if self.valign == 'bottom':
-#             y1 = self.area[1] - self.padding - pixel_size[1]
-#             y2 = self.area[1] - self.padding
-
-        
-#         if no_clip:
-#             logging.info('no_clip: forcing shape inside bounds of area if necessary')
-#             if x2 >= self.area[0]:
-#                 x2 = self.area[0] - 1
-#             if y2 >= self.area[1]:
-#                 y2 = self.area[1] - 1
-                
-#         my_xy = [x1, y1, x2, y2]
-#         logging.debug(f'box coordinates: {my_xy}')
-        
-#         # clear the image
-#         self.image = None
-#         # create a draw context using the blank image
-#         draw_func = getattr(ImageDraw.Draw(self.image), self.shape)
-        
-#         draw_func(xy=my_xy, **kwargs)
-#         return True
 
 
 
@@ -1128,8 +1142,8 @@ def compare_obj(a, b):
 
 
 
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
+logger = logging.getLogger(__name__)
+logger.root.setLevel('DEBUG')
 
 
 
