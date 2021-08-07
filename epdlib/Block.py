@@ -160,7 +160,7 @@ class Block:
             fill(int): 0-255 8 bit value for fill color for text/images [0 (black)]
             bkground(int): 0-255 8 bit value for background color [255 (white)]\
             mode(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
-            border_config(dict): dictonary containing configuration keys for adding border to image
+            border_config(dict): dictonary containing configuration for adding border to image
                 see help(add_border)
             
         Properties:
@@ -689,20 +689,6 @@ class DrawBlock(Block):
             :obj:bool - true for successful update"""
         if update:
             self.draw_image()
-
-
-
-
-
-
-b = DrawBlock(area=(800, 400), shape='ellipse', padding=10, border_config={'fill'})
-
-
-
-
-
-
-b.image
 
 
 
@@ -1254,8 +1240,8 @@ def compare_obj(a, b):
 
 
 
-logger = logging.getLogger(__name__)
-logger.root.setLevel('DEBUG')
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
 
 
 
