@@ -6,6 +6,8 @@
 
 
 
+
+
 import logging
 import textwrap
 from random import randrange
@@ -300,6 +302,303 @@ class Block:
             raise ValueError(f'area should be a list-like object with length 2: {abs_coordinates}')
                 
         self._abs_coordinates = abs_coordinates
+        
+    def update(self, *args, **kwargs):
+        '''method for updating content of block
+        
+        This method is overriden in child classes with methods that are specific to the type of block'''
+        pass
+
+
+
+
+
+
+class DrawBlock(Block):
+    '''constructor for DrawBlock Class
+    
+    Child class of Block 
+    
+    Individual image block used in assembling composite epdlib.Layout images. 
+    
+    DrawBlocks provide basic drawing elements such as rectangles and ovals. For 
+    more complex drawing tasks it may be better to create the image externally 
+    and use an ImageBlock.
+    '''
+    
+    def __init__(self, area, *args, shape=None, abs_x=None, abs_y=None, scale_x=1, scale_y=1, 
+                 halign='center', valign='center', draw_format={}, 
+                 no_clip=True, **kwargs):
+        """Intializes TextBlock object
+        
+        Args:
+            area(tuple of int): area of block in pixels
+            shape(str): shape to draw (see DrawBlock.list_shapes())
+            abs_x(int): absolute x dimension in pixels of drawing (overrides scale_x)
+            abs_y(int): absolute y dimension in pixels of drawing (overrides scale_y)
+            scale_x(float): percentage of total x area (0..1) (abs_x overrides)
+            scale_y(float): percentage of total y area (0..1) (abs_y overrides)
+            halign(str): horizontal alignment of drawing; 'center', 'left', 'right' 
+            valign(str): vertical alignment of drawing; 'center', 'top', 'bottom'
+            draw_format(dict): dict of kwargs for shape drawing function
+            no_clip(bool): when True fit shapes completely within area
+            
+        Properties:
+            image(PIL:Image): rendered shape"""        
+        super().__init__(area, *args, **kwargs)
+        self.image = None
+        self.no_clip = no_clip
+        self.draw_format = draw_format
+        self.abs_x = abs_x
+        self.abs_y = abs_y
+        self.scale_x = scale_x
+        self.scale_y = scale_y
+        self.shape = shape
+        self.halign = halign
+        self.valign = valign
+        self.draw_format = draw_format
+        if self.draw_format and self.shape:
+            self.draw_image()
+        else:
+            logging.debug('incomplete init, will not draw image')
+
+
+    @property
+    def image(self):
+        '''image created by this block'''
+        return self._image
+    
+    @image.setter
+    def image(self, image):
+        if image:
+            self._image = image
+        else:
+            self._image = Image.new(size=(self.area), color=self.bkground, mode=self.mode)
+    
+    @property
+    def shape(self):
+        '''Pillow.ImageDraw shape function to use for drawing
+        
+        see DrawBlock().list_shapes() for a list of supported shapes
+        
+        See the Pillow docs for complete informatoin and supported kwargs for 
+        each shape: https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html
+        
+        Sets:
+            self.draw_func()'''
+        return self._shape
+    
+    @shape.setter
+    def shape(self, shape):
+        if shape and shape not in constants.DRAW_SHAPES:
+            raise AttributeError(f'"DrawBlock" object has no shape attribute "{shape}"')
+        
+        if shape:
+            self.draw_func = getattr(ImageDraw.Draw(self.image), shape)
+        else:
+            self.draw_func = None
+        
+        self._shape = shape
+        
+        
+    @property
+    def halign(self):
+        '''str: horizontal alignment setting (x postion)
+        
+        "center", "left", "right" '''        
+        return self._halign
+    
+    @halign.setter
+    def halign(self, halign):
+        if halign in constants.H_ALIGNMENT:
+            self._halign = halign
+        else:
+            raise ValueError(f'"{halign}" is not a valid horizontal alignment value')
+    
+    @property
+    def valign(self):
+        '''str: vertical alignment setting (y position)
+        
+        "center", "top", "bottom"'''
+        return self._valign
+    
+    @valign.setter
+    def valign(self, valign):
+        if valign in constants.V_ALIGNMENT:
+            self._valign = valign
+        else:
+            raise ValueError(f'"{valign}" is not a valid vertical alignment value')
+    
+    @property
+    def abs_x(self):
+        '''int: absolute x dimension of drawing
+        
+        when set, this will override the "scale_x" value'''
+        return self._abs_x
+    
+    @abs_x.setter
+    @strict_enforce((int, type(None)))
+    def abs_x(self, abs_x):
+        if not abs_x:
+            pass
+        elif abs_x < 1:
+            raise ValueError('"abs_x" must be > 0')
+        
+        self._abs_x = abs_x
+
+    @property
+    def abs_y(self):
+        '''int: absolute y dimension of drawing
+        
+        when set, this will override the "scale_y" value '''
+        return self._abs_y
+    
+    @abs_y.setter
+    @strict_enforce((int, type(None)))
+    def abs_y(self, abs_y):
+        if not abs_y:
+            pass
+        elif abs_y < 1:
+            raise ValueError('"abs_y" must be > 0')
+        
+        self._abs_y = abs_y
+        
+    @property
+    def scale_x(self):
+        '''float: 0..1 percentage of x area to use for drawing
+        
+        this is overridden by "scale_x" when set'''
+        return self._scale_x
+    
+    @scale_x.setter
+    @strict_enforce((int, float))
+    def scale_x(self, scale_x):
+        if not 0 <= scale_x <= 1:
+            raise ValueError('"scale_x" must be between 0 and 1')
+        
+        self._scale_x = scale_x
+
+    @property
+    def scale_y(self):
+        '''float: 0..1 percentage of y area to use for drawing
+        
+        this is overridden by "scale_y" when set'''
+        return self._scale_y
+    
+    @scale_y.setter
+    @strict_enforce((int, float))
+    def scale_y(self, scale_y):
+        if not 0 <= scale_y <= 1:
+            raise ValueError('"scale_y" must be between 0 and 1')
+        
+        self._scale_y = scale_y
+    
+    
+    @property
+    def draw_format(self):
+        '''dict: kwargs that will be passed to draw_func
+        
+        see method `draw_help()` for valid kwargs that can be passed to the drawing function'''
+        return self._draw_format
+    
+    @draw_format.setter
+    def draw_format(self, draw_format):
+        if not 'fill' in draw_format:
+            logging.debug(f'setting fill to: {self.fill}')
+            draw_format['fill'] = self.fill
+            
+        self._draw_format = draw_format
+
+    @staticmethod
+    def list_shapes():
+        '''static method to show available DrawBlock shapes'''
+        return constants.DRAW_SHAPES
+                                     
+    def draw_help(self):
+        '''print help for current drawing function'''
+        if self.draw_func:
+            help(self.draw_func)
+        else:
+            print('No drawing function selected')
+    
+    def draw_image(self):
+        '''update the image using the selected drawing function and "draw_format"'''
+        logging.debug('drawing image')
+        self.image = None
+        self.shape = self.shape
+                      
+        pixel_size = [0, 0]
+#         scale_size = [self.scale_x, self.scale_y]
+        
+
+        for idx, val in enumerate([self.abs_x, self.abs_y]):
+            if val:
+                pixel_size[idx] = val
+                logging.debug(f'using absolute pixel size {idx}: {val}')
+            else:
+                pixel_size[idx] = int(self.area[idx] *[self.scale_x, self.scale_y][idx] - 2*self.padding)
+                logging.debug(f'using calculated pixel size {idx}: {pixel_size[idx]}')
+                
+                
+            if pixel_size[idx] > self.padded_area[idx]:
+                logging.warning(f'set size is larger than padded_area: {val} > {self.area[idx]}')
+        
+        logging.debug(f'pixel_size: {pixel_size}')
+        
+        # left, top
+        x1 = self.padding
+        y1 = self.padding
+        x2 = pixel_size[0] + self.padding
+        y2 = pixel_size[1] + self.padding
+        
+        logging.debug(f'alignment: h={self.halign}, v={self.valign}')
+
+        if self.halign == 'center':
+            x1 = int((self.area[0] - pixel_size[0])/2)
+            x2 = x1 + pixel_size[0]
+            
+        if self.valign == 'center':
+            y1 = int((self.area[1] - pixel_size[1])/2)
+            y2 = y1 + pixel_size[1]
+
+            
+        if self.halign == 'right':
+            x1 = self.area[0] - self.padding - pixel_size[0]
+            x2 = self.area[0] - self.padding
+            
+            
+        if self.valign == 'bottom':
+            y1 = self.area[1] - self.padding - pixel_size[1]
+            y2 = self.area[1] - self.padding
+
+        
+        if self.no_clip:
+            logging.info('no_clip: forcing shape inside bounds of area if necessary')
+            if x2 >= self.area[0]:
+                x2 = self.area[0] - 1
+            if y2 >= self.area[1]:
+                y2 = self.area[1] - 1
+                
+        my_xy = [x1, y1, x2, y2]
+        logging.debug(f'box coordinates: {my_xy}')        
+        
+    
+        logging.debug(f'drawing function: {str(self.draw_func.__func__.__name__)}(xy={my_xy}, {self.draw_format})')
+        self.draw_func(xy=my_xy, **self.draw_format)
+
+    def update(self, update=True):
+        """Update image property
+        
+        DrawBlocks that re fully init'ed with a shape and format are automatcially updated. DrawBlocks
+        do not need to be updated again unless the properties are updated.
+
+        Args:
+            update(bool): when True redraw image
+
+        Returns:
+            :obj:bool - true for successful update"""
+        if update:
+            self.draw_image()
 
 
 
@@ -358,6 +657,7 @@ class TextBlock(Block):
                 a given language (see chardist below)
             chardist (str, optional): string matching one of the character 
                 distributions in constants.py (default USA_CHARDIST)
+            align (str, optional): 'left', 'right', 'center' justify text (default: left)
         
         Properties:
             text_formatted('str'): text with line breaks according to maxchar and max_lines

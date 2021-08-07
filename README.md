@@ -1,11 +1,15 @@
-# epdlib v0.4
-EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
+# epdlib v0.5
+EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image, drawing or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
 
 ## Changes
+See the [ChangeLog](./changes.md) for details
+### v0.5
+* Add support for Block type "DrawBlock"
+
 ### v0.4
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
     - Assigning EPD object to screen has changed from directy assignment to using a the string that corresponds to the name.
-See the [ChangeLog](./changes.md) for details
+
 
 ## Dependencies
 Python Modules:
@@ -60,7 +64,34 @@ Properties:
 ### Methods
 `update(update)`
 Place holder method for child classes.
+
+## Block.DrawBlock
+Child class of `Block` that contains `pillow.ImageDraw` drawing objects. `DrawBlock` objects can contain ellipses, rounded_rectangles or rectangles. These are useful for creating horizontal and vertical rules and separators. DrawBlock objects can be aligned horizontally ('center', 'left', 'right' or vertically ('center', 'top', 'bottom') within the block area.
+
+*Class* `Block.DrawBlock(area, *args, shape=None, abs_x=None, abs_y=None, scale_x=1, scale_y=1, halign='center', valign='center', draw_format={}, no_clip=True, **kwargs)`
+
+`DrawBlock` objects that are fully initizlized with `area` and `shape` will automatically generate an image. No further updates are necessary. When using `DrawBlock` in a `Layout` layout, it is not necessary to send an update when the block is refreshed unless the properties have been changed. The generated image will remain in memory until the program is termindated.
+
+### Properties       
+ * `area` (tuple of int): area of block in pixels
+ * `shape` (str): shape to draw (see DrawBlock.list_shapes())
+ * `abs_x` (int): absolute x dimension in pixels of drawing (overrides scale_x)
+ * `abs_y` (int): absolute y dimension in pixels of drawing (overrides scale_y)
+ * `scale_x` (float): percentage of total x area (0..1) (abs_x overrides)
+ * `scale_y` (float): percentage of total y area (0..1) (abs_y overrides)
+ * `halign` (str): horizontal alignment of drawing; 'center', 'left', 'right' 
+ * `valign` (str): vertical alignment of drawing; 'center', 'top', 'bottom'
+ * `draw_format` (dict): dict of kwargs for shape drawing function
+ * `no_clip` (bool): when True fit shapes completely within area
+ * `image` (PIL:Image): rendered shape
  
+ ###  Methods
+  * `list_shapes()`: list supported shapes that can be drawn -- Static Method
+  * `draw_help()`: print help docstring for the current `shape`
+  * `update(update=True)`: when `True` update the image. This is **only** necessary if the object properties have been changed or the object was not created with a `shape` value
+  * `draw_image()`: update the image
+  
+
 
 ## Block.TextBlock
 Child class of `Block` that contains formatted text. `TextBlock` objects can do basic formatting of strings. Text is always rendered as a 1 bit image (black on white or white on black). Text can be horizontally justified and centered and vertically centered within the area of the block. 
@@ -86,6 +117,7 @@ All properties of the parent class are inherited.
 * `chardist` (dict): statistical character distribution for a supported language to use for a specified font
     - dictionary of letter and float representing fractional distribution (see `print_chardist`)
 * `image` (PIL.Image): resultant image generated of formatted text
+*  `align` (str): 'left', 'right', 'center' justify text (default: left)
 
 ### Functions
 * `print_chardist(chardist=None)` - print supported character distrubtions
@@ -238,19 +270,20 @@ The demo creates a very basic layout and displays some text in four orientations
 `python3 -m epdlib.Screen`
 
 ### Creating an Image from a Layout
-The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
-
+The following recipe will produce the screen layout shown above for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+![500x300 layout example](./docs/layout_example.png)
 ```
 import epdlib
 
 # create the layout object - adjust the resolution to match the display area
-layout_obj = epdlib.Layout(resolution=(640, 400))
+layout_obj = epdlib.Layout(resolution=(500, 300))
 
 l = { # basic two row layout
     'tux_img': {                
+            'type': 'ImageBlock',        # required as of v0.6
             'image': True,               # image block
             'padding': 10,               # pixels to padd around edge
-            'width': 1/4,                # 1/4 of the entire width
+            'width': .25,                # 1/4 of the entire width
             'height': 1/4,               # 1/4 of the entire height
             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
             'hcenter': True,             # horizontally center image
@@ -258,25 +291,43 @@ l = { # basic two row layout
             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
             'mode': 'L',                 # treat this image as an 8bit gray-scale image
         },
+    'vertical_rule_1' :{
+            'type': 'DrawBlock',         # required as of v0.6
+            'shape': 'rounded_rectangle',# shape to draw
+            'abs_x': 5,                  # absolute x dimension of shape in pixels
+            'scale_y': .8,               # scale shape so it is 80% of available area
+            'halign': 'center',          # horizontally center in area
+            'valign': 'center',          # vertically center in area
+            'draw_format': {'radius': 5, # any key word args (kwargs) needed for formatting the shpae
+                            'outline': 128,
+                            'width': 2},
+            'height': 1/4,
+            'width': .02,
+            'abs_coordinates': (None, 0), # x value will be calculated from the 'tux_image' block, the y value is "0"
+            'relative': ['tux_img', 'vertical_rule_1'] # use 'tux_image' X value, use 'vertical_rule_1' for Y value
+    },
     'pangram_a': { 
-                'image': None,           # set to None if this is a text block
-                'max_lines': 3,          # maximum lines of text to use when wrapping text
-                'padding': 10,           # padding around all edges (in pixles)
-                'width': 3/4,            # proportion of the entire width
-                'height': 1/4,           # proprtion of the entire height
-                'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
-                                              # coordinates that are relative to other blocks and will be calculated
-                'hcenter': False,         # horizontal-center the text and the resulting image
-                'vcenter': True,         # vertically-center the text within the block
-                'relative': ['tux_img', 'pangram_a'], # blocks to which THIS block's coordinates are relative to
-                                                            # -- in this case X: `weather_img` and Y: `temperature`
-                                                            # the width of the block `weather` will be used to
-                                                            # to calculate the X value of this block and the Y value
-                                                            # specified within the `temperature` block will be used 
-                'font': './fonts/Open_Sans/OpenSans-Regular.ttf', # TTF Font face to use; relative paths are OK
-                'font_size': None         # set this to None to automatically scale the font to the size of the block
+            'type': 'TextBlock',          # required as ov v0.6
+            'image': None,                # set to None if this is a text block
+            'max_lines': 3,               # maximum lines of text to use when wrapping text
+            'padding': 10,                # padding around all edges (in pixles)
+            'width': .73,                 # proportion of the entire width
+            'height': 1/4,                # proprtion of the entire height
+            'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
+                                          # coordinates that are relative to other blocks and will be calculated
+            'hcenter': False,             # horizontal-center the text and the resulting image
+            'vcenter': True,              # vertically-center the text within the block
+            'relative': ['vertical_rule_1', 'pangram_a'], # blocks to which THIS block's coordinates are relative to
+                                                        # -- in this case X: `weather_img` and Y: `temperature`
+                                                        # the width of the block `weather` will be used to
+                                                        # to calculate the X value of this block and the Y value
+                                                        # specified within the `temperature` block will be used 
+            'font': './fonts/Open_Sans/OpenSans-Regular.ttf', # TTF Font face to use; relative paths are OK
+            'font_size': None,             # set this to None to automatically scale the font to the size of the block
+            'mode': 'L'                    # set text blocks to "mode": L" to enable anti-aliasing on HD screens (automatically disabled on non HD)
     },
     'pangram_b': { 
+                'type': 'TextBlock',
                 'image': None,
                 'max_lines': 2,
                 'padding': 0,
@@ -288,11 +339,13 @@ l = { # basic two row layout
                 'relative': ['pangram_b', 'tux_img'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
                 'font_size': None,
-                'inverse': True
+                'inverse': True,
+                'mode': 'L'
     },
-    'pangram_c': { 
+    'pangram_c': {
+                'type': 'TextBlock',
                 'image': None,
-                'max_lines': 3,
+                'max_lines': 2,
                 'padding': 0,
                 'width': 1,
                 'height': 1/4,
@@ -303,8 +356,10 @@ l = { # basic two row layout
                 'font': './fonts/Open_Sans/OpenSans-BoldItalic.ttf',
                 'font_size': None,
                 'inverse': False,
+                'mode': 'L'
     },    
     'text': {
+                'type': 'TextBlock',
                 'image': None,
                 'max_lines': 3,
                 'padding': 10,
@@ -325,12 +380,14 @@ l = { # basic two row layout
 layout_obj.layout = l
 
 # create a dictionary with the values that will be pushed to each block
+# note that is is not necessary to update the DrawBlocks if they are fully configured
 update = {
     'tux_img': './images/tux.png',      
     'pangram_a': 'The quick brown fox jumps over the lazy dog.',  
     'pangram_b': 'Pack my box with five jugs of liquor.',          
     'pangram_c': 'Jackdaws love my big sphinx of quartz.',                    
-    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. '}
+    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. This text is not anti-aliased'}
+
 
 # update the layout with the data in the dictionary and send each item to the proper block
 layout_obj.update_contents(update)
@@ -345,7 +402,7 @@ myImg.save('sample.jpg')
 ### Write an image to a Screen
 The following code will create an interface for writing images to the EPD
 *Requirements*
-* Waveshare EPD module or IT8951 library (see Notes below)
+* Waveshare EPD module or IT8951 library (see [Notes](#Notes) below)
 
 ```
 from epdlib import Screen
@@ -376,16 +433,20 @@ my_screen.clearEPD()
 
 <a name="Notes"></a>
 ## Notes
-The Waveshare-epd library is provided only as a git repo. Try the following to install it:
-
+**WaveShare non-IT8951 Screens**
+The waveshare-epd library is required for non-IT8951 screens and can be installed from the Git repo:
 ```
 pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
 ```
 
-The IT8951 library is provided only as a git repo. Try the following ot install it:
+**IT8951 basee Screens**
+The Broadcom BCM 2835 library is required by the IT8951 module. Download and install the BCM2835 library according to the directions found on [Mike McCauley's site](http://www.airspayce.com/mikem/bcm2835/)
+
+[Greg D Meyer's IT8951 library](https://github.com/GregDMeyer/IT8951) is also required and can be installed from the Git repo:
 ```
 pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
+
 
 getting ready for pypi:
 https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65edc5fe9c56
