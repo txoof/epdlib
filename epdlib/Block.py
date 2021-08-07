@@ -344,7 +344,7 @@ class DrawBlock(Block):
             no_clip(bool): when True fit shapes completely within area
             
         Properties:
-            image(PIL:Image): text rendered as an image"""        
+            image(PIL:Image): rendered shape"""        
         super().__init__(area, *args, **kwargs)
         self.image = None
         self.no_clip = no_clip
@@ -657,6 +657,7 @@ class TextBlock(Block):
                 a given language (see chardist below)
             chardist (str, optional): string matching one of the character 
                 distributions in constants.py (default USA_CHARDIST)
+            align (str, optional): 'left', 'right', 'center' justify text (default: left)
         
         Properties:
             text_formatted('str'): text with line breaks according to maxchar and max_lines
@@ -1142,8 +1143,8 @@ def compare_obj(a, b):
 
 
 
-logger = logging.getLogger(__name__)
-logger.root.setLevel('DEBUG')
+# logger = logging.getLogger(__name__)
+# logger.root.setLevel('DEBUG')
 
 
 
