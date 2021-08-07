@@ -37,8 +37,7 @@ LAYOUT_TEXTBLOCK_DEFAULTS = {'max_lines': 1,
 
 LAYOUT_IMAGEBLOCK_DEFAULTS = {}
 
-LAYOUT_DRAWBLOCK_DEFAULTS = {'size': (1, 1),
-                             'draw_format': None,
+LAYOUT_DRAWBLOCK_DEFAULTS = {'draw_format': {},
                              'shape': None,
                              'valign': 'center',
                              'halign': 'center',
