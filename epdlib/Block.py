@@ -85,6 +85,50 @@ def permissive_enforce(*types):
 
 
 
+def add_border(img, fill, width, outline=None, outline_width=1, sides=['all']):
+    '''add a border around an image
+    
+    Args:
+        img(PIL.Image): image to add border to
+        fill(int): border fill color 0..255 8bit gray shade
+        width(int): number of pixels to use for border
+        outline(int): 0..255 8bit gray shade for outline of border region
+        outline_width(int): width in pixels of outline
+        sides(list of str): sides to add border: "all", "left", "right", "bottom", "top" 
+        
+    Returns:
+        PIL.Image'''
+    if width < 1:
+        logging.info(f'"width" is < 1, taking no action: {width}')
+        return img
+    
+    logging.debug('adding border to image')
+    draw = ImageDraw.Draw(img)
+    img_x, img_y = img.size
+    top = [0, 0, img_x, width-1]
+    bottom = [0, img_y-width, img_x-1, img_y-1]
+    left = [0, 0, width, img_y]
+    right = [img_x-width, 0, img_x-1, img_y-1]
+    
+    sides_dict = {'top': top,
+                  'bottom': bottom,
+                  'left': left,
+                  'right': right}
+    
+    if 'all' in sides:
+        sides = sides_dict.keys()
+        
+    for each in sides:
+        logging.debug(f'adding border to side {each}')
+        draw.rectangle(xy=sides_dict[each], fill=fill, outline=outline, width=outline_width)
+    return img
+    
+
+
+
+
+
+
 class BlockError(Exception):
     '''General error class for Blocks'''
     pass
@@ -97,7 +141,8 @@ class BlockError(Exception):
 
 class Block:
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
-                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1', **kwargs):
+                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1', 
+                border_config={}, **kwargs):
         '''Create a Block object
         
         Parent class for other types of blocks
@@ -115,12 +160,15 @@ class Block:
             fill(int): 0-255 8 bit value for fill color for text/images [0 (black)]
             bkground(int): 0-255 8 bit value for background color [255 (white)]\
             mode(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
+            border_config(dict): dictonary containing configuration keys for adding border to image
+                see help(add_border)
             
         Properties:
             image: None - overridden in child classes
             padded_area(tuple): area less padding to form padded border around block'''
         self.mode = mode
         self.bkground = bkground
+        self.border_config = border_config
         self.fill = fill
         self.area = area
         self.padding = padding
@@ -165,13 +213,52 @@ class Block:
             self._set_bkground = bkground
         
         self._bkground = bkground
+  
+    @property
+    def border_config(self):
+        return self._border_config
+    
+    @border_config.setter
+    @strict_enforce(dict)
+    def border_config(self, border_config):
+        for key, default in constants.BLOCK_ADD_BORDER_DEFAULTS.items():
+            if key not in border_config:
+                border_config[key] = default
+            
+            self._border_config = border_config
+                
+            
+#     @property
+#     def padding_bkground(self):
+#         '''int: bkground color to use in padded area'''
+#         return self._padding_bkground
+    
+#     @padding_bkground.setter
+#     @strict_enforce((type(None), int))
+#     def padding_bkground(self, padding_bkground):
+#         if not padding_bkground:
+#             pass
+#         elif padding_bkground < 0 or padding_bkground > 255:
+#             raise ValueError(f'padding_bkground must be between 0:255: {padding_bkground}')
+        
+#         self._padding_bkground = padding_bkground
+        
+    
+#     @property
+#     def sides(self):
+#         '''list of str: sides to pad
+        
+#         ['all', 'left', 'right', 'top', 'bottom']'''
+#         return self._sides
+    
+#     @sides.setter
+#     @strict_enforce((list, tuple))
+#     def sides(self, sides):
+#         self._sides = sides
     
     @property
     def fill(self):
-        '''int: fill color (foreground text, lines, etc.): (8 bit) 0-255
-        
-        Raises:
-            ValueError (non po)'''
+        '''int: fill color (foreground text, lines, etc.): (8 bit) 0-255'''
         return self._fill
     
     @fill.setter
@@ -585,6 +672,9 @@ class DrawBlock(Block):
     
         logging.debug(f'drawing function: {str(self.draw_func.__func__.__name__)}(xy={my_xy}, {self.draw_format})')
         self.draw_func(xy=my_xy, **self.draw_format)
+        
+        if self.border_config['width'] > 0:
+            self.image = add_border(self.image, **self.border_config)
 
     def update(self, update=True):
         """Update image property
@@ -599,6 +689,20 @@ class DrawBlock(Block):
             :obj:bool - true for successful update"""
         if update:
             self.draw_image()
+
+
+
+
+
+
+b = DrawBlock(area=(800, 400), shape='ellipse', padding=10, border_config={'fill'})
+
+
+
+
+
+
+b.image
 
 
 
@@ -932,7 +1036,9 @@ class TextBlock(Block):
         logging.debug(f'paste coordinates: {paste_x, paste_y}')
         final_image = Image.new(mode=self.mode, size=self.area, color=self.bkground)
         final_image.paste(text_image, (paste_x, paste_y))
-        
+                
+        if self.border_config['width'] > 0:       
+            final_image = add_border(img=final_image, **self.border_config)
         
         return final_image
 
@@ -962,8 +1068,9 @@ class TextBlock(Block):
 
 
 
-# t = TextBlock(area=(2, 4), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=55, max_lines=7,
-#              padding=60, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right')
+# t = TextBlock(area=(800, 180), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=22, max_lines=3,
+#              padding=10, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right',
+#              border_config={'fill': 0, 'width': 4, 'sides': ['top', 'right']})
 # t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
 # # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
 # t.update()
@@ -1077,6 +1184,9 @@ class ImageBlock(Block):
 
             image_area.paste(im, (paste_x, paste_y))
             
+            if self.border_config['width'] > 0:
+                image_area = add_border(image_area, **self.border_config)
+            
             self._image = image_area
     
     def update(self, update=None):
@@ -1103,10 +1213,11 @@ class ImageBlock(Block):
 
 
 
-# i = ImageBlock(area=(1600, 2700), mode='L', 
-#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=240)
-# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
-# # i.update('../images/hubble.jpg')
+# i = ImageBlock(area=(700, 300), mode='L', 
+#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=True, bkground=255,
+#                border_config={'fill': 128, 'width': 5, 'sides': ['all']})
+# # i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
+# i.update('../images/hubble.jpg')
 # # i.update('../tux.png')
 # # i.update('../PIA03519_small.jpg')
 # # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
@@ -1143,8 +1254,8 @@ def compare_obj(a, b):
 
 
 
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
+logger = logging.getLogger(__name__)
+logger.root.setLevel('DEBUG')
 
 
 

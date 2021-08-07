@@ -270,9 +270,10 @@ The demo creates a very basic layout and displays some text in four orientations
 `python3 -m epdlib.Screen`
 
 ### Creating an Image from a Layout
-The following recipe will produce the screen layout shown above for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+The following recipe will produce the a layout for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
 ![500x300 layout example](./docs/layout_example.png)
 ```
+## Sample Layout ##
 import epdlib
 
 # create the layout object - adjust the resolution to match the display area
@@ -329,8 +330,8 @@ l = { # basic two row layout
     'pangram_b': { 
                 'type': 'TextBlock',
                 'image': None,
-                'max_lines': 2,
-                'padding': 0,
+                'max_lines': 3,
+                'padding': 8,
                 'width': 1,
                 'height': 1/4,
                 'abs_coordinates': (0, None),
@@ -339,8 +340,11 @@ l = { # basic two row layout
                 'relative': ['pangram_b', 'tux_img'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
                 'font_size': None,
-                'inverse': True,
-                'mode': 'L'
+                'inverse': False,
+                'mode': 'L',
+                'border_config': {'fill': 0, # add a border to the top and bottom of this text block
+                                  'width': 3,
+                                  'sides': ['top', 'bottom']}
     },
     'pangram_c': {
                 'type': 'TextBlock',
@@ -351,7 +355,7 @@ l = { # basic two row layout
                 'height': 1/4,
                 'abs_coordinates': (0, None),
                 'hcenter': True,
-                'vcenter': False,
+                'vcenter': True,
                 'relative': ['pangram_c', 'pangram_b'],
                 'font': './fonts/Open_Sans/OpenSans-BoldItalic.ttf',
                 'font_size': None,
@@ -361,12 +365,12 @@ l = { # basic two row layout
     'text': {
                 'type': 'TextBlock',
                 'image': None,
-                'max_lines': 3,
+                'max_lines': 4,
                 'padding': 10,
                 'width': 1,
                 'height': 1/4,
                 'abs_coordinates': (0, None),
-                'hcenter': False,
+                'hcenter': True,
                 'vcenter': True,
                 'relative': ['text', 'pangram_c'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
@@ -384,9 +388,9 @@ layout_obj.layout = l
 update = {
     'tux_img': './images/tux.png',      
     'pangram_a': 'The quick brown fox jumps over the lazy dog.',  
-    'pangram_b': 'Pack my box with five jugs of liquor.',          
+    'pangram_b': 'Pack my box with five jugs of liquor. This block has a top & bottom border',          
     'pangram_c': 'Jackdaws love my big sphinx of quartz.',                    
-    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. This text is not anti-aliased'}
+    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. This text is not anti-aliased.'}
 
 
 # update the layout with the data in the dictionary and send each item to the proper block
@@ -396,7 +400,6 @@ layout_obj.update_contents(update)
 myImg = layout_obj.concat()
 # write the image out to a file
 myImg.save('sample.jpg')
-
 ```
 
 ### Write an image to a Screen
@@ -446,6 +449,7 @@ The Broadcom BCM 2835 library is required by the IT8951 module. Download and ins
 ```
 pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
+
 
 
 getting ready for pypi:

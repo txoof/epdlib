@@ -43,6 +43,9 @@ LAYOUT_DRAWBLOCK_DEFAULTS = {'draw_format': {},
                              'halign': 'center',
                              'no_clip': True,
                             }
+BLOCK_ADD_BORDER_DEFAULTS = {'fill': None,
+                             'width': 0
+                            }
                              
 # layout_defaults = {
 #                    'type': None,
