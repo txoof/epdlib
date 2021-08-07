@@ -142,8 +142,24 @@ class Layout:
         logging.debug('checking default values for layout')
         for section, values in self.layout.items():
             logging.debug(f'section: [{section:-^30}]')
+            
+            
             if not 'type' in values:
-                raise KeyError(f'section "{section}" is missing key "type"! Each section in the layout must have the correct block type')
+                logging.critical(f'epdlib v{version.__version__}: section "{section}" is missing key "type". As of v0.6 all layout sections must include the key "type". Please see v0.5 changelog')
+                # switch to exception in v0.6
+#                 raise KeyError(f'section "{section}" is missing key "type"! Each section in the layout must have the correct block type')
+                
+                ## backwards compatibility for pre v0.5 layouts -- remove this in v0.6
+                logging.warning(f'guessing block type for section "{section}"')
+                if values['image']:
+                    my_type = 'ImageBlock'
+                else: 
+                    my_type = 'TextBlock'
+                
+                logging.warning(f'guessed: {my_type} -- if this is incorrect add the key "type" with the appropriate Block type in this section of the layout.')
+                values['type'] = my_type
+                ## end backwards compatibility
+                
             else:
                 my_type = values['type']
                 
@@ -176,6 +192,9 @@ class Layout:
             logging.info(f'section: [{section:.^30}]')
             
             # calculate absolute area and padded area of each block
+            
+            logging.debug(f"resolution: {self.resolution}")
+            logging.debug(f"width: {values['width']}, height: {values['height']}")
 
             area = (round(self.resolution[0]*values['width']), 
                     round(self.resolution[1]*values['height']))
@@ -193,6 +212,11 @@ class Layout:
             if values['abs_coordinates'][0] is None or values['abs_coordinates'][1] is None:
                 logging.debug('calculating block position from relative positions')
                 pos = [None, None]
+                
+                if not isinstance(values['relative'], (tuple, list)):
+                    raise KeyError(f'section "{section}" has a missing or malformed "relative" key.')
+                    
+                
                 for index, val in enumerate(values['relative']):
                     # use the absolute value provided in this section
                     if val == section:
@@ -202,7 +226,7 @@ class Layout:
                         try:
                             pos[index] = self.layout[val]['area'][index] + self.layout[val]['abs_coordinates'][index]
                         except KeyError:
-                            raise KeyError(f'bad relative section value: "{value}" in section "{section}" could not be found')
+                            raise KeyError(f'bad relative section value: could not locate relative section "{val}"  when processing section "{section}"')
                 values['abs_coordinates'] = (pos[0], pos[1])
             else: 
                 logging.debug('absolute coordinates provided')
@@ -281,7 +305,7 @@ class Layout:
 # # create the layout object
 # l = { # basic two row layout
 #     'weather_img': {
-#             'type': 'ImageBlock',
+# #             'type': 'ImageBlock',
 #             'image': True,               # image block
 #             'padding': 2,               # pixels to padd around edge
 #             'width': 0.24,                # 1/4 of the entire width
@@ -307,7 +331,7 @@ class Layout:
 #             'relative': ['weather_img', 'v_line_1']
 #     },
 #     'temperature': { 
-#                 'type': 'TextBlock',
+# #                 'type': 'TextBlock',
 #                 'image': None,           # set to None if this is a text block
 #                 'max_lines': 1,          # maximum lines of text to use when wrapping text
 #                 'padding': 10,           # padding around all edges (in pixles)
