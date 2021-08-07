@@ -22,29 +22,8 @@ except ImportError as e:
 
 
 
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
-
-
-
-
-
-
-# def check_num(func):
-#     """decorator function wrapper"""
-#     def func_wrapper(self, d, *args, **kwargs):
-#         """Check for positive integers
-#         Params:
-#             d(int): integer to check
-        
-#         Raises:
-#             ValueError - values that are negative, not integer"""
-#         if not isinstance(d, int):
-#             raise ValueError (f'{d} is not an integer')
-#         if d < 0:
-#             raise ValueError (f'{d} < 0 {func} only accepts values >= 0')
-#         return func(self, d, *args, **kwargs)
-#     return func_wrapper
 
 
 
@@ -116,7 +95,7 @@ class BlockError(Exception):
 
 class Block:
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
-                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1'):
+                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1', **kwargs):
         '''Create a Block object
         
         Parent class for other types of blocks
@@ -130,12 +109,14 @@ class Block:
             abs_coordinates(list/tuple): x, y integer coordinates of this block area
                 within a larger image 
             padding(int): number of pixels to pad around edge of contents [0]
+                this will decrease the usable area to x-2*padding, y-2*padding
             fill(int): 0-255 8 bit value for fill color for text/images [0 (black)]
             bkground(int): 0-255 8 bit value for background color [255 (white)]\
             mode(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
             
         Properties:
-            image: None - overridden in child classes'''
+            image: None - overridden in child classes
+            padded_area(tuple): area less padding to form padded border around block'''
         self.mode = mode
         self.bkground = bkground
         self.fill = fill
@@ -220,11 +201,15 @@ class Block:
                 raise ValueError(f'area must be integer values greater than 0: {area}')
                 
         self._area = area
+        logging.debug(f'block area: {self._area}')
                 
     
     @property
     def padding(self):
         '''int: pixels to pad around left, right, top, bottom
+        
+        Sets:
+            padded_area(tuple)
         
         Raises:
             ValueError(non integers)'''
@@ -242,6 +227,10 @@ class Block:
         
         self._padding = padding
         self.padded_area = [self.area[0]-2*self.padding, self.area[1]-2*self.padding]
+        
+        logging.debug(f'padded area: {self.padded_area}')
+        if self.padded_area[0] < .25* self.area[0] or self.padded_area[1] < .25*self.area[1]:
+            logging.warning(f'the padded area available may be too small to display any content: Area: {self.area}, Padded Area: {self.padded_area}')
     
 #     @property
 #     def scale(self):
@@ -355,7 +344,7 @@ class TextBlock(Block):
         image (:obj:`PIL.Image` or str): PIL image object or string path to image file
         upate (method): update contents of ImageBlock"""                    
     def __init__(self, area, font, *args, text="NONE", font_size=0, 
-                 chardist=None, max_lines=1, maxchar=None, **kwargs):
+                 chardist=None, max_lines=1, maxchar=None, align='left', **kwargs):
         """Intializes TextBlock object
         
         Args:
@@ -369,9 +358,14 @@ class TextBlock(Block):
                 a given language (see chardist below)
             chardist (str, optional): string matching one of the character 
                 distributions in constants.py (default USA_CHARDIST)
+        
+        Properties:
+            text_formatted('str'): text with line breaks according to maxchar and max_lines
+            image(PIL:Image): text rendered as an image
+            
             """        
         super().__init__(area, *args, **kwargs)
-    
+        self.align = align
         self.font_size = font_size
         self.chardist = chardist
         self.maxchar = maxchar
@@ -379,6 +373,17 @@ class TextBlock(Block):
         self.font = font
         self.max_lines = max_lines
         self.text = text
+    
+    @property
+    def align(self):
+        '''str: text alignment "left", "right" or "center"'''
+        return self._align
+    
+    @align.setter
+    def align(self, align):
+        if align not in ["left", "right", "center"]:
+            raise ValueError('align must be "left", "center" or "right"')
+        self._align = align
     
     @property
     def font_size(self):
@@ -446,7 +451,8 @@ class TextBlock(Block):
         if not maxchar:
             maxchar = None
         elif maxchar < 1:
-            raise ValueError(f'maxchar must be integer > 0: {maxchar}')
+#             raise ValueError(f'maxchar must be integer > 0: {maxchar}')
+            pass
             
             
         self._maxchar = maxchar
@@ -465,7 +471,10 @@ class TextBlock(Block):
         
     @property
     def text(self):
-        """:obj:str text string to format"""
+        """str: text string to format
+        
+        Sets:
+            text_formatted(str): text fomratted with line breaks"""
         return self._text
     
     @text.setter
@@ -473,6 +482,7 @@ class TextBlock(Block):
     def text(self, text):
         if text:
             self._text = text
+
         self.text_formatted = self._text_formatter()
         self.image = self._text2image()
 
@@ -495,7 +505,7 @@ class TextBlock(Block):
     def _calc_maxchar(self):
         """calculate the maximum number of characters that can fit within the specified area
           using the current font, specified character distribution (`chardist`) 
-          and x-dimension of the `area`
+          and x-dimension of the `area`. This is used to calculate textwrapping.
           
         Returns:
             :obj:int: characters per line"""
@@ -513,7 +523,8 @@ class TextBlock(Block):
         s_length = self.font.getsize(s)[0] # string length in Pixles
         # find average width of each character
         avg_width = s_length/len(s)
-        maxchar = round(self.area[0]/avg_width)
+        logging.debug(f'average character width: {avg_width}')
+        maxchar = round(self.padded_area[0]/avg_width)
         self._maxchar = maxchar
         logging.debug(f'maximum characters per line: {maxchar}')
         
@@ -532,83 +543,100 @@ class TextBlock(Block):
         Returns:
             :obj:`list` of :obj:`str`"""        
         logging.debug(f'formatting string: {self.text}')
-        wrapper = textwrap.TextWrapper(width=self.maxchar, max_lines=self.max_lines, placeholder='…')
-        formatted = wrapper.wrap(self.text)
-        logging.debug(f'formatted list:\n {formatted}')
+
+        try:
+            formatted = textwrap.fill(self.text, 
+                                      width=self.maxchar, 
+                                      max_lines=self.max_lines, 
+                                      placeholder='…')
+        except (TypeError, ValueError) as e:
+            logging.critical(f'it is not possible to wrap text into this area with the current font settings; returning an empty string: {e}')
+            formatted = ''
+
         return(formatted)
     
     def _text2image(self):
-        """Converts text to grayscale image using
+        """Converts text to grayscale image using formatted text
         
         Returns:
-            :obj:`PIL.Image`: image of formatted text"""
+            (PIL.Image, tuple of bounding box) """
         
-        # max area for rendering text
-        text_image = Image.new(mode=self.mode, size=self.area, color=self.bkground)
-        # get a drawing context
+#         # max area for rendering text
+#         text_image = Image.new(mode=self.mode, size=self.padded_area, color=self.bkground)
+        # scratch image for measuring text 
+        scratch_image = Image.new(mode=self.mode, size=(1, 1), color=self.bkground)
+        draw = ImageDraw.Draw(scratch_image)
+        
+        # height offset from top of character to top of bounding box 
+        y_offset = draw.textbbox((0, 0), 
+                                 text=self.text_formatted, 
+                                 font=self.font, 
+                                 align=self.align)[1] * -1
+
+        # text_mlbbox[1]*-1 is the total height from assent to decender (anchor with ld -- left decender
+        # text_mlbbox[2] is the total x length
+        text_mlbbox = draw.multiline_textbbox((0, 0), 
+                                              text=self.text_formatted, 
+                                              font=self.font, 
+                                              align=self.align, 
+                                              anchor='ld')
+        
+        textsize = (int(text_mlbbox[2]), int(text_mlbbox[1]*-1))
+        logging.debug(f'text size: {textsize}')        
+        
+        
+        if textsize[0] > self.padded_area[0] or textsize[1] > self.padded_area[1]:
+            logging.info('the text will spill outside of padded area using these values')
+        
+        # create a new image based on textsize
+        text_image = Image.new(mode=self.mode, size=textsize, color=self.bkground)
         draw = ImageDraw.Draw(text_image)
+        draw.multiline_text((0, y_offset), 
+                                text=self.text_formatted, 
+                                font=self.font, 
+                                align=self.align,
+                                fill=self.fill)        
+    
         
-        # max area for block:
-        image = Image.new(mode=self.mode, size=self.area, color=self.bkground)
+        paste_x = self.padding
+        paste_y = self.padding
         
-        paste_x, paste_y = [self.padding, self.padding]
-        
-        # maxiumum x width of any line
-        x_max = 0
-        # accumulate total Y  value
-        y_total = 0
-        line_dimensions = []
-        for line in self.text_formatted:
-            x, y = self.font.getsize(line)
-            if x > x_max:
-                x_max = x
-            y_total += y
-            line_dimensions.append({'text': line, 'dim': (x, y)})
-        
-        line_x = 0
-        line_y = 0
-        # draw each line of text into text image
-        for line in line_dimensions:
-            
-            # handle h-centering text
-            if self.hcenter:
-                line_x = int((self.area[0] - line['dim'][0])/2)
-            draw.text((line_x, line_y), line['text'], font=self.font, fill=self.fill)
-            line_y += line['dim'][1]
-        
-        
-        # calculate the ratio resized ratio for positioning math
-        x_ratio = 1
-        y_ratio = 1
-        if self.padding > 0:
-            text_image.thumbnail(size=self.padded_area, resample=Image.LANCZOS)
-            x_ratio = text_image.width/self.area[0]
-            y_ratio = text_image.height/self.area[1]
-            logging.debug('scaling image to fit in padded area')
-            
-        # handle v-centering text
-        if self.vcenter:
-            paste_y = int((self.area[1] - y_total*y_ratio)/2)
-            logging.debug(f'paste_y: {paste_y}')
-            
         if self.rand:
-            if self.hcenter:
-                logging.warning('horizontally centered text may not always layout correctly when using random placement')
-            if self.vcenter:
-                logging.warning('`rand` overrides vcenter')
-            x_range = int(self.area[0] - x_max - self.padding)
-            y_range = int(self.area[1] - y_total)
+
+            x_max = self.padded_area[0] - textsize[0]
+            y_max = self.padded_area[1] - textsize[1]
             
+            try:
+                paste_x = randrange(0, x_max, 1) + self.padding
+            except ValueError:
+                logging.info('text image is too large for random placement in x dimension')
+                x_max = self.padding
+            try:
+                paste_y = randrange(0, y_max, 1) + self.padding
+            except ValueError:
+                logging.info('text image is too large for random placement in y dimension')
+                y_max = self.padding
+                
+            logging.debug(f'pasting using random coordinates')
             
-            # choose random placement
-            paste_x = randrange(self.padding, x_range-self.padding, 1)
-            paste_y = randrange(self.padding, y_range-self.padding, 1)            
         
-        # combine images
-        image.paste(text_image, [paste_x, paste_y])
+        if self.hcenter:
+            paste_x = int((self.area[0] - textsize[0])/2)
+            logging.debug('pasting hcenterd')
+            
+        if self.vcenter:
+            paste_y = int((self.area[1] - textsize[1])/2)
+            logging.debug('pasting vcentered')
+            
         
-        return image
+        logging.debug(f'paste coordinates: {paste_x, paste_y}')
+        final_image = Image.new(mode=self.mode, size=self.area, color=self.bkground)
+        final_image.paste(text_image, (paste_x, paste_y))
         
+        
+        return final_image
+
+
     def print_chardist(self, chardist=None):
         """Print supported character distributions
         
@@ -634,12 +662,11 @@ class TextBlock(Block):
 
 
 
-# t = TextBlock(area=(800, 600), font='../fonts/Font.ttc', font_size=88, max_lines=3,
-#              padding=2, inverse=False, hcenter=False, vcenter=False, rand=True, mode='L', bkground=0, fill=120)
-# t.text = 'The Quick Brown Fox Jumps Over the Lazy Dog'
-
-# t.inverse = not t.inverse
-# t.update('The five boxing wizards jump quickly')
+# t = TextBlock(area=(2, 4), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=55, max_lines=7,
+#              padding=60, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right')
+# t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
+# # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
+# t.update()
 # t.image
 
 
@@ -690,9 +717,10 @@ class ImageBlock(Block):
 
         image_area = Image.new(self.mode, self.area, self.bkground)
     
-        if not image:
+        if not image or image==True:
             logging.debug(f'no image set; setting to blank image with area: {self.area}')
             self._image = image_area
+            return
 
         if image:
             if isinstance(image, (str, Path)):
@@ -706,15 +734,16 @@ class ImageBlock(Block):
             else:
                 raise BlockError('unusable image format')
 
-                
-            if max(im.size) > max(self.area):
-                resize = [self.area[0] - self.padding*2, self.area[1] - self.padding*2]
-                im.thumbnail(resize, Image.BICUBIC)
-                logging.debug('resizing image to fit in area')
+            if max(im.size) > min(self.padded_area):
+                logging.debug(f'resizing image to fit area: {self.padded_area}')
+#                 max_size = min(self.padded_area)
+#                 resize = [max_size, max_size]
+                im.thumbnail(self.padded_area, Image.BICUBIC)
+                logging.debug(f'new image size: {im.size}')
                 
             if self.inverse:
                 im = ImageOps.invert(im)
-   
+            logging.debug(f'padding: {self.padding}')
             paste_x = self.padding
             paste_y = self.padding
 
@@ -774,11 +803,14 @@ class ImageBlock(Block):
 
 
 
-# i = ImageBlock(area=(900, 800), mode='L', 
-#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=200)
-# i.update('../portrait-pilot_SW0YN0Z5T0.jpg')
-# i.update('../hubble.jpg')
-
+# i = ImageBlock(area=(1600, 2700), mode='L', 
+#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=False, bkground=240)
+# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
+# # i.update('../images/hubble.jpg')
+# # i.update('../tux.png')
+# # i.update('../PIA03519_small.jpg')
+# # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
+# # i.update(q)
 # i.image
 
 
@@ -813,5 +845,12 @@ def compare_obj(a, b):
 
 # logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
+
+
+
+
+
+
+
 
 

@@ -1,5 +1,11 @@
-# epdlib 
+# epdlib v0.4
 EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
+
+## Changes
+### v0.4
+* Add support for IT8951 panels with 8bit gray scale and partial refresh
+    - Assigning EPD object to screen has changed from directy assignment to using a the string that corresponds to the name.
+See the [ChangeLog](./changes.md) for details
 
 ## Dependencies
 Python Modules:
@@ -22,6 +28,9 @@ Python Modules:
 * [Block](#Block) - image and text blocks that can be assembed into a final layout
 * [Layout](#Layout) - generate dynamic layouts from Blocks
 * [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
+
+
+
 
 <a name="Block"></a>
 ## Block Module
@@ -103,7 +112,7 @@ All properties of the parent class are inherited.
 
 Font sizes are set based on each individual font and scaled to fit within text blocks using the maximum number of lines specified in the layout. Text is line-broken using the python [textwrap logic](https://docs.python.org/3.7/library/textwrap.html).
 
-*Class* `Layout(resolution, layout=None)`
+*Class* `Layout(resolution, layout=None, force_onebit=False)`
 
 ## Scaling Example
 epdlib `Layout` objects can be scaled to any (reasonable) resolution while maintaining internally consistent ratios.
@@ -121,6 +130,7 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 * `layout` (dict): dictionary containing layout paramaters for each block
     - see example below in Quick-Start Recipe
 * `image` (Pil.Image): concatination of all blocks into single image
+* `force_onebit` (bool): force all blocks within a layout to `mode='1'`
 
 ### Methods
 * `concat()`: join all blocks into a single image
@@ -221,10 +231,15 @@ spam = PIL.Image.new(mode='L', size=(100, 100), color=0)
 scrnShot.save(spam)
 ```
 
-## Quick-Start Recipe
-The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+## Quick-Start Recipes
+### Quick Demo
+The demo creates a very basic layout and displays some text in four orientations. This is an easy way to test your panel and confirm that it is working properly.
+
+`python3 -m epdlib.Screen`
 
 ### Creating an Image from a Layout
+The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+
 ```
 import epdlib
 
@@ -326,44 +341,53 @@ myImg = layout_obj.concat()
 myImg.save('sample.jpg')
 
 ```
+
+### Write an image to a Screen
+The following code will create an interface for writing images to the EPD
+*Requirements*
+* Waveshare EPD module or IT8951 library (see Notes below)
+
+```
+from epdlib import Screen
+from PIL import Image
+## non IT8951 screens
+my_epd = "epd2in7" 
+my_vcom = None
+## IT8951 screens
+# my_epd = "HD"
+# my_vcom = -1.8
+
+# create screen object
+my_screen = Screen(epd=my_epd, vcom=my_vcom)
+
+my_resolution = my_screen.resolution
+
+# open image, convert to 1 bit and scale
+my_img = Image.open('path/to/image.jpg')
+my_img = my_img.convert("1")
+my_img.thumbail(my_resolution)
+
+# write image to screen
+my_screen.writeEPD(my_img)
+
+# clear screen
+my_screen.clearEPD()
+```
+
 <a name="Notes"></a>
 ## Notes
 The Waveshare-epd library is provided only as a git repo. Try the following to install it:
 
 ```
-pipenv install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
+pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
 ```
 
 The IT8951 library is provided only as a git repo. Try the following ot install it:
 ```
-pipenv install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
-```
-
-
-```python
-import epdlib
-s = epdlib.Screen()
-```
-
-
-```python
-s.vcom = -1.93
-```
-
-
-```python
-s.epd = "HD"
-```
-
-
-```python
-
+pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
 
 getting ready for pypi:
 https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65edc5fe9c56
 
 
-```python
-!jupyter-nbconvert --to markdown --stdout readme_inprogress.ipynb > README.md
-```
