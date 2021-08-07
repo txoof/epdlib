@@ -20,8 +20,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 try:
     from . import constants
+    from . import version
 except ImportError as e:
     import constants
+    import version
+    
     
 try: 
     from . import Block as Block
@@ -67,44 +70,27 @@ def strict_enforce(*types):
 
 class Layout:
     def __init__(self, resolution, layout=None, force_onebit=False):
-        '''init layout object
-        
-        Args:
-            resolution(tuple of int): X, Y screen resolution
-            layout(dict): layout rules
-            force_onebit(bool): override the mode setting of any block and force to 1bit mode
-                This can improve the appearnce of anti-aliased fonts on 1bit screens
-            
-        Attributes:
-            blocks(dict of Block obj): dictionary of ImageBlock and TextBlock objects
-            screen(PIL.Image): single image composed of all blocks defined in the layout
-            mode(str): "L" (8bit) or "1" (1bit) if any blocks are 8bit, this will be set to "L"'''
-        
         self.resolution = resolution
         self.force_onebit = force_onebit
-        self.screen = None
-        self.mode = "1"
+        self.mode = '1'
+        self.blocks = {}
         self.layout = layout
-        self._calculate_layout()
-        self._set_blocks()
-
+        
+        
+    
     @property
     def resolution(self):
-        '''tuple of int: absolute resolution of screen'''
         return self._resolution
-
+    
     @resolution.setter
     @strict_enforce((list, tuple))
     def resolution(self, resolution):
         for i in resolution:
-            if i < 0:
-                raise ValueError('resolution values must be positive integers')
-
-            if not isinstance(i, int):
-                raise ValueError('resolution values must be positive integers')
-
+            if i < 0 or not isinstance(i, int):
+                raise ValueError(f'resolution values must be positive integers: {resolution}')
+        
         self._resolution = resolution
-
+        
     @property
     def layout(self):
         return self._layout
@@ -114,109 +100,124 @@ class Layout:
     def layout(self, layout):
         self._layout = layout
         
-        if layout:
+        if self._layout:
+            self._add_defaults()
             self._calculate_layout()
             self._set_blocks()
-            
+    
     def _set_blocks(self):
-        '''create dictionary of all image blocks using the specified layout
-        
-        Sets:
-            blocks(dict of Block): dictionary of all the blocks from the layout
-            mode(str): "L" if any single block is 8bit mode, "1" if all blocks are 1bit'''
         if not self.layout:
-            return        
+            return
         
-        blocks = {}
         logging.info('setting blocks')
-        
+        blocks = {}
         mode_count = 0
         
-        for section in self.layout:
-            logging.info(f'section: [{section:.^30}]')            
-            vals = self.layout[section]
+        for section, vals in self.layout.items():
+            logging.info(f'section: [{section:_^30}]')
             
             if self.force_onebit:
                 vals['mode'] = '1'
-                logging.debug('forcing block mode to 1bit')
-                
-            if not vals['image']:
-                logging.info(f'set text block: {section}')
-                blocks[section] = Block.TextBlock(**vals)
+                logging.debug('forcing block to 1bit mode')
             
-            if vals['image']:
-                logging.info(f'set image block: {section}')
-                logging.debug(f'vals: {vals}')
-                blocks[section] = Block.ImageBlock(**vals)
-                
-            if vals['mode'] == "L":
+            logging.debug(f'setting block type: {vals["type"]}')
+            try:
+                blocks[section] = getattr(Block, vals['type'])(**vals)
+
+            except AttributeError:
+                raise AttributeError(f'module "Block" has no attribute {vals["type"]}. error in section: {section}')
+              
+            if vals['mode'] == 'L':
                 mode_count += 1
                 
+            if mode_count > 0:
+                self.mode = 'L'
+            else:
+                self.mode = '1'
                 
-        self.blocks = blocks
-        if mode_count > 0:
-            self.mode = 'L'
-        else:
-            self.mode = '1'
+            self.blocks = blocks
     
+    
+    def _add_defaults(self):
+        logging.debug('checking default values for layout')
+        for section, values in self.layout.items():
+            logging.debug(f'section: [{section:-^30}]')
+            if not 'type' in values:
+                raise KeyError(f'section "{section}" is missing key "type"! Each section in the layout must have the correct block type')
+            else:
+                my_type = values['type']
+                
+            try:
+                my_defaults = getattr(constants, f'LAYOUT_{my_type.upper()}_DEFAULTS')
+            except AttributeError:
+                raise ModuleNotFoundError(f'"Block" objects do not have a block type "{my_type}"')
+            
+            ### add kludge to bridge between 0.5 and 0.6 -- temporarily allow no type and guess 
+            
+            for key, default in my_defaults.items():
+                if not key in values:
+                    values[key] = default
+                    logging.debug(f'adding "{key}: {default}"')
+            
+            for key, default in constants.LAYOUT_DEFAULTS.items():
+                if not key in values:
+                    values[key] = default
+                    logging.debug(f'adding "{key}: {default}"')
+                    
+            self.layout[section] = values
     
     def _calculate_layout(self):
-        if not self.layout:
+        if not self._layout:
             return
-        logging.debug('## calculating layouts for sections ##')
-        for section in self.layout:
+        
+        
+        logging.debug('calculating layouts')
+        for section, values in self.layout.items() :
             logging.info(f'section: [{section:.^30}]')
-            this_section = self.layout[section]
-            # add default values if they are missing
-            for key, value in constants.layout_defaults.items():
-                if not key in this_section:
-                    logging.debug(f'setting missing value to default: {key}: {value}')
-                    this_section[key] = value
             
-            # absolute area in pixles
-            area = (round(self.resolution[0]*this_section['width']),
-                          round(self.resolution[1]*this_section['height']))
-            this_section['area'] = area
-            # usable area (absolute-x, y padding)
-            padded_area = (area[0] - this_section['padding']*2, 
-                                 area[1] - this_section['padding']*2)
-            this_section['padded_area'] = padded_area
+            # calculate absolute area and padded area of each block
+
+            area = (round(self.resolution[0]*values['width']), 
+                    round(self.resolution[1]*values['height']))
             
-            # set the thumbnail 
-            if this_section['image']:
-                maxsize = min(area)
-                this_section['thumbnail_size'] = (maxsize, maxsize)
+            padded_area = (area[0] - (2* values['padding']),
+                           area[1] - (2* values['padding']))
+    
+            values['area'] = area
+            values['padded_area'] = padded_area
             
-            if this_section['abs_coordinates'][0] is None or this_section['abs_coordinates'][1] is None:
-                logging.debug(f'calculating absolute position')
+            if values['type'] == 'TextBlock':
+                values['font_size'] = self._scale_font(values)
+            
+            
+            if values['abs_coordinates'][0] is None or values['abs_coordinates'][1] is None:
+                logging.debug('calculating block position from relative positions')
                 pos = [None, None]
-                for idx, r in enumerate(this_section['relative']):
-                    if r == section:
-                        # use the coordinates from this section
-                        pos[idx] = this_section['abs_coordinates'][idx]
+                for index, val in enumerate(values['relative']):
+                    # use the absolute value provided in this section
+                    if val == section:
+                        pos[index] = values['abs_coordinates'][index]
                     else:
-                        # use the coordinates from another section
+                        # calculate position relative to another block
                         try:
-                            pos[idx] = self.layout[r]['area'][idx] + self.layout[r]['abs_coordinates'][idx]
-                        except KeyError as e:
-                            raise KeyError(f'bad relative section value: "{r}" in section "{section}"')
-                this_section['abs_coordinates'] = (pos[0], pos[1])
-            else:
+                            pos[index] = self.layout[val]['area'][index] + self.layout[val]['abs_coordinates'][index]
+                        except KeyError:
+                            raise KeyError(f'bad relative section value: "{value}" in section "{section}" could not be found')
+                values['abs_coordinates'] = (pos[0], pos[1])
+            else: 
                 logging.debug('absolute coordinates provided')
+            
+            logging.debug(f'block coordinates: {values["abs_coordinates"]}')
+            
+       
                 
-            logging.debug(f'coordinates for this block: {this_section["abs_coordinates"]}')
-            
-            if not this_section['image']:
-                this_section['font_size'] = self._scalefont(this_section)
-            
-    def _scalefont(self, this_section):
-        text = 'WwQq'
+    def _scale_font(self, this_section):
+        text = constants.LAYOUT_SCALE_FONT_TEXT
         logging.debug('scaling font size')
         x_target, y_target = this_section['padded_area']
         
         y_target = y_target/this_section['max_lines']
-        font = this_section['font']
-        
+        font = this_section['font']        
         
         cont = True
         fontsize = 0
@@ -238,7 +239,7 @@ class Layout:
         logging.debug(f'calculated font size: {fontsize}')
         return fontsize
     
-
+    
     def update_contents(self, update=None):
         if not update:
             return
@@ -257,22 +258,20 @@ class Layout:
         if self.blocks:
             for b in self.blocks:
                 self.image.paste(self.blocks[b].image, self.blocks[b].abs_coordinates)
-        return self.image
+        return self.image    
 
 
 
 
 
 
-# # use deep copy to ensure the original is not modified
 # from copy import deepcopy
+
 # use_layout = deepcopy(l)
+# my_l = Layout(resolution=(800, 645), layout=use_layout)
+# my_l.update_contents(update)
 
-# ml = Layout(resolution=(1200, 800), force_onebit=True)
-# ml.layout = use_layout
-# ml.update_contents(update)
-
-# ml.concat()
+# my_l.concat()
 
 
 
@@ -281,10 +280,11 @@ class Layout:
 
 # # create the layout object
 # l = { # basic two row layout
-#     'weather_img': {                
+#     'weather_img': {
+#             'type': 'ImageBlock',
 #             'image': True,               # image block
 #             'padding': 2,               # pixels to padd around edge
-#             'width': 1/4,                # 1/4 of the entire width
+#             'width': 0.24,                # 1/4 of the entire width
 #             'height': 1/4,               # 1/4 of the entire height
 #             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
 #             'hcenter': True,             # horizontally center image
@@ -294,17 +294,30 @@ class Layout:
 #             'align': 'center',
 #             'bkground': 128
 #         },
+#     'v_line_1': {
+#             'type': 'DrawBlock',
+#             'height': .25,
+#             'width': 0.01,
+#             'mode': 'L',
+#             'shape': 'rounded_rectangle',
+#             'abs_x': 4,
+#             'scale_y': .85,
+#             'draw_format': {'radius': 5},
+#             'abs_coordinates': (None, 0),
+#             'relative': ['weather_img', 'v_line_1']
+#     },
 #     'temperature': { 
+#                 'type': 'TextBlock',
 #                 'image': None,           # set to None if this is a text block
 #                 'max_lines': 1,          # maximum lines of text to use when wrapping text
 #                 'padding': 10,           # padding around all edges (in pixles)
-#                 'width': 1/4,            # proportion of the entire width
+#                 'width': 0.24,            # proportion of the entire width
 #                 'height': 1/4,           # proprtion of the entire height
 #                 'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
 #                                               # coordinates that are relative to other blocks and will be calculated
 #                 'hcenter': True,         # horizontal-center the text and the resulting image
 #                 'vcenter': True,         # vertically-center the text within the block
-#                 'relative': ['weather_img', 'temperature'], # blocks to which THIS block's coordinates are relative to
+#                 'relative': ['v_line_1', 'temperature'], # blocks to which THIS block's coordinates are relative to
 #                                                             # -- in this case X: `weather_img` and Y: `temperature`
 #                                                             # the width of the block `weather` will be used to
 #                                                             # to calculate the X value of this block and the Y value
@@ -315,7 +328,7 @@ class Layout:
 #                 'align': 'center',
 #                 'mode': 'L'
 #     },
-#     'wind': { 
+#     'wind': { 'type': 'TextBlock',
 #                 'image': None,
 #                 'max_lines': 3,
 #                 'padding': 0,
@@ -328,7 +341,7 @@ class Layout:
 #                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
 #                 'font_size': None
 #     },
-#     'rain': { 
+#     'rain': {   'type': 'TextBlock',
 #                 'image': None,
 #                 'max_lines': 3,
 #                 'padding': 0,
@@ -340,17 +353,31 @@ class Layout:
 #                 'relative': ['wind', 'rain'],
 #                 'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
 #                 'font_size': None
-#     },    
-#     'forecast': {
+#     },  
+#     'h_line_1': {
+#                 'type': 'DrawBlock',
+#                 'width': 1,
+#                 'height': .05,
+#                 'mode': 'L',
+#                 'shape': 'ellipse',
+#                 'abs_y': 5,
+#                 'scale_y': .85,
+# #                 'draw_format': {}, 
+#                 'abs_coordinates': (0, None),
+#                 'relative': ['h_line_1', 'temperature'],
+#                 'fill': 128,
+#                 'bkground': 0,
+#     },
+#     'forecast': { 'type': 'TextBlock',
 #                 'image': None,
 #                 'max_lines': 7,
-#                 'padding': 10,
+#                 'padding': 15,
 #                 'width': 1,
-#                 'height': 3/4,
+#                 'height': .70,
 #                 'abs_coordinates': (0, None),
 #                 'hcenter': False,
-#                 'vcenter': True,
-#                 'relative': ['forecast', 'temperature'],
+#                 'vcenter': False,
+#                 'relative': ['forecast', 'h_line_1'],
 #                 'font': './fonts/Open_Sans/OpenSans-Italic.ttf',
 #                 'font_size': None,
 #                 'padding': 10,
@@ -371,7 +398,9 @@ class Layout:
 #     'wind': 'Wind: East 3m/s',                 # wind block will recieve this text
 #     'rain': 'Rain: 0%',                       # rain block
 # #     'forecast': 'Partly cloudy throughout the day with an east wind at 3m/s. High of 20, low of 12 overnight. Tomorrow: temperatures falling to 15 with an increased chance of rain'
-#     'forecast': "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet."
+#     'forecast': "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.",
+# #     'h_line_1': True,
+# #     'v_line_1': True,
 # }
 # # myLayout.update_contents(update)
 
