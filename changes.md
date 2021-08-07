@@ -7,6 +7,10 @@ Add new Block type "DrawBlock" and Layout support
     - supported shapes: `ellipse`, `rounded_rectangle`, `rectangle`
     - DrawBlock shapes can be horizontally (center, left, right) and vertically (center, top, bottom) aligned
     - all formatting paramaters can be used when drawing supported shapes
+* add option to add a border around each block type
+    - `Block` objects accept the kwarg `border_config` to add borders around the top, bottom, left and right sides
+    - see
+
 * update docstrings
 * add dummy `update()` method to `Block` parent class for completness
 
