@@ -270,20 +270,20 @@ The demo creates a very basic layout and displays some text in four orientations
 `python3 -m epdlib.Screen`
 
 ### Creating an Image from a Layout
-The following recipe will produce the screen layout shown above for a 640x400 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
-
+The following recipe will produce the screen layout shown above for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+![500x300 layout example](./docs/layout_example.png)
 ```
 import epdlib
 
 # create the layout object - adjust the resolution to match the display area
-layout_obj = epdlib.Layout(resolution=(640, 400))
+layout_obj = epdlib.Layout(resolution=(500, 300))
 
 l = { # basic two row layout
     'tux_img': {                
             'type': 'ImageBlock',        # required as of v0.6
             'image': True,               # image block
             'padding': 10,               # pixels to padd around edge
-            'width': 1/4,                # 1/4 of the entire width
+            'width': .25,                # 1/4 of the entire width
             'height': 1/4,               # 1/4 of the entire height
             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
             'hcenter': True,             # horizontally center image
@@ -291,24 +291,40 @@ l = { # basic two row layout
             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
             'mode': 'L',                 # treat this image as an 8bit gray-scale image
         },
+    'vertical_rule_1' :{
+            'type': 'DrawBlock',         # required as of v0.6
+            'shape': 'rounded_rectangle',# shape to draw
+            'abs_x': 5,                  # absolute x dimension of shape in pixels
+            'scale_y': .8,               # scale shape so it is 80% of available area
+            'halign': 'center',          # horizontally center in area
+            'valign': 'center',          # vertically center in area
+            'draw_format': {'radius': 5, # any key word args (kwargs) needed for formatting the shpae
+                            'outline': 128,
+                            'width': 2},
+            'height': 1/4,
+            'width': .02,
+            'abs_coordinates': (None, 0), # x value will be calculated from the 'tux_image' block, the y value is "0"
+            'relative': ['tux_img', 'vertical_rule_1'] # use 'tux_image' X value, use 'vertical_rule_1' for Y value
+    },
     'pangram_a': { 
-                'type': 'TextBlock',     # required as ov v0.6
-                'image': None,           # set to None if this is a text block
-                'max_lines': 3,          # maximum lines of text to use when wrapping text
-                'padding': 10,           # padding around all edges (in pixles)
-                'width': 3/4,            # proportion of the entire width
-                'height': 1/4,           # proprtion of the entire height
-                'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
-                                              # coordinates that are relative to other blocks and will be calculated
-                'hcenter': False,         # horizontal-center the text and the resulting image
-                'vcenter': True,         # vertically-center the text within the block
-                'relative': ['tux_img', 'pangram_a'], # blocks to which THIS block's coordinates are relative to
-                                                            # -- in this case X: `weather_img` and Y: `temperature`
-                                                            # the width of the block `weather` will be used to
-                                                            # to calculate the X value of this block and the Y value
-                                                            # specified within the `temperature` block will be used 
-                'font': './fonts/Open_Sans/OpenSans-Regular.ttf', # TTF Font face to use; relative paths are OK
-                'font_size': None         # set this to None to automatically scale the font to the size of the block
+            'type': 'TextBlock',          # required as ov v0.6
+            'image': None,                # set to None if this is a text block
+            'max_lines': 3,               # maximum lines of text to use when wrapping text
+            'padding': 10,                # padding around all edges (in pixles)
+            'width': .73,                 # proportion of the entire width
+            'height': 1/4,                # proprtion of the entire height
+            'abs_coordinates': (None, 0), # absolute coordinates within the final image (use None for those
+                                          # coordinates that are relative to other blocks and will be calculated
+            'hcenter': False,             # horizontal-center the text and the resulting image
+            'vcenter': True,              # vertically-center the text within the block
+            'relative': ['vertical_rule_1', 'pangram_a'], # blocks to which THIS block's coordinates are relative to
+                                                        # -- in this case X: `weather_img` and Y: `temperature`
+                                                        # the width of the block `weather` will be used to
+                                                        # to calculate the X value of this block and the Y value
+                                                        # specified within the `temperature` block will be used 
+            'font': './fonts/Open_Sans/OpenSans-Regular.ttf', # TTF Font face to use; relative paths are OK
+            'font_size': None,             # set this to None to automatically scale the font to the size of the block
+            'mode': 'L'                    # set text blocks to "mode": L" to enable anti-aliasing on HD screens (automatically disabled on non HD)
     },
     'pangram_b': { 
                 'type': 'TextBlock',
@@ -323,12 +339,13 @@ l = { # basic two row layout
                 'relative': ['pangram_b', 'tux_img'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
                 'font_size': None,
-                'inverse': True
+                'inverse': True,
+                'mode': 'L'
     },
     'pangram_c': {
                 'type': 'TextBlock',
                 'image': None,
-                'max_lines': 3,
+                'max_lines': 2,
                 'padding': 0,
                 'width': 1,
                 'height': 1/4,
@@ -339,9 +356,10 @@ l = { # basic two row layout
                 'font': './fonts/Open_Sans/OpenSans-BoldItalic.ttf',
                 'font_size': None,
                 'inverse': False,
+                'mode': 'L'
     },    
     'text': {
-                'type': 'TextBlock'
+                'type': 'TextBlock',
                 'image': None,
                 'max_lines': 3,
                 'padding': 10,
@@ -362,12 +380,14 @@ l = { # basic two row layout
 layout_obj.layout = l
 
 # create a dictionary with the values that will be pushed to each block
+# note that is is not necessary to update the DrawBlocks if they are fully configured
 update = {
     'tux_img': './images/tux.png',      
     'pangram_a': 'The quick brown fox jumps over the lazy dog.',  
     'pangram_b': 'Pack my box with five jugs of liquor.',          
     'pangram_c': 'Jackdaws love my big sphinx of quartz.',                    
-    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. '}
+    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. This text is not anti-aliased'}
+
 
 # update the layout with the data in the dictionary and send each item to the proper block
 layout_obj.update_contents(update)
@@ -382,7 +402,7 @@ myImg.save('sample.jpg')
 ### Write an image to a Screen
 The following code will create an interface for writing images to the EPD
 *Requirements*
-* Waveshare EPD module or IT8951 library (see Notes below)
+* Waveshare EPD module or IT8951 library (see [Notes](#Notes) below)
 
 ```
 from epdlib import Screen
