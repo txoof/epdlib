@@ -532,22 +532,24 @@ class Screen():
             sleep(bool): put the display to sleep after writing () (Depricated kwarg)
             partial(bool): attempt to do a partial refresh -- for 1bit pixels on HD Screens only'''
 
-        image = image.rotate(self.rotation, expand=True)
-        
+        try:
+            image = image.rotate(self.rotation, expand=True)
+        except AttributeError as e:
+            raise ScreenError(f'image could not be rotated: {e}')
+
         if partial:
             if self.HD:
                 write_function = self._partial_writeEPD_hd
             else:
                 logging.warning('partial update is not available on non-hd displays')
                 write_function = self._full_writeEPD_non_hd
-                
+
         else:
             if self.HD:
                 write_function = self._full_writeEPD_hd
             else:
                 write_function = self._full_writeEPD_non_hd
 
-        
         write_function(image)
         if sleep==False:
             logging.warning('`sleep` kwarg is depricated and no longer used; display will be put to sleep after write')
