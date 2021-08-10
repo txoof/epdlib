@@ -5,6 +5,7 @@ EpdLib is a library for creating dynamically scaled screen layouts for frame-buf
 See the [ChangeLog](./changes.md) for details
 ### v0.5
 * Add support for Block type "DrawBlock"
+* Add support for adding borders to all Block types
 
 ### v0.4
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
@@ -39,7 +40,8 @@ Python Modules:
 <a name="Block"></a>
 ## Block Module
 `Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
-*Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0)`
+
+*Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0, border_config={})`
 
 ### Properties
         
@@ -57,6 +59,8 @@ Args [default value]:
  *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 black]
  *  `bkground`(int): 0-255 8 bit value for background color [255 white]
  *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
+ *  `border_config`(dict): dictonary containing kwargs configuration for adding border to image
+                see help(add_border)
 
 Properties:
  *  `image`: None - overridden in child classes'''
@@ -64,6 +68,22 @@ Properties:
 ### Methods
 `update(update)`
 Place holder method for child classes.
+
+### Functions
+*Function* `add_border(img, fill, width, outline=None, outline_width=1, sides=['all'])`
+
+add a border around an image
+
+Args:
+ * `img`(PIL.Image): image to add border to
+ * `fill`(int): border fill color 0..255 8bit gray shade
+ * `width`(int): number of pixels to use for border
+ * `outline`(int): 0..255 8bit gray shade for outline of border region
+ * `outline_width`(int): width in pixels of outline
+ * `sides`(list of str): sides to add border: "all", "left", "right", "bottom", "top" 
+
+Returns:
+    PIL.Image
 
 ## Block.DrawBlock
 Child class of `Block` that contains `pillow.ImageDraw` drawing objects. `DrawBlock` objects can contain ellipses, rounded_rectangles or rectangles. These are useful for creating horizontal and vertical rules and separators. DrawBlock objects can be aligned horizontally ('center', 'left', 'right' or vertically ('center', 'top', 'bottom') within the block area.
