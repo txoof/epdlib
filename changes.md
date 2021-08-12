@@ -1,4 +1,9 @@
-## 0.5.0.3 - 2121.08.09
+## 0.5.0.4 - 2021.08.12
+**Screen**
+* when SPI is not enabled, `writeEPD` returns `FileNotFoundError` instead of `ScreenError`
+    - this makes it easier to provide useful feedback to users when SPI is not setup
+
+## 0.5.0.3 - 2021.08.09
 * handle exeptions when writing to EPD
 
 ## 0.5.0.0 - 2021.08.07

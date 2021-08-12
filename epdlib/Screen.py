@@ -249,6 +249,8 @@ class Screen():
                 logging.debug('Non HD display')
                 try:
                     obj.epd.init()
+                except FileNotFoundError as e:
+                    raise FileNotFoundError(f'It appears SPI is not enabled on this Pi: {e}')
                 except Exception as e:
                     raise ScreenError(f'failed to init display: {e}')
 
@@ -376,7 +378,7 @@ class Screen():
         self._rotation = rotation
         logging.debug(f'rotation={rotation}, resolution={self.resolution}')        
 
-    def _load_hd(self, epd):
+    def _load_hd(self, epd, timeout=20):
         '''configure IT8951 (HD) SPI epd 
         
         Args:
@@ -389,13 +391,17 @@ class Screen():
                 clear_args: [arg1: val, arg2: val],
                 constants: None            
         '''
+        
         from IT8951.display import AutoEPDDisplay
         from IT8951 import constants as constants_HD
+        
         
         logging.debug('configuring IT8951 epd')
         
         if not self.vcom:
             raise ScreenError('`vcom` property must be provided when using "HD" epd type')
+            
+        
         try:
             myepd = AutoEPDDisplay(vcom=self.vcom)
         except ValueError as e:
@@ -798,7 +804,17 @@ def main():
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
 
-        s.writeEPD(l.concat())
+        try:
+            s.writeEPD(l.concat())
+        except FileNotFoundError as e:
+            print(f'{e}')
+            print('Try: $ raspi-config > Interface Options > SPI')
+            do_exit = True
+        else:
+            do_exit = False
+        
+        if do_exit:
+            sys.exit()
         print('sleeping for 2 seconds')
         time.sleep(2)
 
@@ -902,6 +918,35 @@ def main():
 
 
 
+# import multiprocessing
+# import time
+# from IT8951.display import AutoEPDDisplay
+
+
+# def worker(procnum, return_dict):
+#     """worker function"""
+#     print(str(procnum) + " represent!")
+#     return_dict[procnum] = procnum
+
+
+# if __name__ == "__main__":
+#     manager = multiprocessing.Manager()
+#     return_dict = manager.dict()
+#     jobs = []
+#     for i in range(5):
+#         p = multiprocessing.Process(target=worker, args=(i, return_dict))
+#         jobs.append(p)
+#         p.start()
+
+#     for proc in jobs:
+#         proc.join()
+#     print(return_dict.values())
+
+
+
+
+
+
 # epd2in7 = Screen(epd='epd2in7', rotation=0)
 # mylayout_non = Layout.Layout(resolution=epd2in7.resolution, layout=l)
 
@@ -921,7 +966,7 @@ def main():
 
 
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
 
 
@@ -931,12 +976,5 @@ logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     e= main()
-
-
-
-
-
-
-
 
 
