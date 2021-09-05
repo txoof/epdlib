@@ -289,6 +289,9 @@ The demo creates a very basic layout and displays some text in four orientations
 
 `python3 -m epdlib.Screen`
 
+Alternatively:
+`python3 Screen.py`
+
 ### Creating an Image from a Layout
 The following recipe will produce the a layout for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
 ![500x300 layout example](./docs/layout_example.png)
