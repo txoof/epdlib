@@ -203,9 +203,53 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 * `epd` (epd object)
     - waveshare epd object used for interfacing with the display
 * `update` (obj:Screen.Update): monotonicly aware object that tracks time since last update
-* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen 
+* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen *see note below*
 * `mode`(str): '1' for 1 bit screens, 'L' for screens capable of 8 bit grayscale
 * `vcom`(float): vcom voltage for HD IT8951 based screens (not needed & ignored for non-HD screens)
+
+**NOTE**
+
+Screens with cable along long edge
+``` 
+Rotation = 0
+  ┌───────────────┐
+  │          (__) │
+  │  `\------(oo) │
+  │    ||    (__) │
+  │    ||w--||    │
+  └─────┬───┬─────┘
+        │|||│
+
+Rotation = 180
+        │|||│
+  ┌─────┴───┴─────┐
+  │          (__) │
+  │  `\------(oo) │
+  │    ||    (__) │
+  │    ||w--||    │
+  └───────────────┘
+
+```
+
+Screens with cable along short edge
+```
+Rotation = 0
+  ┌───────────────┐
+  │          (__) ├──
+  │  `\------(oo) │--
+  │    ||    (__) │--
+  │    ||w--||    ├──
+  └───────────────┘
+
+Rotation = 180
+  ┌───────────────┐
+──┤          (__) │
+--│  `\------(oo) │
+--│    ||    (__) │
+──┤    ||w--||    │
+  └───────────────┘
+
+```
 
 
 ### Methods
@@ -472,7 +516,6 @@ The Broadcom BCM 2835 library is required by the IT8951 module. Download and ins
 ```
 pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
-
 
 
 getting ready for pypi:
