@@ -1,3 +1,10 @@
+## 0.5.1.1 - 2022.01.16
+**TextBlock**
+
+* add option to stop text wrapping (textwrap=False)
+* changed test string used for calculating maximum characters per line to include digits: 9QqMm
+    - this results in all calculated font sizes being slightly smaller, but fitting better in most cases
+
 ## 0.5.1.0 - 2022.01.16
 **ImageBlock**
 

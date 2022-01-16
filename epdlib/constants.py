@@ -70,7 +70,7 @@ BLOCK_ADD_BORDER_DEFAULTS = {'fill': None,
 #                    'fill': 0,
 #                    'bkground': 255}
 
-LAYOUT_SCALE_FONT_TEXT = 'WwQq'
+LAYOUT_SCALE_FONT_TEXT = '9QqMm'
 
 
 DRAW_SHAPES = ['rectangle', 'rounded_rectangle', 'ellipse']

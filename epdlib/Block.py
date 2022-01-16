@@ -733,7 +733,8 @@ class TextBlock(Block):
         image (:obj:`PIL.Image` or str): PIL image object or string path to image file
         upate (method): update contents of ImageBlock"""                    
     def __init__(self, area, font, *args, text="NONE", font_size=0, 
-                 chardist=None, max_lines=1, maxchar=None, align='left', **kwargs):
+                 chardist=None, max_lines=1, maxchar=None, align='left', 
+                 textwrap=True, **kwargs):
         """Intializes TextBlock object
         
         Args:
@@ -748,6 +749,8 @@ class TextBlock(Block):
             chardist (str, optional): string matching one of the character 
                 distributions in constants.py (default USA_CHARDIST)
             align (str, optional): 'left', 'right', 'center' justify text (default: left)
+            textwrap(bool): wrap text when true, attempt no wrapping when false
+                when false, max_lines will be ignored making text on exactly one line
         
         Properties:
             text_formatted('str'): text with line breaks according to maxchar and max_lines
@@ -756,6 +759,7 @@ class TextBlock(Block):
             """        
         super().__init__(area, *args, **kwargs)
         self.align = align
+        self.textwrap = textwrap
         self.font_size = font_size
         self.chardist = chardist
         self.maxchar = maxchar
@@ -934,14 +938,18 @@ class TextBlock(Block):
             :obj:`list` of :obj:`str`"""        
         logging.debug(f'formatting string: {self.text}')
 
-        try:
-            formatted = textwrap.fill(self.text, 
-                                      width=self.maxchar, 
-                                      max_lines=self.max_lines, 
-                                      placeholder='…')
-        except (TypeError, ValueError) as e:
-            logging.critical(f'it is not possible to wrap text into this area with the current font settings; returning an empty string: {e}')
-            formatted = ''
+        if self.textwrap:
+            try:
+                formatted = textwrap.fill(self.text, 
+                                          width=self.maxchar, 
+                                          max_lines=self.max_lines, 
+                                          placeholder='…')
+            except (TypeError, ValueError) as e:
+                logging.critical(f'it is not possible to wrap text into this area with the current font settings; returning an empty string: {e}')
+                formatted = ''
+        else:
+            logging.debug('textwrap is disabled')
+            formatted = self.text
 
         return(formatted)
     
@@ -1054,9 +1062,10 @@ class TextBlock(Block):
 
 
 
-# t = TextBlock(area=(800, 180), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=22, max_lines=3,
+# t = TextBlock(area=(800, 180), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=44, max_lines=1,
 #              padding=10, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right',
-#              border_config={'fill': 0, 'width': 4, 'sides': ['top', 'right']})
+#              border_config={'fill': 0, 'width': 4, 'sides': ['top', 'right']},
+#              textwrap=False)
 # t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
 # # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
 # t.update()
@@ -1090,7 +1099,7 @@ class ImageBlock(Block):
         Args:
             area(tuple of int): area of block in x/y
             image(PIL.Image, pathlib.Path or similar): image to place in block
-            remove_alpha(bool): remove alpha chanel of PNG or similar files
+            remove_alpha(bool): true: remove alpha chanel of PNG or similar files
                 see: https://stackoverflow.com/a/35859141/5530152'''
         
         super().__init__(area, *args, **kwargs)
