@@ -1084,17 +1084,48 @@ class ImageBlock(Block):
     Overrides:
         image (:obj:`PIL.Image` or str): PIL image object or string path to image file
         update (method): update contents of ImageBlock"""    
-    def __init__(self, area, *args, image=None, **kwargs):
+    def __init__(self, area, *args, image=None, remove_alpha=True, **kwargs):
         '''Initializes ImageBlock
         
         Args:
             area(tuple of int): area of block in x/y
-            image(PIL.Image, pathlib.Path or similar): image to place in block'''
+            image(PIL.Image, pathlib.Path or similar): image to place in block
+            remove_alpha(bool): remove alpha chanel of PNG or similar files
+                see: https://stackoverflow.com/a/35859141/5530152'''
         
         super().__init__(area, *args, **kwargs)
         
         
         self.image = image
+        self.remove_alpha = remove_alpha
+        
+    @staticmethod
+    def remove_transparency(im, bg_colour=(255, 255, 255)):
+        '''remove transparency from PNG and similar file types
+            see: https://stackoverflow.com/a/35859141/5530152
+        
+        Args: 
+            im(PIL image): image
+            bg_color(3-tuple): use this background color in place of the alpha
+            
+        Returns
+            PIL image'''
+
+        # Only process if image has transparency (http://stackoverflow.com/a/1963146)
+        if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
+
+            # Need to convert to RGBA if LA format due to a bug in PIL (http://stackoverflow.com/a/1963146)
+            alpha = im.convert('RGBA').split()[-1]
+
+            # Create a new background image of our matt color.
+            # Must be RGBA because paste requires both images have the same format
+            # (http://stackoverflow.com/a/8720632  and  http://stackoverflow.com/a/9459208)
+            bg = Image.new("RGBA", im.size, bg_colour + (255,))
+            bg.paste(im, mask=alpha)
+            return bg
+
+        else:
+            return im    
         
     @property
     def image(self):
@@ -1109,6 +1140,10 @@ class ImageBlock(Block):
     def image(self, image):
 
         image_area = Image.new(self.mode, self.area, self.bkground)
+        logging.debug(f'image area (max): {image_area.size}')
+        paste_x = self.padding
+        paste_y = self.padding
+        
     
         if not image or image==True:
             logging.debug(f'no image set; setting to blank image with area: {self.area}')
@@ -1126,13 +1161,29 @@ class ImageBlock(Block):
                 im = image
             else:
                 raise BlockError('unusable image format')
+                
+            if self.remove_alpha:
+                im = self.remove_transparency(im)
 
-            if max(im.size) > min(self.padded_area):
-                logging.debug(f'resizing image to fit area: {self.padded_area}')
-#                 max_size = min(self.padded_area)
-#                 resize = [max_size, max_size]
+#             if max(im.size) > min(self.padded_area):
+#                 logging.debug(f'resizing image to fit area: {self.padded_area}')
+# #                 max_size = min(self.padded_area)
+# #                 resize = [max_size, max_size]
+#                 im.thumbnail(self.padded_area, Image.BICUBIC)
+#                 logging.debug(f'new image size: {im.size}')
+
+            logging.debug(f'image dimensions: {im.size}')
+            thumbnail = False
+            for i, val in enumerate(im.size):
+                if val > self.padded_area[i]:
+                    logging.debug(f'idx:{i} diemension ({val}) is greater than idx:{i} padded_area: {self.padded_area[i]}')
+                    thumbnail = True
+            
+            if thumbnail:
+                logging.debug(f'resizing image to: {self.padded_area}')
                 im.thumbnail(self.padded_area, Image.BICUBIC)
-                logging.debug(f'new image size: {im.size}')
+            
+        
                 
             if self.inverse:
                 im = ImageOps.invert(im)
@@ -1142,9 +1193,11 @@ class ImageBlock(Block):
 
             if self.hcenter:
                 paste_x = int((self.area[0] - im.width)/2)
+                logging.debug(f'h centering: x={paste_x}')                
 
             if self.vcenter:
-                paste_y = int((self.area[1] - im.height)/2) 
+                paste_y = int((self.area[1] - im.height)/2)
+                logging.debug(f'v centering: y={paste_y}')                
 
             if self.rand:
                 if self.hcenter:
@@ -1168,6 +1221,7 @@ class ImageBlock(Block):
                 except ValueError as e:
                     logging.info('y image dimension is too large for random placement')
 
+            logging.debug(f'pasting image at: {paste_x}, {paste_y}')
             image_area.paste(im, (paste_x, paste_y))
             
             if self.border_config['width'] > 0:
@@ -1199,15 +1253,16 @@ class ImageBlock(Block):
 
 
 
-# i = ImageBlock(area=(700, 300), mode='L', 
-#                hcenter=True, vcenter=True, padding=10, rand=False, inverse=True, bkground=255,
-#                border_config={'fill': 128, 'width': 5, 'sides': ['all']})
-# # i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
+# i = ImageBlock(area=(396, 264), mode='L', 
+#                hcenter=False, vcenter=True, padding=0, rand=False, inverse=False, bkground=255, 
+#                border_config={'fill': 128, 'width': 1, 'sides': ['all']})
+# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
 # i.update('../images/hubble.jpg')
-# # i.update('../tux.png')
-# # i.update('../PIA03519_small.jpg')
-# # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
-# # i.update(q)
+# i.update('../tux.png')
+# i.update('../PIA03519_small.jpg')
+# i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
+# i.update(q)
+# i.update('../../epd_display/paperpi/plugins/crypto/prices_sparkline.png')
 # i.image
 
 

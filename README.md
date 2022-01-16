@@ -157,6 +157,14 @@ All properties of the parent class are inherited.
 
 ### Properties
 * `image` (:obj:PIL.Image or :obj:str) - `Pillow` image or path provided as a `str` to an image file; relative paths are acceptable
+* `remove_alpha(bool)`: true: remove alpha chanel of PNG or similar files; see: https://stackoverflow.com/a/35859141/5530152
+
+### Methods
+* `update(update=None)` - Update the image with a new image and sets `image` property
+    - update(image)
+* `remove_transparency(im, bg_colour=(255, 255, 255))` - Static method for removing transparency from PNG and similar images
+    - im(PIL image)
+    - bg_color(background) color to replace alpha/transparenncy
 
 <a name="Layout"></a>
 ## Layout Module
@@ -332,9 +340,6 @@ scrnShot.save(spam)
 The demo creates a very basic layout and displays some text in four orientations. This is an easy way to test your panel and confirm that it is working properly.
 
 `python3 -m epdlib.Screen`
-
-Alternatively:
-`python3 Screen.py`
 
 ### Creating an Image from a Layout
 The following recipe will produce the a layout for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.

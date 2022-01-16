@@ -1,5 +1,13 @@
+## 0.5.1.0 - 2022.01.16
+**ImageBlock**
+
+* add static method `remove_transparency(im, bg_colour=(255, 255, 255))` to `ImageBlock` 
+    - removes alpha/transparency chanels from PNG and similar images and replaces with bg_color
+* add propery `remove_alpha=True` to remove transparency/alpha on PNG images by default
+
 ## 0.5.0.4 - 2021.08.12
 **Screen**
+
 * when SPI is not enabled, `writeEPD` returns `FileNotFoundError` instead of `ScreenError`
     - this makes it easier to provide useful feedback to users when SPI is not setup
 
@@ -10,6 +18,7 @@
 Add new Block type "DrawBlock" and Layout support
 
 **Block**
+
 * add class "DrawBlock" for drawing `ImageDraw` basic shapes
     - DrawBlock blocks are useful for creating horizontal and vertical rules in Layout displays
     - supported shapes: `ellipse`, `rounded_rectangle`, `rectangle`
@@ -23,6 +32,7 @@ Add new Block type "DrawBlock" and Layout support
 * add dummy `update()` method to `Block` parent class for completness
 
 **Layout**
+
 * Layouts now support ImageBlock, TextBlock and DrawBlock objects
     - DrawBlock objects are included similar to Text and Image blocks, but **MUST** include the key "type"
         * 'type': 'DrawBlock'
@@ -37,12 +47,14 @@ Fix issue #15 - "unknown module" when display = "HD" and no vcom value set
 Add option to force all blocks in a layout to 1bit mode. TT Fonts are rendered with anti-aliasing in all modes except for 1bit mode. Anti-aliased fonts display poorly on 1bit screens with extremely jagged edges.
 
 **Layout**
+
 * `Layout` objects now support boolean property `force_onebit` 
     - When set to `True` all blocks are forced to `mode = '1'`
 
 ## 0.4.4 - 2021.07.31
 rewrite of `Screen` module to fix unclosed SPI file handles
 **Screen**
+
 * `initEPD()` method is now depricated and no longer needed; this can be removed from the code 
     - displays are automatically woken prior to write/clear and put to sleep after write/clear
     - at your own risk, use `writeEPD(sleep=True)` to keep display awake after write. For non-IT8951 boards, you **must** manually call `epd.sleep()` prior to the next write/clear event to ensure the SPI file handle is properly closed.
