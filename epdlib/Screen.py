@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 from datetime import datetime
 from pathlib import Path
 import time
-
+import omni_epd
 
 
 
@@ -216,16 +216,17 @@ class Screen():
             HD(bool): True for IT8951 panels
             rotatio(int): rotation of screen (0, -90, 90, 180)
             update(obj:Update): monotoic time aware update timer'''
-        self.vcom = vcom        
+        # self.vcom = vcom        
         self.resolution = [1, 1]
-        self.clear_args  = {}
-        self.buffer_no_image = []
+        # self.clear_args  = {}
+        # self.buffer_no_image = []
         self.constants = None
         self.mode = None
         self.HD = False
         self.epd = epd
         self.rotation = rotation
         self.update = Update()
+        self.modes_available = None
         
         
     def _spi_handler(func):
@@ -434,53 +435,67 @@ class Screen():
                 constants: None
                 '''
         
-        import waveshare_epd
+        # import waveshare_epd
         import pkgutil
         import inspect
         from importlib import import_module
+        from omni_epd import displayfactory, EPDNotFoundError
+
+        # logging.debug(f'configuring waveshare_epd.{epd}')
+        logging.debug(f'configuring omni_epd.{epd}')
         
-        logging.debug(f'configuring waveshare_epd.{epd}')
+        # non_hd = []
+        # for i in pkgutil.iter_modules(waveshare_epd.__path__):
+        non_hd = displayfactory.list_supported_displays(True)
+            # non_hd.append(i.name)
         
-        non_hd = []
-        for i in pkgutil.iter_modules(waveshare_epd.__path__):
-            non_hd.append(i.name)
-        
-        if epd in non_hd:
+        # if epd in non_hd:
+        if non_hd.get(epd, False):
             try:
-                myepd = import_module(f'waveshare_epd.{epd}')
-            except ModuleNotFoundError as e:
-                raise ScreenError(f'failed to load {epd} with error: {e}')
+                epd = displayfactory.load_display_driver(displayName)
+            except EPDNotFoundError:
+                print(f"Couldn't find {displayName}")
+                sys.exit()
+            # try:
+            #     myepd = import_module(f'waveshare_epd.{epd}')
+            # except ModuleNotFoundError as e:
+            #     raise ScreenError(f'failed to load {epd} with error: {e}')
         else:
-            raise ScreenError(f'unrecongized waveshare module: {epd}')
+            raise ScreenError(f'unrecongized screen model: {epd}')
 
         # check specs
         # check for supported `Clear()` function
-        try:
-            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
-        except AttributeError:
-            raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
-        clear_args = {}
-        if 'color' in clear_args_spec:
-            clear_args['color'] = 0xFF
+        # try:
+        #     clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
+        # except AttributeError:
+        #     raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
+        # clear_args = {}
+        # if 'color' in clear_args_spec:
+        #     clear_args['color'] = 0xFF
         
-        # check for "standard" `display()` function
-        try:
-            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
-        except AttributeError:
-            raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
+        # # check for "standard" `display()` function
+        # try:
+        #     display_args_spec = inspect.getfullargspec(myepd.EPD.display)
+        # except AttributeError:
+        #     raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
 
-        logging.debug(f'args_spec: {display_args_spec.args}')
-        if len(display_args_spec.args) <= 2:
-            one_bit_display = True
-        else:
+        # logging.debug(f'args_spec: {display_args_spec.args}')
+        # if len(display_args_spec.args) <= 2:
+        #     one_bit_display = True
+        # else:
+        #     one_bit_display = False
+        if len(epd.modes_available) > 1:
             one_bit_display = False
-            
-        resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
+        else:
+            one_bit_display = True
+
+
+        resolution = [epd.height, epd.width]
         
         
-        return {'epd': myepd.EPD(), 
+        return {'epd': epd, 
                 'resolution': resolution, 
-                'clear_args': clear_args,
+                # 'clear_args': clear_args,
                 'one_bit_display': one_bit_display,
                 'constants': None,
                 'mode': '1'}
