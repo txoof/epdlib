@@ -216,7 +216,7 @@ class Screen():
             HD(bool): True for IT8951 panels
             rotatio(int): rotation of screen (0, -90, 90, 180)
             update(obj:Update): monotoic time aware update timer'''
-        # self.vcom = vcom        
+        self.vcom = vcom        
         self.resolution = [1, 1]
         # self.clear_args  = {}
         # self.buffer_no_image = []
@@ -249,7 +249,8 @@ class Screen():
             if not obj.HD:
                 logging.debug('Non HD display')
                 try:
-                    obj.epd.init()
+                    # obj.epd.init()
+                    obj.epd.prepare()
                 except FileNotFoundError as e:
                     raise FileNotFoundError(f'It appears SPI is not enabled on this Pi: {e}')
                 except Exception as e:
@@ -325,7 +326,7 @@ class Screen():
         
         self._epd = myepd['epd']
         self.resolution = myepd['resolution']
-        self.clear_args = myepd['clear_args']
+        # self.clear_args = myepd['clear_args']
         self.constants = myepd['constants']
         self.one_bit_display = myepd['one_bit_display']
         self.mode = myepd['mode']
@@ -372,9 +373,9 @@ class Screen():
             resolution.sort(reverse=True)
             self.resolution = resolution
             
-        self.image = Image.new(self.mode, self.resolution, 255)
-        if not self.HD:
-            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
+        # self.image = Image.new(self.mode, self.resolution, 255)
+        # if not self.HD:
+        #     self.buffer_no_image = self.epd.getbuffer(self.blank_image())
 
         self._rotation = rotation
         logging.debug(f'rotation={rotation}, resolution={self.resolution}')        
@@ -448,20 +449,20 @@ class Screen():
         # for i in pkgutil.iter_modules(waveshare_epd.__path__):
         non_hd = displayfactory.list_supported_displays()
             # non_hd.append(i.name)
-        full_epd = f"waveshare_epd.{epd}"
+        full_epd_name = f"waveshare_epd.{epd}" # This will need to be changed to support inky and others
         # if epd in non_hd:
-        if full_epd in non_hd:
+        if full_epd_name in non_hd:
             try:
-                epd_obj = displayfactory.load_display_driver(full_epd)
+                epd_obj = displayfactory.load_display_driver(full_epd_name)
             except EPDNotFoundError:
-                print(f"Couldn't find {full_epd}")
+                print(f"Couldn't find {full_epd_name}")
                 sys.exit()
             # try:
             #     myepd = import_module(f'waveshare_epd.{epd}')
             # except ModuleNotFoundError as e:
             #     raise ScreenError(f'failed to load {epd} with error: {e}')
         else:
-            raise ScreenError(f'unrecongized screen model: {full_epd}')
+            raise ScreenError(f'unrecongized screen model: {full_epd_name}')
 
         # check specs
         # check for supported `Clear()` function
@@ -486,8 +487,10 @@ class Screen():
         #     one_bit_display = False
         if len(epd_obj.modes_available) > 1:
             one_bit_display = False
+            epd_obj.mode = "bw" # This will eventually support color
         else:
             one_bit_display = True
+            epd_obj.mode = "bw"
 
 
         resolution = [epd_obj.height, epd_obj.width]
@@ -498,7 +501,7 @@ class Screen():
                 # 'clear_args': clear_args,
                 'one_bit_display': one_bit_display,
                 'constants': None,
-                'mode': '1'}
+                'mode': '1'} # This could likely be simplified to just returning OMNI obj
     
     def initEPD(self, *args, **kwargs):
         '''**DEPRICATED** init EPD for wirting
@@ -518,7 +521,8 @@ class Screen():
         if self.HD:
             clear_function = self._clearEPD_hd
         else:
-            clear_function = self._clearEPD_non_hd
+            # clear_function = self._clearEPD_non_hd
+            clear_function = self.epd.clear
         
         return clear_function()
         
@@ -532,7 +536,7 @@ class Screen():
             raise ScreenError(f'failed to clear screen: {e}')
         return status
     
-    def _clearEPD_non_hd(self):
+    def _clearEPD_non_hd(self): # NOT USED - replaced by OMNI
         '''clear non IT8951 screens'''
         status = False
         try:
@@ -563,13 +567,15 @@ class Screen():
                 write_function = self._partial_writeEPD_hd
             else:
                 logging.warning('partial update is not available on non-hd displays')
-                write_function = self._full_writeEPD_non_hd
-
+                # write_function = self._full_writeEPD_non_hd
+                write_function = self.epd.display
+                
         else:
             if self.HD:
                 write_function = self._full_writeEPD_hd
             else:
-                write_function = self._full_writeEPD_non_hd
+                # write_function = self._full_writeEPD_non_hd
+                write_function = self.epd.display
 
         write_function(image)
         if sleep==False:
@@ -595,7 +601,7 @@ class Screen():
             raise ScreenError(f'failed to write image to display: {e}')
             
     
-    def _full_writeEPD_non_hd(self, image):
+    def _full_writeEPD_non_hd(self, image): # NOT USED - replaced by OMNI
         '''wipe screen and write an image'''
         image_buffer = self.epd.getbuffer(image)
         
