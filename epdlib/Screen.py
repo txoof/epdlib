@@ -446,22 +446,22 @@ class Screen():
         
         # non_hd = []
         # for i in pkgutil.iter_modules(waveshare_epd.__path__):
-        non_hd = displayfactory.list_supported_displays(True)
+        non_hd = displayfactory.list_supported_displays()
             # non_hd.append(i.name)
-        
+        full_epd = f"waveshare_epd.{epd}"
         # if epd in non_hd:
-        if non_hd.get(epd, False):
+        if full_epd in non_hd:
             try:
-                epd = displayfactory.load_display_driver(displayName)
+                epd_obj = displayfactory.load_display_driver(full_epd)
             except EPDNotFoundError:
-                print(f"Couldn't find {displayName}")
+                print(f"Couldn't find {full_epd}")
                 sys.exit()
             # try:
             #     myepd = import_module(f'waveshare_epd.{epd}')
             # except ModuleNotFoundError as e:
             #     raise ScreenError(f'failed to load {epd} with error: {e}')
         else:
-            raise ScreenError(f'unrecongized screen model: {epd}')
+            raise ScreenError(f'unrecongized screen model: {full_epd}')
 
         # check specs
         # check for supported `Clear()` function
@@ -484,16 +484,16 @@ class Screen():
         #     one_bit_display = True
         # else:
         #     one_bit_display = False
-        if len(epd.modes_available) > 1:
+        if len(epd_obj.modes_available) > 1:
             one_bit_display = False
         else:
             one_bit_display = True
 
 
-        resolution = [epd.height, epd.width]
+        resolution = [epd_obj.height, epd_obj.width]
         
         
-        return {'epd': epd, 
+        return {'epd': epd_obj, 
                 'resolution': resolution, 
                 # 'clear_args': clear_args,
                 'one_bit_display': one_bit_display,
