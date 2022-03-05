@@ -824,10 +824,11 @@ def main():
     
     myLayout = {
             'title': {                       # text only block
+                'type': 'TextBlock',         # required as of v0.6
                 'image': None,               # do not expect an image
                 'max_lines': 3,              # number of lines of text
                 'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
-                'height': .6,               # 1/3 of the entire height
+                'height': .6,                # 1/3 of the entire height
                 'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
                 'hcenter': True,             # horizontally center text
                 'vcenter': True,             # vertically center text 
@@ -837,6 +838,7 @@ def main():
             },
 
             'artist': {
+                'type': 'TextBlock',
                 'image': None,
                 'max_lines': 2,
                 'width': 1,
