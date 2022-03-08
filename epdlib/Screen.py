@@ -418,6 +418,9 @@ class Screen():
         else:
             raise ScreenError(f'unrecongized screen model: {epd}')
 
+        if 'it8951' in epd:
+            myepd.HD = True
+
         return myepd
 
         
@@ -804,7 +807,6 @@ def main():
         return
     
     if 'it8951' in myepd:
-        myepd = 'HD'
         voltage = input('Enter the vcom voltage for this panel (check the ribbon cable): ')
         try:
             voltage = float(voltage)
