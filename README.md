@@ -508,16 +508,18 @@ my_screen.clearEPD()
 
 <a name="Notes"></a>
 ## Notes
-**WaveShare non-IT8951 Screens**
+### WaveShare non-IT8951 Screens
+
 The waveshare-epd library is required for non-IT8951 screens and can be installed from the Git repo:
+
 ```
 pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
 ```
 
-**IT8951 basee Screens**
-The Broadcom BCM 2835 library is required by the IT8951 module. Download and install the BCM2835 library according to the directions found on [Mike McCauley's site](http://www.airspayce.com/mikem/bcm2835/)
+### IT8951 basee Screens
 
-[Greg D Meyer's IT8951 library](https://github.com/GregDMeyer/IT8951) is also required and can be installed from the Git repo:
+[Greg D Meyer's IT8951 library](https://github.com/GregDMeyer/IT8951) is required and can be installed from the Git repo:
+
 ```
 pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
