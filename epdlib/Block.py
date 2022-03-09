@@ -792,7 +792,7 @@ class TextBlock(Block):
         
         if font_size == 0:
             font_size = int(self.area[0]/40)
-            logging.warning('no font size set, using {font_size}')
+            logging.warning(f'no font size set, using {font_size}')
             
         self._font_size = font_size
 
