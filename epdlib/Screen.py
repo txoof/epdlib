@@ -213,7 +213,7 @@ class Screen():
             resolution(list): X x Y pixels
             HD(bool): True for IT8951 panels
             constants(namespace): constants required for read/write of IT8951 screens
-            mode(str): current mode of the display (check modes_available for options on each screen)
+            mode(str): current mode of the image (check modes_available for options on each screen)
             mode(tuple): modes available for the selected screen
             update(obj:Update): monotoic time aware update timer'''
 
@@ -222,6 +222,7 @@ class Screen():
         self.HD = False
         self.constants = None
         self.mode = '1'
+        self.screen_mode = 'bw'
         self.modes_available = ('bw')
         self.epd = epd
         self.rotation = rotation
@@ -299,9 +300,9 @@ class Screen():
             return
         
         if len(myepd.modes_available) > 1:
-            self.mode = "bw" # This will eventually support color
+            self.mode = "1" # This will eventually support color
         else:
-            self.mode = "bw"
+            self.mode = "1"
 
         self._epd = myepd
         self.resolution = [myepd.height, myepd.width]
@@ -527,10 +528,6 @@ def main():
             'height': .6,                # 1/3 of the entire height
             'abs_coordinates': (0, 0),   # this block is the key block that all other blocks will be defined in terms of
             'hcenter': True,             # horizontally center text
-            'vcenter': True,             # vertically center text 
-                'vcenter': True,             # vertically center text 
-            'vcenter': True,             # vertically center text 
-                'vcenter': True,             # vertically center text 
             'vcenter': True,             # vertically center text 
             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
             'font': str(constants.absolute_path/'../fonts/Font.ttc'), # path to font file
