@@ -2,6 +2,7 @@
 **Screen**
 * Migrated to Omni-EPD for screen support
 * Added support for Inky screens
+* Removed the sleep attribute from writeEPD()
 
 ## 0.5.1.1 - 2022.01.16
 **TextBlock**

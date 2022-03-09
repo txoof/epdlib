@@ -6,6 +6,7 @@ See the [ChangeLog](./changes.md) for details
 ### v0.6
 * Migrated to Omni-EPD for screen support
 * Added support for Inky screens
+* Removed sleep from the writeEPD() method
 
 ### v0.5
 * Add support for Block type "DrawBlock"
