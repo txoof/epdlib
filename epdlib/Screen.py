@@ -385,7 +385,12 @@ class Screen():
             myepd.HD = True
 
         return myepd
-
+    
+    
+    def blank_image(self):
+        '''retrun a PIL image that is entirely blank that matches the resolution of the screen'''
+        return Image.new(self.mode, self.resolution, 255)     
+    
 
     @_spi_handler
     def clearEPD(self):
@@ -395,12 +400,11 @@ class Screen():
 
 
     @_spi_handler
-    def writeEPD(self, image, sleep=True, partial=False):
+    def writeEPD(self, image, partial=False):
         '''write an image to the screen 
         
         Args:
             image(PIL image): image to display
-            sleep(bool): put the display to sleep after writing () (Depricated kwarg)
             partial(bool): attempt to do a partial refresh -- for 1bit pixels on HD Screens only'''
 
         try:
@@ -421,8 +425,6 @@ class Screen():
             write_function = self.epd.display
 
         write_function(image)
-        if sleep==False:
-            logging.warning('`sleep` kwarg is depricated and no longer used; display will be put to sleep after write')
         
         return True
     
