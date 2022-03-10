@@ -3,6 +3,11 @@ EpdLib is a library for creating dynamically scaled screen layouts for frame-buf
 
 ## Changes
 See the [ChangeLog](./changes.md) for details
+### v0.6
+* Migrated to Omni-EPD for screen support
+* Added support for Inky screens
+* Removed sleep from the writeEPD() method
+
 ### v0.5
 * Add support for Block type "DrawBlock"
 * Add support for adding borders to all Block types
@@ -21,11 +26,10 @@ Python Modules:
 * RPi.GPIO
 * spidev
     - ensure SPI is enabled on the pi
-* waveshare-epd (Non IT8951 based panels)
-    - this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
+* omni-epd
+    - this is for interacting with epaper displays and is not strictly needed to use the Block and Layout objects.
     - see [notes](#Notes) below for installation instructions
-* IT8951 (IT8951 based panels)
-    - see [notes](#Notes) below for installation instructions
+
 
 
 
@@ -201,15 +205,15 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 
 <a name="Screen"></a>
 ## Screen Module
-`Screen` objects provide a method for waking and writing to a WaveShare E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
+`Screen` objects provide a method for waking and writing to an E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
 
 *Class* `Screen(resolution=None, epd=None)`
 
 ### Properties
-* `resolution` (2 tuple of int): resolution in pixels 
+* `resolution` (2 list of int): resolution in pixels 
     - this is overriden by the epd object resolution when it is set
 * `epd` (epd object)
-    - waveshare epd object used for interfacing with the display
+    - epd object used for interfacing with the display
 * `update` (obj:Screen.Update): monotonicly aware object that tracks time since last update
 * `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen *see note below*
 * `mode`(str): '1' for 1 bit screens, 'L' for screens capable of 8 bit grayscale
@@ -261,23 +265,18 @@ Rotation = 180
 
 
 ### Methods
-* `clearScreen()`: Set a blank image screen
 * `clearEPD()`: send the clear signal to the EPD to wipe all contents and set to "white"
-* `writeEPD(image, sleep=True, partial=False)`: write `image` to the EPD. 
+* `writeEPD(image, partial=False)`: write `image` to the EPD. 
     - resets update timer
-    - sleep: put the display to low power mode (default: True)
     - partial: update only chaged portions of the screen (faster, but only works with black and white pixles) (default: False)
-* `intiEPD()` - initializes the EPD for writing
 * `blank_image():` produces a blank PIL.Image in of `mode` type of `resolution` dimensions
 * `list_compatible_modules()`: print a list of all waveshare_epd panels that are compatible with paperpi
 
 ### Example
 ```
 import Screen
-import waveshare_epd
 myScreen = Screen()
 myScreen.epd = "epd5in83"
-myScreen.initEPD()
 myScreen.writeEPD('./my_image.png')
 ```
 
@@ -477,7 +476,7 @@ myImg.save('sample.jpg')
 ### Write an image to a Screen
 The following code will create an interface for writing images to the EPD
 *Requirements*
-* Waveshare EPD module or IT8951 library (see [Notes](#Notes) below)
+* Omni-EPD library (see [Notes](#Notes) below)
 
 ```
 from epdlib import Screen
@@ -508,18 +507,12 @@ my_screen.clearEPD()
 
 <a name="Notes"></a>
 ## Notes
-**WaveShare non-IT8951 Screens**
-The waveshare-epd library is required for non-IT8951 screens and can be installed from the Git repo:
-```
-pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
-```
+### e-Paper Screen Drivers
 
-**IT8951 basee Screens**
-The Broadcom BCM 2835 library is required by the IT8951 module. Download and install the BCM2835 library according to the directions found on [Mike McCauley's site](http://www.airspayce.com/mikem/bcm2835/)
+The omni-epd library is required for all screens and can be installed from the Git repo:
 
-[Greg D Meyer's IT8951 library](https://github.com/GregDMeyer/IT8951) is also required and can be installed from the Git repo:
 ```
-pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
+sudo pip3 install git+https://github.com/robweber/omni-epd.git#egg=omni-epd
 ```
 
 
