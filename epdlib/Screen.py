@@ -294,7 +294,7 @@ class Screen():
             return
         
         myepd = self._loadEPD(epd)
-        print(myepd.height)
+        
         if not myepd:
             self._epd = None
             return
