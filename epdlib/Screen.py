@@ -584,7 +584,7 @@ def main():
 
 
 logger = logging.getLogger(__name__)
-logger.root.setLevel('DEBUG')
+# logger.root.setLevel('DEBUG')
 
 if __name__ == '__main__':
     e= main()
