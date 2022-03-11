@@ -1,4 +1,4 @@
-# epdlib v0.5
+# epdlib v0.6
 EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image, drawing or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
 
 ## Changes
@@ -36,7 +36,7 @@ Python Modules:
 **Modules:**
 * [Block](#Block) - image and text blocks that can be assembed into a final layout
 * [Layout](#Layout) - generate dynamic layouts from Blocks
-* [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
+* [Screen](#Screen) - simple interface for waking and writing to EPD devices
 
 
 
@@ -475,6 +475,7 @@ myImg.save('sample.jpg')
 
 ### Write an image to a Screen
 The following code will create an interface for writing images to the EPD
+
 *Requirements*
 * Omni-EPD library (see [Notes](#Notes) below)
 
