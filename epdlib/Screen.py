@@ -300,9 +300,9 @@ class Screen():
             return
         
         if len(myepd.modes_available) > 1:
-            self.mode = "1" # This will eventually support color
+            self.mode = "L" # This will eventually support color
         else:
-            self.mode = "1"
+            self.mode = "L"
 
         self._epd = myepd
         self.resolution = [myepd.height, myepd.width]
@@ -370,7 +370,7 @@ class Screen():
         Returns:
             myepd: epd object, 
         '''
-        logging.debug(f'configuring omni_edp.{epd}')
+        logging.debug(f'configuring omni_edp with {epd}')
         supported_devices = displayfactory.list_supported_displays()
         if epd in supported_devices:
             try:
