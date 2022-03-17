@@ -25,5 +25,6 @@ setuptools.setup(
     install_requires=install_requires,
     project_urls=project_urls,
     python_requires=python_requires,
+    dependency_links=dependency_links
     package_data={"documentation": ["./docs"]},
 )
