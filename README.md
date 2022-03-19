@@ -1,10 +1,16 @@
-# epdlib v0.5
+# epdlib v0.6
 EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image, drawing or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
 
 ## Changes
 See the [ChangeLog](./changes.md) for details
+### v0.6
+* Migrated to Omni-EPD for screen support
+* Added support for Inky screens
+* Removed sleep from the writeEPD() method
+
 ### v0.5
 * Add support for Block type "DrawBlock"
+* Add support for adding borders to all Block types
 
 ### v0.4
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
@@ -20,18 +26,17 @@ Python Modules:
 * RPi.GPIO
 * spidev
     - ensure SPI is enabled on the pi
-* waveshare-epd (Non IT8951 based panels)
-    - this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
+* omni-epd
+    - this is for interacting with epaper displays and is not strictly needed to use the Block and Layout objects.
     - see [notes](#Notes) below for installation instructions
-* IT8951 (IT8951 based panels)
-    - see [notes](#Notes) below for installation instructions
+
 
 
 
 **Modules:**
 * [Block](#Block) - image and text blocks that can be assembed into a final layout
 * [Layout](#Layout) - generate dynamic layouts from Blocks
-* [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
+* [Screen](#Screen) - simple interface for waking and writing to EPD devices
 
 
 
@@ -39,7 +44,8 @@ Python Modules:
 <a name="Block"></a>
 ## Block Module
 `Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
-*Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0)`
+
+*Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0, border_config={})`
 
 ### Properties
         
@@ -57,6 +63,8 @@ Args [default value]:
  *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 black]
  *  `bkground`(int): 0-255 8 bit value for background color [255 white]
  *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
+ *  `border_config`(dict): dictonary containing kwargs configuration for adding border to image
+                see help(add_border)
 
 Properties:
  *  `image`: None - overridden in child classes'''
@@ -64,6 +72,22 @@ Properties:
 ### Methods
 `update(update)`
 Place holder method for child classes.
+
+### Functions
+*Function* `add_border(img, fill, width, outline=None, outline_width=1, sides=['all'])`
+
+add a border around an image
+
+Args:
+ * `img`(PIL.Image): image to add border to
+ * `fill`(int): border fill color 0..255 8bit gray shade
+ * `width`(int): number of pixels to use for border
+ * `outline`(int): 0..255 8bit gray shade for outline of border region
+ * `outline_width`(int): width in pixels of outline
+ * `sides`(list of str): sides to add border: "all", "left", "right", "bottom", "top" 
+
+Returns:
+    PIL.Image
 
 ## Block.DrawBlock
 Child class of `Block` that contains `pillow.ImageDraw` drawing objects. `DrawBlock` objects can contain ellipses, rounded_rectangles or rectangles. These are useful for creating horizontal and vertical rules and separators. DrawBlock objects can be aligned horizontally ('center', 'left', 'right' or vertically ('center', 'top', 'bottom') within the block area.
@@ -137,6 +161,14 @@ All properties of the parent class are inherited.
 
 ### Properties
 * `image` (:obj:PIL.Image or :obj:str) - `Pillow` image or path provided as a `str` to an image file; relative paths are acceptable
+* `remove_alpha(bool)`: true: remove alpha chanel of PNG or similar files; see: https://stackoverflow.com/a/35859141/5530152
+
+### Methods
+* `update(update=None)` - Update the image with a new image and sets `image` property
+    - update(image)
+* `remove_transparency(im, bg_colour=(255, 255, 255))` - Static method for removing transparency from PNG and similar images
+    - im(PIL image)
+    - bg_color(background) color to replace alpha/transparenncy
 
 <a name="Layout"></a>
 ## Layout Module
@@ -173,39 +205,78 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 
 <a name="Screen"></a>
 ## Screen Module
-`Screen` objects provide a method for waking and writing to a WaveShare E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
+`Screen` objects provide a method for waking and writing to an E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
 
 *Class* `Screen(resolution=None, epd=None)`
 
 ### Properties
-* `resolution` (2 tuple of int): resolution in pixels 
+* `resolution` (2 list of int): resolution in pixels 
     - this is overriden by the epd object resolution when it is set
 * `epd` (epd object)
-    - waveshare epd object used for interfacing with the display
+    - epd object used for interfacing with the display
 * `update` (obj:Screen.Update): monotonicly aware object that tracks time since last update
-* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen 
+* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen *see note below*
 * `mode`(str): '1' for 1 bit screens, 'L' for screens capable of 8 bit grayscale
 * `vcom`(float): vcom voltage for HD IT8951 based screens (not needed & ignored for non-HD screens)
 
+**NOTE**
+
+Screens with cable along long edge
+``` 
+Rotation = 0
+  ┌───────────────┐
+  │          (__) │
+  │  `\------(oo) │
+  │    ||    (__) │
+  │    ||w--||    │
+  └─────┬───┬─────┘
+        │|||│
+
+Rotation = 180
+        │|||│
+  ┌─────┴───┴─────┐
+  │          (__) │
+  │  `\------(oo) │
+  │    ||    (__) │
+  │    ||w--||    │
+  └───────────────┘
+
+```
+
+Screens with cable along short edge
+```
+Rotation = 0
+  ┌───────────────┐
+  │          (__) ├──
+  │  `\------(oo) │--
+  │    ||    (__) │--
+  │    ||w--||    ├──
+  └───────────────┘
+
+Rotation = 180
+  ┌───────────────┐
+──┤          (__) │
+--│  `\------(oo) │
+--│    ||    (__) │
+──┤    ||w--||    │
+  └───────────────┘
+
+```
+
 
 ### Methods
-* `clearScreen()`: Set a blank image screen
 * `clearEPD()`: send the clear signal to the EPD to wipe all contents and set to "white"
-* `writeEPD(image, sleep=True, partial=False)`: write `image` to the EPD. 
+* `writeEPD(image, partial=False)`: write `image` to the EPD. 
     - resets update timer
-    - sleep: put the display to low power mode (default: True)
     - partial: update only chaged portions of the screen (faster, but only works with black and white pixles) (default: False)
-* `intiEPD()` - initializes the EPD for writing
 * `blank_image():` produces a blank PIL.Image in of `mode` type of `resolution` dimensions
 * `list_compatible_modules()`: print a list of all waveshare_epd panels that are compatible with paperpi
 
 ### Example
 ```
 import Screen
-import waveshare_epd
 myScreen = Screen()
 myScreen.epd = "epd5in83"
-myScreen.initEPD()
 myScreen.writeEPD('./my_image.png')
 ```
 
@@ -270,9 +341,10 @@ The demo creates a very basic layout and displays some text in four orientations
 `python3 -m epdlib.Screen`
 
 ### Creating an Image from a Layout
-The following recipe will produce the screen layout shown above for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
+The following recipe will produce the a layout for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
 ![500x300 layout example](./docs/layout_example.png)
 ```
+## Sample Layout ##
 import epdlib
 
 # create the layout object - adjust the resolution to match the display area
@@ -329,8 +401,8 @@ l = { # basic two row layout
     'pangram_b': { 
                 'type': 'TextBlock',
                 'image': None,
-                'max_lines': 2,
-                'padding': 0,
+                'max_lines': 3,
+                'padding': 8,
                 'width': 1,
                 'height': 1/4,
                 'abs_coordinates': (0, None),
@@ -339,8 +411,11 @@ l = { # basic two row layout
                 'relative': ['pangram_b', 'tux_img'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
                 'font_size': None,
-                'inverse': True,
-                'mode': 'L'
+                'inverse': False,
+                'mode': 'L',
+                'border_config': {'fill': 0, # add a border to the top and bottom of this text block
+                                  'width': 3,
+                                  'sides': ['top', 'bottom']}
     },
     'pangram_c': {
                 'type': 'TextBlock',
@@ -351,7 +426,7 @@ l = { # basic two row layout
                 'height': 1/4,
                 'abs_coordinates': (0, None),
                 'hcenter': True,
-                'vcenter': False,
+                'vcenter': True,
                 'relative': ['pangram_c', 'pangram_b'],
                 'font': './fonts/Open_Sans/OpenSans-BoldItalic.ttf',
                 'font_size': None,
@@ -361,12 +436,12 @@ l = { # basic two row layout
     'text': {
                 'type': 'TextBlock',
                 'image': None,
-                'max_lines': 3,
+                'max_lines': 4,
                 'padding': 10,
                 'width': 1,
                 'height': 1/4,
                 'abs_coordinates': (0, None),
-                'hcenter': False,
+                'hcenter': True,
                 'vcenter': True,
                 'relative': ['text', 'pangram_c'],
                 'font': './fonts/Open_Sans/OpenSans-Regular.ttf',
@@ -384,9 +459,9 @@ layout_obj.layout = l
 update = {
     'tux_img': './images/tux.png',      
     'pangram_a': 'The quick brown fox jumps over the lazy dog.',  
-    'pangram_b': 'Pack my box with five jugs of liquor.',          
+    'pangram_b': 'Pack my box with five jugs of liquor. This block has a top & bottom border',          
     'pangram_c': 'Jackdaws love my big sphinx of quartz.',                    
-    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. This text is not anti-aliased'}
+    'text': 'A pangram or holoalphabetic sentence is a sentence using every letter of a given alphabet at least once. This text is not anti-aliased.'}
 
 
 # update the layout with the data in the dictionary and send each item to the proper block
@@ -396,13 +471,13 @@ layout_obj.update_contents(update)
 myImg = layout_obj.concat()
 # write the image out to a file
 myImg.save('sample.jpg')
-
 ```
 
 ### Write an image to a Screen
 The following code will create an interface for writing images to the EPD
+
 *Requirements*
-* Waveshare EPD module or IT8951 library (see [Notes](#Notes) below)
+* Omni-EPD library (see [Notes](#Notes) below)
 
 ```
 from epdlib import Screen
@@ -433,18 +508,12 @@ my_screen.clearEPD()
 
 <a name="Notes"></a>
 ## Notes
-**WaveShare non-IT8951 Screens**
-The waveshare-epd library is required for non-IT8951 screens and can be installed from the Git repo:
-```
-pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
-```
+### e-Paper Screen Drivers
 
-**IT8951 basee Screens**
-The Broadcom BCM 2835 library is required by the IT8951 module. Download and install the BCM2835 library according to the directions found on [Mike McCauley's site](http://www.airspayce.com/mikem/bcm2835/)
+The omni-epd library is required for all screens and can be installed from the Git repo:
 
-[Greg D Meyer's IT8951 library](https://github.com/GregDMeyer/IT8951) is also required and can be installed from the Git repo:
 ```
-pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
+sudo pip3 install git+https://github.com/robweber/omni-epd.git#egg=omni-epd
 ```
 
 

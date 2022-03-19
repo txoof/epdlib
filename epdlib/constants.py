@@ -43,6 +43,9 @@ LAYOUT_DRAWBLOCK_DEFAULTS = {'draw_format': {},
                              'halign': 'center',
                              'no_clip': True,
                             }
+BLOCK_ADD_BORDER_DEFAULTS = {'fill': None,
+                             'width': 0
+                            }
                              
 # layout_defaults = {
 #                    'type': None,
@@ -67,7 +70,7 @@ LAYOUT_DRAWBLOCK_DEFAULTS = {'draw_format': {},
 #                    'fill': 0,
 #                    'bkground': 255}
 
-LAYOUT_SCALE_FONT_TEXT = 'WwQq'
+LAYOUT_SCALE_FONT_TEXT = '9QqMm'
 
 
 DRAW_SHAPES = ['rectangle', 'rounded_rectangle', 'ellipse']

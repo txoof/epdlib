@@ -109,7 +109,7 @@ class Layout:
         if not self.layout:
             return
         
-        logging.info('setting blocks')
+        logging.info('[[____setting blocks____]]')
         blocks = {}
         mode_count = 0
         
@@ -139,7 +139,7 @@ class Layout:
     
     
     def _add_defaults(self):
-        logging.debug('checking default values for layout')
+        logging.debug('[[----checking default values for layout----]')
         for section, values in self.layout.items():
             logging.debug(f'section: [{section:-^30}]')
             
@@ -187,7 +187,7 @@ class Layout:
             return
         
         
-        logging.debug('calculating layouts')
+        logging.debug('[[....calculating layouts....]]')
         for section, values in self.layout.items() :
             logging.info(f'section: [{section:.^30}]')
             

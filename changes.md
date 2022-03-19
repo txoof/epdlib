@@ -1,15 +1,73 @@
+## v0.6.0.0 - 2022.03.09
+**Screen**
+* Migrated to Omni-EPD for screen support
+* Added support for Inky screens
+* Removed the sleep attribute from writeEPD()
+
+## 0.5.1.1 - 2022.01.16
+**TextBlock**
+
+* add option to stop text wrapping (textwrap=False)
+* changed test string used for calculating maximum characters per line to include digits: 9QqMm
+    - this results in all calculated font sizes being slightly smaller, but fitting better in most cases
+
+## 0.5.1.0 - 2022.01.16
+**ImageBlock**
+
+* add static method `remove_transparency(im, bg_colour=(255, 255, 255))` to `ImageBlock` 
+    - removes alpha/transparency chanels from PNG and similar images and replaces with bg_color
+* add propery `remove_alpha=True` to remove transparency/alpha on PNG images by default
+
+## 0.5.0.4 - 2021.08.12
+**Screen**
+
+* when SPI is not enabled, `writeEPD` returns `FileNotFoundError` instead of `ScreenError`
+    - this makes it easier to provide useful feedback to users when SPI is not setup
+
+## 0.5.0.3 - 2021.08.09
+* handle exeptions when writing to EPD
+
+## 0.5.0.0 - 2021.08.07
+Add new Block type "DrawBlock" and Layout support
+
+**Block**
+
+* add class "DrawBlock" for drawing `ImageDraw` basic shapes
+    - DrawBlock blocks are useful for creating horizontal and vertical rules in Layout displays
+    - supported shapes: `ellipse`, `rounded_rectangle`, `rectangle`
+    - DrawBlock shapes can be horizontally (center, left, right) and vertically (center, top, bottom) aligned
+    - all formatting paramaters can be used when drawing supported shapes
+* add option to add a border around each block type
+    - `Block` objects accept the kwarg `border_config` to add borders around the top, bottom, left and right sides
+    - see
+
+* update docstrings
+* add dummy `update()` method to `Block` parent class for completness
+
+**Layout**
+
+* Layouts now support ImageBlock, TextBlock and DrawBlock objects
+    - DrawBlock objects are included similar to Text and Image blocks, but **MUST** include the key "type"
+        * 'type': 'DrawBlock'
+    - As of epdlib v0.6, all layout sections **MUST** include the key "type"
+        * Layout v0.5 attempts to guess the appropriate block type; this will be removed in v0.6
+* Small changes in logging output to decrease verbosity and make verbose output easier to follow
+
 ## 0.4.6.0 - 2021.08.05
 Fix issue #15 - "unknown module" when display = "HD" and no vcom value set
 
 ## 0.4.5.0 - 2021.08.02
 Add option to force all blocks in a layout to 1bit mode. TT Fonts are rendered with anti-aliasing in all modes except for 1bit mode. Anti-aliased fonts display poorly on 1bit screens with extremely jagged edges.
+
 **Layout**
+
 * `Layout` objects now support boolean property `force_onebit` 
     - When set to `True` all blocks are forced to `mode = '1'`
 
 ## 0.4.4 - 2021.07.31
 rewrite of `Screen` module to fix unclosed SPI file handles
 **Screen**
+
 * `initEPD()` method is now depricated and no longer needed; this can be removed from the code 
     - displays are automatically woken prior to write/clear and put to sleep after write/clear
     - at your own risk, use `writeEPD(sleep=True)` to keep display awake after write. For non-IT8951 boards, you **must** manually call `epd.sleep()` prior to the next write/clear event to ensure the SPI file handle is properly closed.
@@ -41,6 +99,7 @@ rework of `Block` and `Layout` modules to fix padding and text scaling
 * add property `mode` "L" when *any* block is 8bit "1" when all blocks are 1bit
 
 ## 0.4.2
+
 **Screen**
 
 * now supports IT8951 based panels

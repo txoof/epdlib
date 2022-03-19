@@ -136,3 +136,6 @@ dmypy.json
 # stupid mac files
 ._*
 .DS_Store
+
+# VSCode Workspace files
+*.code-workspace
