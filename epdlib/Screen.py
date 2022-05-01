@@ -6,10 +6,8 @@
 
 
 
-
-
 import logging
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 from datetime import datetime
 from pathlib import Path
 import time
@@ -201,7 +199,7 @@ class Screen():
         * age since creation (monotonic time)
         * time since last updated with write or clear (monotonic time)
     '''
-    def __init__(self, epd=None, rotation=0, vcom=None):
+    def __init__(self, epd=None, rotation=0, vcom=None, mirror=False):
         '''create Screen() object
         
         Args:
@@ -218,6 +216,7 @@ class Screen():
             update(obj:Update): monotoic time aware update timer'''
 
         self.vcom = vcom
+        self.mirror = mirror
         self.resolution = [1, 1]
         self.HD = False
         self.constants = None
@@ -327,7 +326,18 @@ class Screen():
         else:
             self._vcom = vcom
 
-
+    @property
+    def mirror(self):
+        '''mirror output -- some WaveShare panels display content mirrored
+        
+        Boolean'''
+        return self._mirror
+    
+    @mirror.setter
+    @strict_enforce(bool)
+    def mirror(self, mirror):
+        self._mirror = mirror
+            
     @property
     def rotation(self):
         '''rotation of screen
@@ -356,7 +366,7 @@ class Screen():
             self.resolution = resolution
 
         self._rotation = rotation
-        logging.debug(f'rotation={rotation}, resolution={self.resolution}')        
+        logging.debug(f'rotation={rotation}, resolution={self.resolution}, mirror={self.mirror}')        
 
 
     def _loadEPD(self, epd):
@@ -406,7 +416,16 @@ class Screen():
         Args:
             image(PIL image): image to display
             partial(bool): attempt to do a partial refresh -- for 1bit pixels on HD Screens only'''
-
+        
+        try:
+            if self.mirror:
+                logging.debug('mirroring output')
+                image = ImageOps.mirror(image)
+            else:
+                pass
+        except Exception as e:
+            raise ScreenError(f'image could not be mirrored: {e}')
+        
         try:
             image = image.rotate(self.rotation, expand=True)
         except AttributeError as e:
@@ -427,7 +446,6 @@ class Screen():
         write_function(image)
         
         return True
-    
 
     def _partial_writeEPD_hd(self, image):  # This will be obsoleted once partial updates are added to Omni-EPD
         '''partial update, affects only those changed black and white pixels with no flash/wipe
@@ -456,6 +474,10 @@ class Screen():
             self.epd.sleep()
 
 
+
+
+
+
 def list_compatible_modules(print_modules=True):
     '''
     list compatible waveshare EPD modules
@@ -473,6 +495,10 @@ def list_compatible_modules(print_modules=True):
             print(f"{idx:02d}. {screen.split('.')[1]:<15s} ({screen.split('.')[0][slice(0, 9)]})")
          
     return panels
+
+
+
+
 
 
 def main():
@@ -551,11 +577,14 @@ def main():
     }    
     
     print(f"using font: {myLayout['title']['font']}")
-    s = Screen(epd=myepd, vcom=voltage)
+    print(f'Screen setup epd: {myepd}, vcom: {voltage}')
+    s = Screen(epd=myepd, vcom=voltage, mirror=False)
     
-    for r in [0, 90, -90, 180]:
-        print(f'setup for rotation: {r}')
-        s.rotation = r
+    for r in [(0, False), (0, True), (90, False), (-90, False), (180, False), (180, True)]:
+        print(f'setup for rotation: {r[0]}, mirrored: {r[1]}')
+        s.rotation = r[0]
+        s.mirror = r[1]
+    
 
         l = Layout(resolution=s.resolution)
         l.layout = myLayout
@@ -588,5 +617,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     e= main()
+
+
 
 
