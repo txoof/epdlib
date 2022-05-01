@@ -489,10 +489,10 @@ def list_compatible_modules(print_modules=True):
     panels = displayfactory.list_supported_displays()
 
     if print_modules:
-        print(f'NN. Screen          (manufact.)')
+        print(f'NN. mfg.name                   ')
         print( '-------------------------------')
         for idx, screen in enumerate(panels):
-            print(f"{idx:02d}. {screen.split('.')[1]:<15s} ({screen.split('.')[0][slice(0, 9)]})")
+            print(f"{idx:02d}. {screen}")
          
     return panels
 
