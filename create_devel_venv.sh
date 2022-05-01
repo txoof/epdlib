@@ -10,7 +10,7 @@ REQUIRED_PY=( "pipenv" )
 # Python version to use for venv
 PYTHON_VERSION="python 3"
 # extra options to issue when creating pipenv
-PIPENV_EXTRAS=""
+PIPENV_EXTRAS="--skip-lock"
 # install jupyter kernel == false
 INSTALL_JUP_KERNEL=0
 
@@ -91,7 +91,7 @@ function build_pipenv {
 
   # create the pipenv; skip locking
   # pillow gives all sorts of headaches when locking
-  pipenv --$PYTHON_VERSION $PIPENV_EXTRAS --skip-lock
+  pipenv install $PIPENV_EXTRAS
   if [ $? -ne 0 ];
   then
     exit_error "creating virtual environment failed due to errors."
