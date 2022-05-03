@@ -189,6 +189,177 @@ class Update:
 
 
 
+
+def strict_enforce(*types):
+    """decorator: strictly enforce type compliance within classes
+    
+    Usage:
+    @strict_enforce(type1, type2, (type3, type4))
+    def foo(val1, val2, val4):
+        ...
+    """
+    def decorator(f):
+        def new_f(self, *args, **kwds):
+            #we need to convert args into something mutable   
+            newargs = []        
+            for (a, t) in zip(args, types):
+                if not isinstance(a, t):
+                    raise TypeError(f'"{a}" is not type {t}')
+#                 newargs.append( t(a)) #feel free to have more elaborated convertion
+            return f(self, *args, **kwds)
+        return new_f
+    return decorator
+
+
+
+
+
+
+class ScreenShot:
+    """capture a rolling set of `n` screenshots into specified directory"""
+    def __init__(self, path='./', n=2, prefix=None):
+        """constructor method 
+        Properties:
+            path (:str:): location to save screenshots - default: './'
+            n (:int:): number of screenshots to keep - default: 2
+            img_array (:obj:list of :obj: `Path`): list of existing files
+            """
+        self.total = n
+        self.path = Path(path).expanduser().resolve()
+        self.prefix = prefix
+        
+    
+    @property
+    def total(self):
+        """total number of screenshots to save
+        Attribute:
+            n (int): integer >= 1
+        Rasises:
+            TypeError - n must be integer
+            ValueError - n must be positive"""
+        return self._total
+    
+    @total.setter
+    @strict_enforce(int)
+    def total(self, n):
+        if n < 1:
+            raise ValueError(f'`n` must be >= 1')
+    
+        self._total = n
+        self.img_array = []
+
+    def time(self): 
+        """returns time string in the format YY-MM-DD_HHMM.SS - 70-12-31_1359.03"""
+        return datetime.now().strftime("%y-%m-%d_%H%M.%S")
+        
+    def delete(self, img):
+        """deletes `img`
+        Attributes:
+            img (:obj: `Path`): unilinks/deletes the path"""
+        logging.debug(f'removing image: {img}')
+        try:
+            img.unlink()
+        except Exception as e:
+            logging.error(e)
+        pass
+        
+    def save(self, img):
+        """saves the most recent `n` images, deleting n+1 older image
+        
+        Attributes:
+            img (:obj: PIL.Image.Image): image to save
+        Raises:
+            TypeError - img must be of type Image.Image"""
+        if not isinstance(img, Image.Image):
+            raise TypeError(f'`img` must be of type Image.Image')
+            
+        filename = self.time() + '.png'
+        
+        if self.prefix:
+            filename = prefix + filename
+
+        filepath = self.path / filename
+        logging.debug(f'writing image: {filepath}')
+        img.save(filepath)
+        self.img_array.insert(0, filepath)
+        if len(self.img_array) > self.total:
+            self.delete(self.img_array.pop())
+
+
+
+
+
+
+class ScreenError(Exception):
+    '''general exception for Screen obj errors'''
+    pass
+
+
+
+
+
+
+class Update:
+    """Class for creating a montotonicaly aware object that records passage of time
+    
+    create an update aware object:
+        myObj = Update()
+        
+    Time since creation:
+        myObj.age
+        
+    Time since last updated:
+        myObj.last_updated
+        
+    
+    Update the object:
+        myObj.update = True"""
+    
+    def __repr__(self):
+        return str(self.age)
+    
+    def __init__(self):
+        '''constructor for Update class
+        
+        Properties:
+            start (float): floating point number in CLOCK_MONOTONIC time.
+                this is a fixed point in time the object was created
+            update (boolean): indicates that the object has been updated'''
+            
+        self.start = self.now
+        self.update()
+    
+    def __str__(self):
+        return str(f'{self.last_updated:.2f} seconds old')
+    
+    @property
+    def age(self):
+        """age of the object in seconds since created"""
+        return self.now - self.start
+    
+    @property
+    def now(self):
+        """time in CLOCK_MONOTONIC time"""
+        return time.clock_gettime(time.CLOCK_MONOTONIC)
+    
+    @property
+    def last_updated(self):
+        """seconds since object was last updated"""
+        return self.now - self._last_updated
+    
+#     @last_updated.setter
+    def update(self):
+        """update the object   
+        Args:
+            update(boolean): True updates object"""
+        self._last_updated = self.now
+    
+
+
+
+
+
+
 class Screen():
     '''WaveShare E-Paper screen object for standardizing init, write and clear functions.
     Most WaveShare SPI screens including HD IT8951 base screens are supported.
@@ -200,13 +371,14 @@ class Screen():
         * age since creation (monotonic time)
         * time since last updated with write or clear (monotonic time)
     '''
-    def __init__(self, epd=None, rotation=0, vcom=None):
+    def __init__(self, epd=None, rotation=0, vcom=None, mirror=False):
         '''create Screen() object
         
         Args:
             epd(str): name of epd (use Screen().list_compatible() to view a list)
             rotation(int): 0, -90, 90, 180 rotation of screen
             vcom(float): negative float vcom value from panel ribon cable
+            mirror(bool): mirror output (only applied to IT8951 Displays)
             
         Properties:
             resolution(list): X x Y pixels
@@ -216,7 +388,8 @@ class Screen():
             HD(bool): True for IT8951 panels
             rotatio(int): rotation of screen (0, -90, 90, 180)
             update(obj:Update): monotoic time aware update timer'''
-        self.vcom = vcom        
+        self.vcom = vcom
+        self.mirror = mirror
         self.resolution = [1, 1]
         self.clear_args  = {}
         self.buffer_no_image = []
@@ -344,7 +517,15 @@ class Screen():
             raise ValueError('vcom must between 0 and -5')
         else:
             self._vcom = vcom
-        
+    @property 
+    def mirror(self):
+        return self._mirror
+    
+    @mirror.setter
+    @strict_enforce(bool)
+    def mirror(self, mirror):
+        self._mirror = mirror
+    
     @property
     def rotation(self):
         '''rotation of screen
@@ -403,7 +584,7 @@ class Screen():
             
         
         try:
-            myepd = AutoEPDDisplay(vcom=self.vcom)
+            myepd = AutoEPDDisplay(vcom=self.vcom, mirror=self.mirror)
         except ValueError as e:
             raise ScreenError(f'invalid vcom value: {e}')
         resolution = list(myepd.display_dims)
@@ -623,14 +804,6 @@ class Screen():
 
 
 
-
-# !lsof |grep spidev0 |wc -l
-
-
-
-
-
-
 def list_compatible_modules(print_modules=True):
     '''list compatible waveshare EPD modules
     
@@ -793,12 +966,23 @@ def main():
     }    
     
     print(f"using font: {myLayout['title']['font']}")
-    s = Screen(epd=myepd, vcom=voltage)
-    
-    for r in [0, 90, -90, 180]:
-        print(f'setup for rotation: {r}')
-        s.rotation = r
 
+    
+    for r in [(0, False), (0, True), (90, False), (-90, False), (180, False), (180, True)]:
+        s = Screen(epd=myepd, vcom=voltage, mirror=False)
+        if s.HD:
+            s = Screen(epd=myepd, vcom=voltage, mirror=r[1])
+            s.rotation = r[0]
+#             s.mirror = r[1]
+            print(f'Setup for rotation={r[0]}; mirror={r[1]}')
+
+        elif r[1]:
+            # skip mirrored output for non HD displays
+            continue
+        else:
+            s = Screen(epd=myepd, vcom=voltage)
+            print(f'Setup for rotation={r[0]}')
+            
         l = Layout(resolution=s.resolution)
         l.layout = myLayout
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
@@ -829,152 +1013,14 @@ def main():
 
 
 
-# import Layout
-# l = {
-#     'text_a': {
-#         'image': None,
-#         'padding': 10, 
-#         'width': 1,
-#         'height': .25,
-#         'abs_coordinates': (0, 0),
-#         'mode': '1',
-#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#         'max_lines': 3,
-#         'fill': 0,
-#         'font_size': None},
-    
-#     'text_b': {
-#         'image': None,
-#         'padding': 10,
-#         'inverse': True,
-#         'width': 1,
-#         'height': .25,
-#         'abs_coordinates': (0, None),
-#         'relative': ['text_b', 'text_a'],
-#         'mode': '1',
-#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#         'max_lines': 3,
-#         'font_size': None},
-    
-#     'image_a': {
-#         'image': True,
-#         'width': 1/2,
-#         'height': 1/2,
-#         'mode': 'L',
-#         'abs_coordinates': (0, None),
-#         'relative': ['image_a', 'text_b'],
-#         'scale_x': 1,
-#         'hcenter': True,
-#         'vcenter': True,
-#         'inverse': True},
-    
-#     'image_b': {
-#         'image': True,
-#         'width': 1/2,
-#         'height': 1/2,
-#         'mode': 'L',
-#         'abs_coordinates': (None, None),
-#         'relative': ['image_a', 'text_b'],
-#         'bkground': 255,
-#         'vcenter': True,
-#         'hcenter': True},
-        
-# }
-
-# # full layout update
-# u1 = {'text_a': 'The quick brown fox jumps over the lazy dog.',
-#      'text_b': 'Pack my box with five dozen liquor jugs. Jackdaws love my big sphinx of quartz.',
-#      'image_a': '../images/PIA03519_small.jpg',
-#      'image_b': '../images/portrait-pilot_SW0YN0Z5T0.jpg'}
-
-# # partial layout update (only black/white portions)
-# u2 = {'text_a': 'The five boxing wizards jump quickly. How vexingly quick daft zebras jump!',
-#       'text_b': "God help the noble Claudio! If he have caught the Benedick, it will cost him a thousand pound ere a be cured."}
-
-
-
-
-
-
-# s = Screen(epd='HD', vcom=-1.93, rotation=0)
-# mylayout_hd = Layout.Layout(resolution=s.resolution, layout=l)
-
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(mylayout_hd.concat())
-# time.sleep(5)
-
-# mylayout_hd.update_contents(u2)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# s.clearEPD()
-# # clean up the open SPI handles
-# s.epd.epd.spi.__del__()
-
-
-
-
-
-
-# import multiprocessing
-# import time
-# from IT8951.display import AutoEPDDisplay
-
-
-# def worker(procnum, return_dict):
-#     """worker function"""
-#     print(str(procnum) + " represent!")
-#     return_dict[procnum] = procnum
-
-
-# if __name__ == "__main__":
-#     manager = multiprocessing.Manager()
-#     return_dict = manager.dict()
-#     jobs = []
-#     for i in range(5):
-#         p = multiprocessing.Process(target=worker, args=(i, return_dict))
-#         jobs.append(p)
-#         p.start()
-
-#     for proc in jobs:
-#         proc.join()
-#     print(return_dict.values())
-
-
-
-
-
-
-# epd2in7 = Screen(epd='epd2in7', rotation=0)
-# mylayout_non = Layout.Layout(resolution=epd2in7.resolution, layout=l)
-
-# mylayout_non.update_contents(u1)
-# epd2in7.writeEPD(mylayout_non.concat())
-# time.sleep(5)
-# mylayout_non.update_contents(u2)
-# epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
-# mylayout_non.update_contents(u1)
-# time.sleep(5)
-# epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
-# time.sleep(5)
-# epd2in7.clearEPD()
-
-
-
-
-
-
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
-
-
-
-
-
-
 if __name__ == '__main__':
     e= main()
+
+
+
+
+
+
+
 
 
