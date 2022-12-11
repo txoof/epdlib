@@ -3,9 +3,12 @@ EpdLib is a library for creating dynamically scaled screen layouts for frame-buf
 
 ## Changes
 See the [ChangeLog](./changes.md) for details
+
 ### v0.5
 * Add support for Block type "DrawBlock"
 * Add support for adding borders to all Block types
+* Add option to mirror output 
+* `Screen()` handles kwargs 
 
 ### v0.4
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
@@ -13,31 +16,22 @@ See the [ChangeLog](./changes.md) for details
 
 
 ## Dependencies
+
 Python Modules:
-* Pillow
-    - System dependencies for Pillow:
-        * libopenjp2-7
-        * libtiff5
+* Pillow: System dependencies for Pillow:
+    * libopenjp2-7
+    * libtiff5
 * RPi.GPIO
-* spidev
-    - ensure SPI is enabled on the pi
-* waveshare-epd (Non IT8951 based panels)
-    - this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
-    - see [notes](#Notes) below for installation instructions
-* IT8951 (IT8951 based panels)
-    - see [notes](#Notes) below for installation instructions
+* spidev: ensure SPI is enabled on the pi
+* waveshare-epd (Non IT8951 based panels): see [notes](#notes) below for installation instructions
+    * this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
+* IT8951 (IT8951 based panels): see [notes](#notes) below for installation instructions
 
+## Modules:
+* [Block](#block-module) - image and text blocks that can be assembed into a final layout
+* [Layout](#layout-module) - generate dynamic layouts from Blocks
+* [Screen](#screen-module) - simple interface for waking and writing to WaveShare EPD devices
 
-
-**Modules:**
-* [Block](#Block) - image and text blocks that can be assembed into a final layout
-* [Layout](#Layout) - generate dynamic layouts from Blocks
-* [Screen](#Screen) - simple interface for waking and writing to WaveShare EPD devices
-
-
-
-
-<a name="Block"></a>
 ## Block Module
 `Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
 
@@ -166,7 +160,6 @@ All properties of the parent class are inherited.
     - im(PIL image)
     - bg_color(background) color to replace alpha/transparenncy
 
-<a name="Layout"></a>
 ## Layout Module
 `Layout` objects support scaling images and dynamically scaling [TTF](https://en.wikipedia.org/wiki/TrueType) font-size for different screen sizes. 
 
@@ -199,21 +192,22 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
     - updates (dict)
         - dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
 
-<a name="Screen"></a>
 ## Screen Module
+
 `Screen` objects provide a method for waking and writing to a WaveShare E-Paper Display (EPD). `Screen` objects are aware of their resolution and when they were last updated (stored in monotonic time). 
 
 *Class* `Screen(resolution=None, epd=None)`
 
 ### Properties
-* `resolution` (2 tuple of int): resolution in pixels 
-    - this is overriden by the epd object resolution when it is set
-* `epd` (epd object)
-    - waveshare epd object used for interfacing with the display
-* `update` (obj:Screen.Update): monotonicly aware object that tracks time since last update
-* `rotation` (int): [-90, 0, 90, 180, 270] rotation of screen *see note below*
-* `mode`(str): '1' for 1 bit screens, 'L' for screens capable of 8 bit grayscale
-* `vcom`(float): vcom voltage for HD IT8951 based screens (not needed & ignored for non-HD screens)
+
+* `resolution` (list): X x Y pixels
+* `clear_args` (dict): kwargs dict of any additional kwargs that are needed for clearing a display
+* `buffer_no_image` (PIL:Image): "blank" image for clearing bi-color panels (empty for all others)
+* `vcom (float): negative vcom voltage from panel ribon cable
+* `HD` (bool): True for IT8951 panels
+* `rotation` (int): rotation of screen (0, -90, 90, 180)
+* `mirror` (bool): mirror the output 
+* `update` (obj:Update): monotoic time aware update timer
 
 **NOTE**
 
@@ -506,8 +500,8 @@ my_screen.writeEPD(my_img)
 my_screen.clearEPD()
 ```
 
-<a name="Notes"></a>
 ## Notes
+
 ### WaveShare non-IT8951 Screens
 
 The waveshare-epd library is required for non-IT8951 screens and can be installed from the Git repo:

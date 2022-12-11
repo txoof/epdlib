@@ -1,3 +1,8 @@
+## 0.5.2.1 - 2022.12.11
+
+* add option to mirror screen: `Screen(mirror=True)`
+* Screen() now handles kwargs on init and maps them to properties
+
 ## 0.5.1.1 - 2022.01.16
 **TextBlock**
 
