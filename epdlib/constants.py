@@ -9,6 +9,8 @@ from pathlib import Path
 absolute_path = Path(__file__).resolve().parent
 
 
+SCREEN_ROTATIONS = [0, 90, -90, 180, 270]
+
 LAYOUT_DEFAULTS = {'type': None,
                    'image': None,
                    'height': 1,

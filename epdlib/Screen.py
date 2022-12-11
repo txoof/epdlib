@@ -9,10 +9,17 @@
 
 
 import logging
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 from datetime import datetime
 from pathlib import Path
 import time
+
+try:
+    from . import constants
+except ImportError as e:
+    import constants
+
+    
 
 
 
@@ -200,7 +207,7 @@ class Screen():
         * age since creation (monotonic time)
         * time since last updated with write or clear (monotonic time)
     '''
-    def __init__(self, epd=None, rotation=0, vcom=None):
+    def __init__(self, epd=None, rotation=0, vcom=None, *args, **kwargs):
         '''create Screen() object
         
         Args:
@@ -214,19 +221,20 @@ class Screen():
             buffer_no_image(PIL:Image): "blank" image for clearing bi-color panels (empty for all others)
             vcom(float): negative vcom voltage from panel ribon cable
             HD(bool): True for IT8951 panels
-            rotatio(int): rotation of screen (0, -90, 90, 180)
+            rotation(int): rotation of screen (0, -90, 90, 180)
+            mirror(bool): mirror the output 
             update(obj:Update): monotoic time aware update timer'''
         self.vcom = vcom        
-        self.resolution = [1, 1]
-        self.clear_args  = {}
-        self.buffer_no_image = []
-        self.constants = None
-        self.mode = None
-        self.HD = False
+        self.resolution = kwargs.get('resolution', [1, 1])
+        self.clear_args  = kwargs.get('clear_args', {})
+        self.buffer_no_image = kwargs.get('buffer_no_image', [])
+        self.constants = kwargs.get('constants', None)
+        self.mode = kwargs.get('mode', None)
+        self.HD = kwargs.get('HD', False)
         self.epd = epd
         self.rotation = rotation
+        self.mirror = kwargs.get('mirror', False)
         self.update = Update()
-        
         
     def _spi_handler(func):
         '''manage SPI file handles and wake/sleep displays
@@ -354,13 +362,9 @@ class Screen():
     
     @rotation.setter
     @strict_enforce(int)
-    def rotation(self, rotation):
-        if not self.epd:
-            self._rotation = rotation
-            return
-        
-        if rotation not in [-90, 0, 90, 180, 270]:
-            raise ValueError(f'valid rotation values are [-90, 0, 90, 180, 270]')
+    def rotation(self, rotation):        
+        if rotation not in constants.SCREEN_ROTATIONS:
+            raise ValueError(f'valid rotation values are {constants.SCREEN_ROTATIONS}')
         
         if rotation in [90, -90, 270]:
             resolution = self.resolution
@@ -370,14 +374,28 @@ class Screen():
             resolution = self.resolution
             resolution.sort(reverse=True)
             self.resolution = resolution
-            
-        self.image = Image.new(self.mode, self.resolution, 255)
-        if not self.HD:
-            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
+        
+        # set an image if the epd is defined
+        if self.epd:            
+            self.image = Image.new(self.mode, self.resolution, 255)
+            if not self.HD:
+                self.buffer_no_image = self.epd.getbuffer(self.blank_image())
 
         self._rotation = rotation
         logging.debug(f'rotation={rotation}, resolution={self.resolution}')        
 
+    @property
+    def mirror(self):
+        '''mirror output to screen'''
+        
+        return self._mirror
+    
+    @mirror.setter
+    @strict_enforce(bool)
+    def mirror(self, mirror):
+        self._mirror = mirror
+        logging.debug(f'mirror output: {mirror}')
+        
     def _load_hd(self, epd, timeout=20):
         '''configure IT8951 (HD) SPI epd 
         
@@ -555,6 +573,10 @@ class Screen():
                 write_function = self._full_writeEPD_hd
             else:
                 write_function = self._full_writeEPD_non_hd
+        
+        if self.mirror:
+            logging.debug('mirroring output')
+            image = ImageOps.mirror(image)
 
         write_function(image)
         if sleep==False:
@@ -579,7 +601,6 @@ class Screen():
         except Exception as e:
             raise ScreenError(f'failed to write image to display: {e}')
             
-    
     def _full_writeEPD_non_hd(self, image):
         '''wipe screen and write an image'''
         image_buffer = self.epd.getbuffer(image)
@@ -617,14 +638,6 @@ class Screen():
                 logging.info('there are no handles that are closable')
         else:
             self.epd.sleep()
-
-
-
-
-
-
-
-# !lsof |grep spidev0 |wc -l
 
 
 
@@ -820,6 +833,11 @@ def main():
 
 
         print('refresh screen -- screen should flash and be refreshed')
+    print('mirror output')
+    s.mirror = True
+    s.rotation = 0
+    s.writeEPD(l.concat())
+    time.sleep(3)
     
     print('clear screen')
     s.clearEPD()
@@ -912,54 +930,6 @@ def main():
 # s.clearEPD()
 # # clean up the open SPI handles
 # s.epd.epd.spi.__del__()
-
-
-
-
-
-
-# import multiprocessing
-# import time
-# from IT8951.display import AutoEPDDisplay
-
-
-# def worker(procnum, return_dict):
-#     """worker function"""
-#     print(str(procnum) + " represent!")
-#     return_dict[procnum] = procnum
-
-
-# if __name__ == "__main__":
-#     manager = multiprocessing.Manager()
-#     return_dict = manager.dict()
-#     jobs = []
-#     for i in range(5):
-#         p = multiprocessing.Process(target=worker, args=(i, return_dict))
-#         jobs.append(p)
-#         p.start()
-
-#     for proc in jobs:
-#         proc.join()
-#     print(return_dict.values())
-
-
-
-
-
-
-# epd2in7 = Screen(epd='epd2in7', rotation=0)
-# mylayout_non = Layout.Layout(resolution=epd2in7.resolution, layout=l)
-
-# mylayout_non.update_contents(u1)
-# epd2in7.writeEPD(mylayout_non.concat())
-# time.sleep(5)
-# mylayout_non.update_contents(u2)
-# epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
-# mylayout_non.update_contents(u1)
-# time.sleep(5)
-# epd2in7.writeEPD(image=mylayout_non.concat(), partial=True)
-# time.sleep(5)
-# epd2in7.clearEPD()
 
 
 
