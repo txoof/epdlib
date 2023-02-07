@@ -8,6 +8,7 @@ from pathlib import Path
 
 absolute_path = Path(__file__).resolve().parent
 
+MODES = {'1': '1 bit', 'L': '8 bit', 'RGB': 'Red, Green, Blue'}
 
 SCREEN_ROTATIONS = [0, 90, -90, 180, 270]
 
