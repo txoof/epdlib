@@ -69,10 +69,10 @@ def strict_enforce(*types):
 
 
 class Layout:
-    def __init__(self, resolution, layout=None, force_onebit=False):
+    def __init__(self, resolution, layout=None, force_onebit=False, mode='1'):
         self.resolution = resolution
         self.force_onebit = force_onebit
-        self.mode = '1'
+        self.mode = mode
         self.blocks = {}
         self.layout = layout
         
@@ -105,13 +105,25 @@ class Layout:
             self._calculate_layout()
             self._set_blocks()
     
+    @property
+    def mode(self):
+        '''string: PIL image color mode'''
+        return self._mode
+    
+    @mode.setter
+    @strict_enforce(str)
+    def mode(self, mode):
+        if mode not in constants.MODES.keys():
+            raise ValueError(f'invalid mode: {mode}\nvalid modes are {constants.MODES.items()}')
+        self._mode = mode
+    
     def _set_blocks(self):
         if not self.layout:
             return
         
         logging.info('[[____setting blocks____]]')
         blocks = {}
-        mode_count = 0
+#         mode_count = 0
         
         for section, vals in self.layout.items():
             logging.info(f'section: [{section:_^30}]')
@@ -126,14 +138,16 @@ class Layout:
 
             except AttributeError:
                 raise AttributeError(f'module "Block" has no attribute {vals["type"]}. error in section: {section}')
-              
-            if vals['mode'] == 'L':
-                mode_count += 1
+
+            
+            
+#             if vals['mode'] == 'L':
+#                 mode_count += 1
                 
-            if mode_count > 0:
-                self.mode = 'L'
-            else:
-                self.mode = '1'
+#             if mode_count > 0:
+#                 self.mode = 'L'
+#             else:
+#                 self.mode = '1'
                 
             self.blocks = blocks
     
@@ -278,11 +292,73 @@ class Layout:
                 logging.debug(f'"{key}" is not a recognized block, skipping')
                 
     def concat(self):
-        self.image = Image.new('L', self.resolution, 255)
+        self.image = Image.new(self.mode, self.resolution, 'white')
         if self.blocks:
             for b in self.blocks:
                 self.image.paste(self.blocks[b].image, self.blocks[b].abs_coordinates)
         return self.image    
+
+
+
+
+
+
+from Screen import Screen
+
+s = Screen()
+s.epd = 'epd5in65f'
+
+s.rotation = 180
+
+s.resolution
+
+l = Layout(resolution=s.resolution, mode='RGB')
+l.layout = {
+    'image' : {
+        'type': 'ImageBlock',
+        'image': True,
+        'padding': 10,
+        'width': 1,
+        'height': 0.9,
+        'abs_coordinates': (0, 0),
+        'hcenter': True,
+        'vcenter': True,
+        'relative': False,
+        'mode': 'RGB',
+        'bkground': 'white'
+    },
+    'text': {
+        'type': 'TextBlock',
+        'image': None,
+        'max_lines': 1,
+        'bkground': 'Yellow',
+        'fill': 'red',
+        'width': 1,
+        'height': .1,
+        'abs_coordinates': (0, None),
+        'relative': ['text', 'image'],
+        'font': '../fonts/Open_Sans/OpenSans-Regular.ttf',
+        'mode': 'RGB',
+        'vcenter': True,
+        'hcenter': True,
+        
+        
+    }
+}
+l.update_contents({'image': '../Inrainbowscover.png', 'text': 'Jackdaws love my big sphinx of quartz!'})
+
+l.update_contents({'image': '../Inrainbowscover.png', 'text': 'Jackdaws love my big sphinx of quartz!'})
+
+l.concat()
+
+# s.writeEPD(l.concat())
+
+
+
+
+
+
+
 
 
 

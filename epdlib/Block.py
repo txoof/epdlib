@@ -139,7 +139,6 @@ class BlockError(Exception):
 
 
 
-
 class Block:
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
                 abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1', 
@@ -1258,28 +1257,6 @@ class ImageBlock(Block):
         else:
             logging.warn('update called with no arguments, no action taken')
             return False        
-
-
-
-
-
-
-help(Block)
-
-
-
-
-
-
-b = ImageBlock(area=(800, 600), mode='RGB', bkground='white', border_config=)
-
-
-
-
-
-
-b.image = '../Inrainbowscover.png'
-b.image
 
 
 

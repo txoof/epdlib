@@ -1,3 +1,28 @@
+## 0.6.0   - 2023.02.10
+
+**Screen**
+
+* Add "RGB" as valid value for `mode` property
+    - This is auto-detected for all 8 Color Screens
+* Update `list_compatible_modules` module function to show supported mode.
+
+**Layout**
+
+* Add `mode` property to `__init__`
+    - Supports "1", "RGB", "L"
+* Mode property validates value against `constants.MODES` and throws `AttributeError`
+* 
+
+**Block**
+
+* `Block` superclass for all classes now supports "RGB" mode
+* All classes support the following for `fill`, `bkground` and `outline` 
+    - RGB tuples: `(128, 128, 128)`
+    - hex `0x808080`
+    - integers: `8421504`
+    - colormap colors: `"gray"`- (see `ImageColor.getcolor`)
+
+
 ## 0.5.2.1 - 2022.12.11
 
 * add option to mirror screen: `Screen(mirror=True)`

@@ -1,16 +1,25 @@
-# epdlib v0.5
+# epdlib v0.6
+
 EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image, drawing or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
 
 ## Changes
+
 See the [ChangeLog](./changes.md) for details
 
+### v0.6
+
+* Add support for 8-Color WaveShare screens to Block, Screen and Layout
+* All Blocks and Layouts now support "RGB" content
+
 ### v0.5
+
 * Add support for Block type "DrawBlock"
 * Add support for adding borders to all Block types
 * Add option to mirror output 
 * `Screen()` handles kwargs 
 
 ### v0.4
+
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
     - Assigning EPD object to screen has changed from directy assignment to using a the string that corresponds to the name.
 

@@ -311,7 +311,7 @@ class Screen():
             clear_args(dict): arguments required for clearing the screen
             constants(namespace): constants required for read/write of IT8951 screens
             HD(bool): True for IT8951 based screens
-            mode(str): "1" or "L" (note this does not override the mode if already set)'''
+            mode(str): "1", "L", "RGB" (note this does not override the mode if already set)'''
         
         if not epd or epd.lower == 'none':
             self._epd = None
@@ -425,6 +425,8 @@ class Screen():
         except ValueError as e:
             raise ScreenError(f'invalid vcom value: {e}')
         resolution = list(myepd.display_dims)
+        resolution.sort(reverse=true)
+        resolution = resolution
         clear_args = {}
         one_bit_display = False
         
@@ -488,20 +490,31 @@ class Screen():
             raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
 
         logging.debug(f'args_spec: {display_args_spec.args}')
+        
+        # 2 and 3 color displays have >= 2 args
         if len(display_args_spec.args) <= 2:
             one_bit_display = True
+            mode = '1'
         else:
             one_bit_display = False
-            
-        resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
+            mode = 'L'
         
+        # use the presence of `BLUE` and `ORANGE` properties as evidence that this is a color display
+        if vars(myepd.EPD()).get('BLUE', False) and vars(myepd.EPD()).get('ORANGE', False):
+            one_bit_display = False
+            mode = 'RGB'
+        else:
+            mode = '1'
+                    
+        resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
+        resolution.sort(reverse=True)
         
         return {'epd': myepd.EPD(), 
                 'resolution': resolution, 
                 'clear_args': clear_args,
                 'one_bit_display': one_bit_display,
                 'constants': None,
-                'mode': '1'}
+                'mode': mode}
     
     def initEPD(self, *args, **kwargs):
         '''**DEPRICATED** init EPD for wirting
@@ -606,10 +619,13 @@ class Screen():
         image_buffer = self.epd.getbuffer(image)
         
         try:
-            if self.one_bit_display:
+            if self.one_bit_display: # one bit displays
                 self.epd.display(image_buffer)
-            else:
+            elif self.one_bit_display == False and self.mode != '1': # 7 color displays
+                self.epd.display(image_buffer)
+            else: # bi-color displays that require multiple images
                 self.epd.display(image_buffer, self.buffer_no_image)
+            
         except Exception as e:
             raise ScreenError(f'failed to write image to display: {e}')
 
@@ -664,10 +680,21 @@ def list_compatible_modules(print_modules=True):
         if not 'epd' in i.name:
             continue
 
+            
         try:
             myepd = import_module(f'waveshare_epd.{i.name}')                
+        
         except ModuleNotFoundError:
             reason.append(f'ModuleNotFound: {i.name}')
+            
+        try:
+            if vars(myepd.EPD()).get('GREEN', False):
+                mode = '"RGB" 8 Color'
+            else:
+                mode = '"1" 1 bit'
+        except AttributeError:
+            mode = False
+            
         
         try:
             clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
@@ -675,8 +702,10 @@ def list_compatible_modules(print_modules=True):
             if len(clear_args) > 2:
                 supported = False
                 reason.append('Non-standard, unsupported `EPD.Clear()` function')
+                mode = 'Unsupported'
         except AttributeError:
             supported = False
+            mode = 'Unsupported'
             reason.append('AttributeError: module does not support `EPD.Clear()`')
             
         try:
@@ -687,24 +716,27 @@ def list_compatible_modules(print_modules=True):
             reason.append('AttributeError: module does not support `EPD.display()`')
             
         
+                
 
 
         panels.append({'name': i.name, 
                        'clear_args': clear_args, 
                        'display_args': display_args,
                        'supported': supported,
-                       'reason': reason})
+                       'reason': reason,
+                       'mode': mode})
         
     panels.append({'name': 'HD IT8951 Based Screens',
                    'display_args': {},
                    'supported': True,
-                   'reason': []})
+                   'reason': [],
+                   'mode': '"L" 8 bit'})
     
     if print_modules:
-        print(f'NN. Board        Supported:')
-        print( '---------------------------')
+        print(f'Board              Supported:      Mode:')
+        print( '-----------------------------------------')
         for idx, i in enumerate(panels):
-            print(f"{idx:02d}. {i['name']:<12s} {i['supported']}")
+            print(f"{idx:02d}. {i['name']:<14s} {i['supported']!s: <15} {i['mode']}")
             if not i['supported']:
                 print(f'    Issues:')
                 for j in i['reason']:
