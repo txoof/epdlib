@@ -10,6 +10,7 @@ See the [ChangeLog](./changes.md) for details
 
 * Add support for 8-Color WaveShare screens to Block, Screen and Layout
 * All Blocks and Layouts now support "RGB" content
+* Layouts and blocks can now be dynamically updated during runtime
 
 ### v0.5
 
@@ -61,8 +62,8 @@ Args [default value]:
  *  `padding`(int): number of pixels to pad around edge of contents [0]
  *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 black]
  *  `bkground`(int): 0-255 8 bit value for background color [255 white]
- *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
- *  `border_config`(dict): dictonary containing kwargs configuration for adding border to image
+ *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale, 'RGB': (Red, Green, Blue) values ['1']
+ *  `border_config`(dict): dictionary containing kwargs configuration for adding border to image
                 see help(add_border)
 
 Properties:
@@ -174,7 +175,7 @@ All properties of the parent class are inherited.
 
 Font sizes are set based on each individual font and scaled to fit within text blocks using the maximum number of lines specified in the layout. Text is line-broken using the python [textwrap logic](https://docs.python.org/3.7/library/textwrap.html).
 
-*Class* `Layout(resolution, layout=None, force_onebit=False)`
+*Class* `Layout(resolution, layout=None, force_onebit=False, mode='1')`
 
 ## Scaling Example
 epdlib `Layout` objects can be scaled to any (reasonable) resolution while maintaining internally consistent ratios.
@@ -188,18 +189,23 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 
 
 ### Properties
-* `resolution` (2-tuple of int): resolution of the entire screen in pixles
-* `layout` (dict): dictionary containing layout paramaters for each block
+* `resolution` (2-tuple of int): resolution of the entire screen in pixels
+* `layout` (dict): dictionary containing layout parameters for each block
     - see example below in Quick-Start Recipe
 * `image` (Pil.Image): concatination of all blocks into single image
 * `force_onebit` (bool): force all blocks within a layout to `mode='1'`
+* `mode` (str): PIL image mode to use for generating the image
+    - supports `'1'` 1 Bit, `'L'` 8 bit Gray, `'RGB'`: 8 Color RGB (`see constants.MODES`)
 
 ### Methods
 * `concat()`: join all blocks into a single image
     - sets `image` property
-* `update_contents(updates=None)` - update the contents of each block
-    - updates (dict)
-        - dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
+* `update_block_props(block, props={}, force_recalc=False)`: update the properties of a block. TextBlocks will always be recalculated to ensure the current font settings are still valid. NB! The contents must be updated using `update_contents` for the updated properties to take effect.
+    - `block` (str): name of existing block
+    - `props` (dict): dictionary of properties to update in the block
+    - `force_recalc` (bool): force the recalculation fo all blocks. Use this if the positioning, size or resolution changes.
+* `update_contents(updates=None)`: update the contents of each block
+    - `updates` (dict): dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
 
 ## Screen Module
 
@@ -347,7 +353,8 @@ The demo creates a very basic layout and displays some text in four orientations
 ### Creating an Image from a Layout
 The following recipe will produce the a layout for a 500x300 pixel display. This image can be passed directly to a WaveShare e-Paper display for writing.
 ![500x300 layout example](./docs/layout_example.png)
-```
+
+```Python
 ## Sample Layout ##
 import epdlib
 
@@ -475,14 +482,27 @@ layout_obj.update_contents(update)
 myImg = layout_obj.concat()
 # write the image out to a file
 myImg.save('sample.jpg')
+
+# update a the properties of a block
+layout_obj.update_block_props(block-'tux_img', props={'inverse': True})
+
+# after an update, the block needs to be updated again
+update = {
+    'tux_img': './images/tux.png'
+    }
+
+updateImg = layout_obj.concat()
+updateImg.save('updateSAmple.jpg')
 ```
+
+
 
 ### Write an image to a Screen
 The following code will create an interface for writing images to the EPD
 *Requirements*
 * Waveshare EPD module or IT8951 library (see [Notes](#Notes) below)
 
-```
+```Python
 from epdlib import Screen
 from PIL import Image
 ## non IT8951 screens
@@ -515,7 +535,7 @@ my_screen.clearEPD()
 
 The waveshare-epd library is required for non-IT8951 screens and can be installed from the Git repo:
 
-```
+```Shell
 pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python"
 ```
 
@@ -523,7 +543,7 @@ pip install -e "git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&s
 
 [Greg D Meyer's IT8951 library](https://github.com/GregDMeyer/IT8951) is required and can be installed from the Git repo:
 
-```
+```Shell
 pip install -e "git+https://github.com/GregDMeyer/IT8951#egg=IT8951"
 ```
 

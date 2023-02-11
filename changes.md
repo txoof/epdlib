@@ -1,4 +1,4 @@
-## 0.6.0   - 2023.02.10
+## 0.6.0.0 - 2023.02.10
 
 **Screen**
 
@@ -11,7 +11,9 @@
 * Add `mode` property to `__init__`
     - Supports "1", "RGB", "L"
 * Mode property validates value against `constants.MODES` and throws `AttributeError`
-* 
+* API Change in `Layout` class: add public method `set_block` to create or update a single block
+* API Change in `Layout` class: add public method `update_block_props` to allow changing the layout settings for a block
+    - the block must be updated using `update_contents` after the properties are changed
 
 **Block**
 
