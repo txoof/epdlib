@@ -8,13 +8,6 @@
 
 
 
-
-
-
-
-
-
-
 import logging
 from pathlib import Path
 import copy
@@ -259,39 +252,40 @@ class Layout:
                 logging.debug('absolute coordinates provided')
             
             logging.debug(f'block coordinates: {values["abs_coordinates"]}')            
-
-    def _scale_font(self, this_section):
+    
+    @staticmethod
+    def _scale_font(this_section):
         '''scale a font face into the avaialble area/max-lines settings
-        
+
         Args:
             this_section(dict): layout section dictionary
-        
+
         Returns
             fontsize(int): integer value for font size'''
         text = constants.LAYOUT_SCALE_FONT_TEXT
         logging.debug('scaling font size')
         x_target, y_target = this_section['padded_area']
-        
+
         y_target = y_target/this_section['max_lines']
         font = this_section['font']        
-        
+
         cont = True
         fontsize = 0
         # try different font sizes until an a value that fits within the y_target value is found
         while cont:
             fontsize += 1
             testfont = ImageFont.truetype(font, fontsize)
-            
-            fontdim = testfont.getsize(text)
-            
-            if fontdim[0] > x_target:
+
+            fontdim = testfont.getbbox(text)
+
+            if fontdim[2] > x_target:
                 cont = False
                 logging.debug('x target size reached')
-            
-            if fontdim[1] > y_target:
+
+            if fontdim[3] > y_target:
                 cont = False
                 logging.debug('y target size reached')
-            
+
         fontsize -= 1
         logging.debug(f'calculated font size: {fontsize}')
         return fontsize
@@ -339,8 +333,6 @@ class Layout:
 # s = Screen()
 # s.epd = 'epd5in65f'
 
-# s.rotation = 180
-
 # s.resolution
 
 # l = Layout(resolution=s.resolution, mode='RGB')
@@ -361,7 +353,7 @@ class Layout:
 #     'text': {
 #         'type': 'TextBlock',
 #         'image': None,
-#         'max_lines': 1,
+#         'max_lines': 3,
 #         'bkground': 'Yellow',
 #         'fill': 'red',
 #         'width': 1,
@@ -382,7 +374,7 @@ class Layout:
 
 # l.concat()
 
-# l.update_block_props('text', props={'fill': 'orange', 'max_lines': 2})
+# l.update_block_props('text', props={'fill': 'silver', 'max_lines': 1})
 # l.update_block_props('image', props={'bkground': 'gray', 'rand': True})
 # l.update_contents({'text': 'Jackdaws love my big sphinx of quartz! The quick brown fox jumps over the lazy dog.',
 #                    'image': '../Inrainbowscover.png'})
@@ -390,6 +382,6 @@ class Layout:
 
 # l.concat()
 
-# s.writeEPD(l.concat())
+# # s.writeEPD(l.concat())
 
 
