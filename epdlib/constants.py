@@ -12,6 +12,8 @@ MODES = {'1': '1 bit', 'L': '8 bit', 'RGB': 'Red, Green, Blue'}
 
 SCREEN_ROTATIONS = [0, 90, -90, 180, 270]
 
+COLORS_7 = ['RED', 'ORANGE', 'YELLOW', 'GREEN', 'BLUE', 'WHITE', 'BLACK']
+
 LAYOUT_DEFAULTS = {'type': None,
                    'image': None,
                    'height': 1,

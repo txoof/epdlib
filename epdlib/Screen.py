@@ -9,7 +9,7 @@
 
 
 import logging
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageOps, ImageColor
 from datetime import datetime
 from pathlib import Path
 import time
@@ -45,6 +45,13 @@ def strict_enforce(*types):
             return f(self, *args, **kwds)
         return new_f
     return decorator
+
+
+
+
+
+
+
 
 
 
@@ -437,7 +444,6 @@ class Screen():
                 'constants': constants_HD,
                 'mode': 'L'}    
         
-
     def _load_non_hd(self, epd):
         '''configure non IT8951 SPI epd
         
@@ -526,6 +532,8 @@ class Screen():
     def blank_image(self):
         '''retrun a PIL image that is entirely blank that matches the resolution of the screen'''
         return Image.new(self.mode, self.resolution, 255)     
+    
+    
     
     @_spi_handler
     def clearEPD(self):
@@ -642,6 +650,45 @@ class Screen():
         self.epd.draw_partial(self.constants.DisplayModes.DU)
     
     @staticmethod
+    def colors2pallette(colors=constants.COLORS_7, num_colors=256):
+        '''generate a color pallette to be used when reducing an image to a fixed set
+        of colors in RGB mode
+        
+        Args:
+            colors(list): list of colors as strings of hex values or CSS3-style color specifiers
+            num_colors(int): number of colors in the color space (default 256)
+            
+        Return:
+            palette(list of int): list of integer values for new pallette space'''
+        
+        # hard code to RGB
+        mode = 'RGB'
+        
+        # palette is a single list of values
+        palette = []
+        for n in colors:
+            # convert color string to RGB tuple
+            v = ImageColor.getcolor(n, mode)
+            # append each tuple value to list
+            for i in v:
+                palette.append(i)
+        
+        # pad out the palette space with zero values
+        palette = palette + [0, 0, 0] * (num_colors - len(palette)//3)
+        
+        return palette
+                                                
+    @staticmethod
+    def reduce_palette(image, palette, dither=False):
+        if isinstance(image, str):
+            image = Image.open(image)
+        p = Image.new('P', (1, 1))
+        p.putpalette(palette)
+        return image.convert("RGB").quantize(palette=p, dither=dither)
+        
+        
+    
+    @staticmethod
     def list_compatible():
         list_compatible_modules()
         
@@ -654,6 +701,71 @@ class Screen():
                 logging.info('there are no handles that are closable')
         else:
             self.epd.sleep()
+
+
+
+
+
+
+# # from Screen import Screen
+# from Layout import Layout
+
+# s = Screen()
+# s.epd = 'epd5in65f'
+
+# s.resolution
+
+# l = Layout(resolution=s.resolution, mode='RGB')
+# l.layout = {
+#     'image' : {
+#         'type': 'ImageBlock',
+#         'image': True,
+#         'padding': 10,
+#         'width': 1,
+#         'height': 0.9,
+#         'abs_coordinates': (0, 0),
+#         'hcenter': True,
+#         'vcenter': True,
+#         'relative': False,
+#         'mode': '1',
+#         'bkground': 'white'
+#     },
+#     'text': {
+#         'type': 'TextBlock',
+#         'image': None,
+#         'max_lines': 3,
+#         'bkground': 'Yellow',
+#         'fill': 'red',
+#         'width': 1,
+#         'height': .1,
+#         'abs_coordinates': (0, None),
+#         'relative': ['text', 'image'],
+#         'font': '../fonts/Open_Sans/OpenSans-Regular.ttf',
+#         'mode': 'RGB',
+#         'vcenter': True,
+#         'hcenter': True,
+        
+        
+#     }
+# }
+# # i = s.reduce_palette('../TNYInstagramCartoons2018-Promo.jpg', palette=s.colors2pallette(), dither=False)
+# i = Image.open('../TNYInstagramCartoons2018-Promo.jpg')
+# l.update_contents({'image': i, 'text': 'Jackdaws love my big sphinx of quartz!'})
+
+
+# # l.update_contents({'image': '../Inrainbowscover.png', 'text': 'Jackdaws love my big sphinx of quartz!'})
+
+# l.concat()
+
+# # l.update_block_props('text', props={'fill': 'silver', 'max_lines': 1})
+# # l.update_block_props('image', props={'bkground': 'gray', 'rand': True})
+# # l.update_contents({'text': 'Jackdaws love my big sphinx of quartz! The quick brown fox jumps over the lazy dog.',
+# #                    'image': '../Inrainbowscover.png'})
+
+
+# l.concat()
+
+# s.writeEPD(l.concat())
 
 
 
