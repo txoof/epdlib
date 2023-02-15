@@ -51,13 +51,6 @@ def strict_enforce(*types):
 
 
 
-
-
-
-
-
-
-
 class ScreenShot:
     """capture a rolling set of `n` screenshots into specified directory"""
     def __init__(self, path='./', n=2, prefix=None):
@@ -344,6 +337,9 @@ class Screen():
         self.one_bit_display = myepd['one_bit_display']
         self.mode = myepd['mode']
         
+        if not self.one_bit_display or self.mode != '1':
+            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
+        
         logging.debug(f'epd configuration {myepd}')
         
     @property 
@@ -481,14 +477,22 @@ class Screen():
 
         # check specs
         # check for supported `Clear()` function
+        clear_args ={}
         try:
-            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
-        except AttributeError:
-            raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
-        clear_args = {}
-        if 'color' in clear_args_spec:
-            clear_args['color'] = 0xFF
+            clear_sig = inspect.signature(myepd.EPD.Clear)
+        except AttributeError as e:
+            raise ScreenError(f'{epd} has an unsupported `EPD.Clear()` function and is not usable with this module ')
+
+        color_default = clear_sig.parameters.get('color', False)
         
+        # it appears that not all of the older waveshare epd screens have
+        # a default `color` parameter. For those use constants.CLEAR_COLOR (0xFF)
+        if color_default:
+            logging.debug(f'Clear() function has color parameter')
+            if color_default.default is color_default.empty:
+                clear_args['color'] = constants.CLEAR_COLOR
+                logging.debug(f'Clear(color) parameter has no default; using: {clear_args}')       
+
         # check for "standard" `display()` function
         try:
             display_args_spec = inspect.getfullargspec(myepd.EPD.display)
@@ -628,10 +632,13 @@ class Screen():
         
         try:
             if self.one_bit_display: # one bit displays
+                logging.debug('one-bit display')
                 self.epd.display(image_buffer)
             elif self.one_bit_display == False and self.mode != '1': # 7 color displays
+                logging.debug('seven-color display')
                 self.epd.display(image_buffer)
             else: # bi-color displays that require multiple images
+                logging.debug('bi-color display')
                 self.epd.display(image_buffer, self.buffer_no_image)
             
         except Exception as e:
@@ -707,7 +714,7 @@ class Screen():
 
 
 
-# # from Screen import Screen
+# from Screen import Screen
 # from Layout import Layout
 
 # s = Screen()
@@ -985,103 +992,6 @@ def main():
     
     print('clear screen')
     s.clearEPD()
-
-
-
-
-
-
-# import Layout
-# l = {
-#     'text_a': {
-#         'image': None,
-#         'padding': 10, 
-#         'width': 1,
-#         'height': .25,
-#         'abs_coordinates': (0, 0),
-#         'mode': '1',
-#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#         'max_lines': 3,
-#         'fill': 0,
-#         'font_size': None},
-    
-#     'text_b': {
-#         'image': None,
-#         'padding': 10,
-#         'inverse': True,
-#         'width': 1,
-#         'height': .25,
-#         'abs_coordinates': (0, None),
-#         'relative': ['text_b', 'text_a'],
-#         'mode': '1',
-#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#         'max_lines': 3,
-#         'font_size': None},
-    
-#     'image_a': {
-#         'image': True,
-#         'width': 1/2,
-#         'height': 1/2,
-#         'mode': 'L',
-#         'abs_coordinates': (0, None),
-#         'relative': ['image_a', 'text_b'],
-#         'scale_x': 1,
-#         'hcenter': True,
-#         'vcenter': True,
-#         'inverse': True},
-    
-#     'image_b': {
-#         'image': True,
-#         'width': 1/2,
-#         'height': 1/2,
-#         'mode': 'L',
-#         'abs_coordinates': (None, None),
-#         'relative': ['image_a', 'text_b'],
-#         'bkground': 255,
-#         'vcenter': True,
-#         'hcenter': True},
-        
-# }
-
-# # full layout update
-# u1 = {'text_a': 'The quick brown fox jumps over the lazy dog.',
-#      'text_b': 'Pack my box with five dozen liquor jugs. Jackdaws love my big sphinx of quartz.',
-#      'image_a': '../images/PIA03519_small.jpg',
-#      'image_b': '../images/portrait-pilot_SW0YN0Z5T0.jpg'}
-
-# # partial layout update (only black/white portions)
-# u2 = {'text_a': 'The five boxing wizards jump quickly. How vexingly quick daft zebras jump!',
-#       'text_b': "God help the noble Claudio! If he have caught the Benedick, it will cost him a thousand pound ere a be cured."}
-
-
-
-
-
-
-# s = Screen(epd='HD', vcom=-1.93, rotation=0)
-# mylayout_hd = Layout.Layout(resolution=s.resolution, layout=l)
-
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(mylayout_hd.concat())
-# time.sleep(5)
-
-# mylayout_hd.update_contents(u2)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# s.clearEPD()
-# # clean up the open SPI handles
-# s.epd.epd.spi.__del__()
-
-
-
-
-
-
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
 
 
 

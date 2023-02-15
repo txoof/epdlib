@@ -14,6 +14,8 @@ SCREEN_ROTATIONS = [0, 90, -90, 180, 270]
 
 COLORS_7 = ['RED', 'ORANGE', 'YELLOW', 'GREEN', 'BLUE', 'WHITE', 'BLACK']
 
+CLEAR_COLOR = 0xFF
+
 LAYOUT_DEFAULTS = {'type': None,
                    'image': None,
                    'height': 1,
