@@ -3,8 +3,12 @@
 **Screen**
 
 * Add "RGB" as valid value for `mode` property
-    - This is auto-detected for all 8 Color Screens
-* Update `list_compatible_modules` module function to show supported mode.
+    - This is auto-detected for all 7 Color Screens
+* Add method `reduce_palette` to reduce all of the colors in an image to a set palette
+   
+* Add method `colors2palette` to produce a palette that can be used with the `reduce_palette` method
+    - The default is a 7-color palette of w3 colors: 'RED', 'ORANGE', 'YELLOW', 'GREEN', 'BLUE', 'WHITE', 'BLACK' 
+* Update `list_compatible_modules` module function to show supported mode
 
 **Layout**
 
@@ -14,6 +18,7 @@
 * API Change in `Layout` class: add public method `set_block` to create or update a single block
 * API Change in `Layout` class: add public method `update_block_props` to allow changing the layout settings for a block
     - the block must be updated using `update_contents` after the properties are changed
+* API Change in `Layout` class: all `Layout.layout` dictionaries must now contain the key `type` that indicates the block type: (`TextBlock`, `ImageBlock`, `DrawBlock`). Failure to include this key will raise a `KeyError`.
 
 **Block**
 

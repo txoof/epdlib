@@ -1,6 +1,10 @@
 # epdlib v0.6
 
-EpdLib is a library for creating dynamically scaled screen layouts for frame-buffered devices such as e-paper/e-ink displays. Complex layouts are defined as image, drawing or text blocks. Using epdlib blocks makes it trivial to develop for different disiplay resolutions as layouts are aware of thier resolution and scale the blocks dynamically to match the available area.
+EpdLib provides functionality for creating and displaying scalable layouts that work with most of WaveShare's EPaper displays (EPD). The `Layout` module can also be used for generating flexible layouts for any screen-buffered display that does not require fast updates. 
+
+EpdLib provides classes for interfacing with the screen (`Screen`), building layouts that will work at any resolution (`Layout`), and blocks that are used to assemble layouts (`Block`). EpdLib makes it trivial to build a project that will work on almost any WaveShare display without worrying about the resolution.
+
+EpdLib supports all 1 bit displays*
 
 ## Changes
 
@@ -11,6 +15,7 @@ See the [ChangeLog](./changes.md) for details
 * Add support for 8-Color WaveShare screens to Block, Screen and Layout
 * All Blocks and Layouts now support "RGB" content
 * Layouts and blocks can now be dynamically updated during runtime
+* `Layout.layout` dictionaries must contain key `type` that matches the block type
 
 ### v0.5
 
@@ -24,6 +29,7 @@ See the [ChangeLog](./changes.md) for details
 * Add support for IT8951 panels with 8bit gray scale and partial refresh
     - Assigning EPD object to screen has changed from directy assignment to using a the string that corresponds to the name.
 
+*****
 
 ## Dependencies
 
@@ -37,13 +43,19 @@ Python Modules:
     * this is for interacting with waveshare epaper displays and is not strictly needed to use the Block and Layout objects.
 * IT8951 (IT8951 based panels): see [notes](#notes) below for installation instructions
 
+*****
+
 ## Modules:
-* [Block](#block-module) - image and text blocks that can be assembed into a final layout
-* [Layout](#layout-module) - generate dynamic layouts from Blocks
-* [Screen](#screen-module) - simple interface for waking and writing to WaveShare EPD devices
+
+* [Block](#block-module) - image and text blocks that can be used to create a layout
+* [Layout](#layout-module) - generate resolution agnostic layouts from Blocks
+* [Screen](#screen-module) - simple interface for writing to WaveShare EPD devices
+
+*****
 
 ## Block Module
-`Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout. `Block` objects can also handle wrapping text and resizing images to fit within their borders.
+
+`Block` objects are containers for text and images. `Block` objects are aware of their dimensions and can be made aware of their position within a larger layout.
 
 *Class* `Block(area, hcenter=False, vcenter=False, rand=False, inverse=False, abs_coordinates=(0, 0), padding=0, border_config={})`
 
@@ -51,52 +63,59 @@ Python Modules:
         
 Parent class for other types of blocks
 
-Args [default value]: 
- *  `area`(list/tuple): x and y integer values for dimensions of block area
- *  `hcenter`(bool): True: horizontally center contents [False]
- *  `vcenter`(bool): True: vertically center contents [False]
- *  `rand`(bool): True: randomly place contents in area [False]
- *  `inverse`(bool): True: invert pixel values [False]
- *  `abs_coordinates`(list/tuple): x, y integer coordinates of this block area
-    within a larger image [(0, 0)]
- *  `padding`(int): number of pixels to pad around edge of contents [0]
- *  `fill`(int): 0-255 8 bit value for fill color for text/images [0 black]
- *  `bkground`(int): 0-255 8 bit value for background color [255 white]
- *  `mode`(str): '1': 1 bit color, 'L': 8 bit grayscale, 'RGB': (Red, Green, Blue) values ['1']
- *  `border_config`(dict): dictionary containing kwargs configuration for adding border to image
-                see help(add_border)
+### Args
 
-Properties:
+ *  `area` (list/tuple): x and y integer values for dimensions of block area
+ *  `hcenter` (bool): True: horizontally center contents [False]
+ *  `vcenter` (bool): True: vertically center contents [False]
+ *  `rand` (bool): True: randomly place contents in area [False]
+ *  `inverse` (bool): True: invert pixel values [False]
+ *  `abs_coordinates` (list/tuple): x, y integer coordinates of this block area
+    within a larger image [(0, 0)]
+ *  `padding` (int): number of pixels to pad around edge of contents [0]
+ *  `fill` (int): 0-255 8 bit value for fill color for text/images [0 black]
+ *  `bkground` (int): 0-255 8 bit value for background color [255 white]
+ *  `mode` (str): '1': 1 bit color, 'L': 8 bit grayscale, 'RGB': (Red, Green, Blue) values ['1']
+ *  `border_config`(dict): dictionary containing kwargs configuration for adding border to image see `help(add_border)`
+
+#### Properties
+
  *  `image`: None - overridden in child classes'''
 
-### Methods
-`update(update)`
-Place holder method for child classes.
+### Block Methods
 
-### Functions
-*Function* `add_border(img, fill, width, outline=None, outline_width=1, sides=['all'])`
+#### `update(update)`
 
-add a border around an image
+Place holder method for child classes used for updating the contents of the block.
 
-Args:
- * `img`(PIL.Image): image to add border to
- * `fill`(int): border fill color 0..255 8bit gray shade
- * `width`(int): number of pixels to use for border
- * `outline`(int): 0..255 8bit gray shade for outline of border region
- * `outline_width`(int): width in pixels of outline
- * `sides`(list of str): sides to add border: "all", "left", "right", "bottom", "top" 
+### Block Functions
+
+#### `add_border(img, fill, width, outline=None, outline_width=1, sides=['all'])`
+
+Add a border around an image
+
+##### Args
+
+ * `img` (PIL.Image): image to add border to
+ * `fill` (int): border fill color 0..255 8bit gray shade
+ * `width` (int): number of pixels to use for border
+ * `outline` (int): 0..255 8bit gray shade for outline of border region
+ * `outline_width` (int): width in pixels of outline
+ * `sides` (list of str): sides to add border: "all", "left", "right", "bottom", "top" 
 
 Returns:
     PIL.Image
 
 ## Block.DrawBlock
+
 Child class of `Block` that contains `pillow.ImageDraw` drawing objects. `DrawBlock` objects can contain ellipses, rounded_rectangles or rectangles. These are useful for creating horizontal and vertical rules and separators. DrawBlock objects can be aligned horizontally ('center', 'left', 'right' or vertically ('center', 'top', 'bottom') within the block area.
 
 *Class* `Block.DrawBlock(area, *args, shape=None, abs_x=None, abs_y=None, scale_x=1, scale_y=1, halign='center', valign='center', draw_format={}, no_clip=True, **kwargs)`
 
-`DrawBlock` objects that are fully initizlized with `area` and `shape` will automatically generate an image. No further updates are necessary. When using `DrawBlock` in a `Layout` layout, it is not necessary to send an update when the block is refreshed unless the properties have been changed. The generated image will remain in memory until the program is termindated.
+`DrawBlock` objects that are fully initialized with `area` and `shape` will automatically generate an image. No further updates are necessary. When using `DrawBlock` in a `Layout` layout, it is not necessary to send an update when the block is refreshed unless the properties have been changed. The generated image will remain in memory until the program is terminated.
 
 ### Properties       
+
  * `area` (tuple of int): area of block in pixels
  * `shape` (str): shape to draw (see DrawBlock.list_shapes())
  * `abs_x` (int): absolute x dimension in pixels of drawing (overrides scale_x)
@@ -109,13 +128,44 @@ Child class of `Block` that contains `pillow.ImageDraw` drawing objects. `DrawBl
  * `no_clip` (bool): when True fit shapes completely within area
  * `image` (PIL:Image): rendered shape
  
- ###  Methods
-  * `list_shapes()`: list supported shapes that can be drawn -- Static Method
-  * `draw_help()`: print help docstring for the current `shape`
-  * `update(update=True)`: when `True` update the image. This is **only** necessary if the object properties have been changed or the object was not created with a `shape` value
-  * `draw_image()`: update the image
-  
+###  Methods
 
+#### `list_shapes()`
+
+Static method: list supported shapes that can be drawn
+
+##### Args
+
+* None
+
+#### `draw_help()`
+
+Static method: print the docstring for the currently set shape
+
+##### Args
+
+* None
+
+#### `update(update=True)`
+
+Update the image. This is **only** necessary if the object properties have been changed or the object was not created with a `shape` property.
+
+##### Args
+
+* `update` (bool) True forces update of image
+
+#### `draw_image()` 
+
+Update the image using the selected drawing function and `draw_format` property
+
+#### Args
+
+* None
+
+#### Returns
+
+* None
+  
 
 ## Block.TextBlock
 Child class of `Block` that contains formatted text. `TextBlock` objects can do basic formatting of strings. Text is always rendered as a 1 bit image (black on white or white on black). Text can be horizontally justified and centered and vertically centered within the area of the block. 
@@ -124,9 +174,10 @@ All properties of the parent class are inherited.
 
 *Class* `Block.TextBlock(font, area, text='NONE', font_size=0, max_lines=1, maxchar=None, chardist=None)`
 
-`TextBlock` objects will attempt to calculate the appropriate number of characters to render on each line given an area, font face and character distribution. Each font face renders characters at a different width and each TTF character uses a different X width (excluding fixed-width fonts). Each language favors certain characters over others. 
+`TextBlock` objects will attempt to calculate the appropriate number of characters to render on each line given an area, font face and character distribution. Each font face renders characters at a different width and each TTF character uses a different X width (excluding fixed-width fonts). 
 
 ### Properties
+
 * `font` (str): path to TTF font face - relative paths are acceptable
 * `area` (2-tuple of int): area of block in pixles - required
 * `text` (str): string to format 
@@ -144,40 +195,64 @@ All properties of the parent class are inherited.
 *  `align` (str): 'left', 'right', 'center' justify text (default: left)
 
 ### Functions
-* `print_chardist(chardist=None)` - print supported character distrubtions
-    - chardist (str)
-        - `chardist='USA_CHARDIST'` print the character distribution for USA English
+
+* `print_chardist(chardist=None)` - print supported character distributions
+    - chardist (str): `chardist='USA_CHARDIST'` print the character distribution for USA English
 
 ### Methods
-* `update(update=None)` - Update the text string with a new string and sets `image` property
-    - update (str)
+
+#### `update(update=None)`
+
+Update the text string with a new string and sets `image` property
+
+#### Args
+
+* `update` (str): string to display
 
 ## Block.ImageBlock
-Child class of `Block` that contains formated images. `ImageBlock` objects do basic formatting of color, centering and scaling. All `ImageBlock` images are 8 bit grayscale `Pillow.Image(mode='L')`. Images that are too large for the area are rescaled using the `Pillow.Image.thumbnail()` strageies to limit distortion. Images that are smaller than the set area will **not** be resized.
+
+Child class of `Block` that contains formated images. `ImageBlock` objects do basic formatting of color, centering and scaling. All `ImageBlock` images are 8 bit grayscale `Pillow.Image(mode='L')`. Images that are too large for the area are rescaled using the `Pillow.Image.thumbnail()` strategies to limit distortion. Images that are smaller than the set area will **not** be resized.
 
 All properties of the parent class are inherited.
 
 *Class* `Block.ImageBlock(area, image=None)`
 
 ### Properties
+
 * `image` (:obj:PIL.Image or :obj:str) - `Pillow` image or path provided as a `str` to an image file; relative paths are acceptable
 * `remove_alpha(bool)`: true: remove alpha chanel of PNG or similar files; see: https://stackoverflow.com/a/35859141/5530152
 
 ### Methods
-* `update(update=None)` - Update the image with a new image and sets `image` property
-    - update(image)
-* `remove_transparency(im, bg_colour=(255, 255, 255))` - Static method for removing transparency from PNG and similar images
-    - im(PIL image)
-    - bg_color(background) color to replace alpha/transparenncy
+
+#### `update(update=None)`
+
+Update the image with a new image and sets `image` property
+
+##### Args
+
+* `update` (image) image to display
+
+#### Returns
+
+* Tru on success
+
+#### `remove_transparency(im, bg_colour=(255, 255, 255))` 
+
+Static method: remove transparency from PNG and similar images
+
+##### Args
+
+* `im` (PIL image) image to process
+* `bg_color` (background) color to replace alpha/transparency
+
+*****
 
 ## Layout Module
+
 `Layout` objects support scaling images and dynamically scaling [TTF](https://en.wikipedia.org/wiki/TrueType) font-size for different screen sizes. 
 
 Font sizes are set based on each individual font and scaled to fit within text blocks using the maximum number of lines specified in the layout. Text is line-broken using the python [textwrap logic](https://docs.python.org/3.7/library/textwrap.html).
 
-*Class* `Layout(resolution, layout=None, force_onebit=False, mode='1')`
-
-## Scaling Example
 epdlib `Layout` objects can be scaled to any (reasonable) resolution while maintaining internally consistent ratios.
 
 **500x500 Layout**
@@ -187,25 +262,57 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 **300x200 Layout**
 ![300x200 weather_image](./docs/weather_3x2.png)
 
+*Class* `Layout(resolution, layout=None, force_onebit=False, mode='1')`
 
 ### Properties
+
 * `resolution` (2-tuple of int): resolution of the entire screen in pixels
+* `blocks` (dict): dictionary containing of configured `Block` objects
 * `layout` (dict): dictionary containing layout parameters for each block
-    - see example below in Quick-Start Recipe
+    - sets blocks property
+    - see example below in the [Quick-Start Recipes](#quick-start-recipes) section
 * `image` (Pil.Image): concatination of all blocks into single image
 * `force_onebit` (bool): force all blocks within a layout to `mode='1'`
 * `mode` (str): PIL image mode to use for generating the image
-    - supports `'1'` 1 Bit, `'L'` 8 bit Gray, `'RGB'`: 8 Color RGB (`see constants.MODES`)
+    - supports `'1'` 1 Bit, `'L'` 8 bit Gray, `'RGB'`: 8 Color RGB 
 
 ### Methods
-* `concat()`: join all blocks into a single image
-    - sets `image` property
-* `update_block_props(block, props={}, force_recalc=False)`: update the properties of a block. TextBlocks will always be recalculated to ensure the current font settings are still valid. NB! The contents must be updated using `update_contents` for the updated properties to take effect.
-    - `block` (str): name of existing block
-    - `props` (dict): dictionary of properties to update in the block
-    - `force_recalc` (bool): force the recalculation fo all blocks. Use this if the positioning, size or resolution changes.
-* `update_contents(updates=None)`: update the contents of each block
-    - `updates` (dict): dictionary in the format `{'text_section': 'text to use', 'image_section': '/path/to/img', 'pil_img_section': PIL.Image}`
+
+#### `concat()`
+
+Join all blocks into a single image and sets `image` property
+
+##### Args
+
+* None
+
+##### Returns
+
+* `PIL.Image`
+
+#### `update_block_props(block, props={}, force_recalc=False)`
+
+Update the properties of a block. TextBlocks will always be recalculated to ensure the current font settings are still valid. NB! The contents must be updated using `update_contents` for the updated properties to be reflected in the `image` property.
+
+##### Args
+
+*  `block` (str): name of existing block
+* `props` (dict): dictionary of properties to update in the block
+* `force_recalc` (bool): force the recalculation fo all blocks. Use this if the positioning, size or resolution changes.
+
+##### Returns
+
+* None
+
+#### `update_contents(updates=None)`
+
+Update the contents of each block
+
+##### Args
+
+* `updates` (dict): dictionary in the format `{'text_section_A': 'text to use', 'image_section_B': '/path/to/img', 'pil_img_section': PIL.Image}`
+
+*********
 
 ## Screen Module
 
@@ -227,7 +334,7 @@ epdlib `Layout` objects can be scaled to any (reasonable) resolution while maint
 **NOTE**
 
 Screens with cable along long edge
-``` 
+``` text
 Rotation = 0
   ┌───────────────┐
   │          (__) │
@@ -249,7 +356,7 @@ Rotation = 180
 ```
 
 Screens with cable along short edge
-```
+```text
 Rotation = 0
   ┌───────────────┐
   │          (__) ├──
@@ -269,20 +376,115 @@ Rotation = 180
 ```
 
 
-### Methods
-* `clearScreen()`: Set a blank image screen
-* `clearEPD()`: send the clear signal to the EPD to wipe all contents and set to "white"
-* `writeEPD(image, sleep=True, partial=False)`: write `image` to the EPD. 
-    - resets update timer
-    - sleep: put the display to low power mode (default: True)
-    - partial: update only chaged portions of the screen (faster, but only works with black and white pixles) (default: False)
-* `intiEPD()` - initializes the EPD for writing
-* `blank_image():` produces a blank PIL.Image in of `mode` type of `resolution` dimensions
-* `list_compatible_modules()`: print a list of all waveshare_epd panels that are compatible with paperpi
+### Screen Methods
 
-### Example
-```
+#### `blank_image():` 
+
+Return a blank PIL.Image in of `mode` type of `resolution` dimensions.
+
+##### Args
+
+* None
+
+
+#### `clearEPD()`
+
+Send the clear signal to the EPD to wipe all contents and set to "white" that is appropriate for configured EPD.
+
+##### Args
+
+* None
+
+##### Returns
+
+* None
+
+#### `colors2palette(colors=constants.COLORS_7, num_colors=256)`
+
+Static method to generate a palette that can be used in reducing an image to a fixed set of colors
+
+
+#### `intiEPD()`
+
+Initializes the EPD for writing (deprecated and no longer functional). This is now handled automatically by the class to ensure that SPI file handles are opened and closed properly. There is no need to init the EPD under normal circumstances.
+
+For non HD (IT8951) displays, use `epd.init()` to manually init the screen. It is imperative to track `init()` calls and close the SPI file handles with `epd.sleep()`. Failure to do this will result in long-running jobs to fail due to running out of SPI file handles.
+
+##### Args
+
+* None
+
+##### Returns
+
+* None
+
+#### `list_compatible_modules()`
+
+Static method to print a list of all waveshare_epd panels that are compatible with epdlib
+
+##### Args
+
+* None
+
+##### Returns
+
+* None
+
+####  `reduce_palette(image, palette, dither=False)`
+
+Reduce an image to a fixed palette of colors. This method creates a posterized version of the original image forcing all colors to set colors. This is useful for matching the supported colors of an EPD.
+
+##### Args
+
+* `image`: `PIL.Image` image to be reduced
+* `palette`: `list` of RGB color values - this is a flat list, not a list of lists or tuples
+    - Use `colors2palette()` to generate an appropriate list
+* `dither`: `bool` True: creates a dithered image, False creates color fields
+
+##### Returns
+
+* `PIL.Image`
+
+##### Example
+
+```Python
+# create reduced palette images 
 import Screen
+from PIL import Image
+# create screen object
+s = Screen(epd='epd5in65f')
+# load image
+image = Image.Open('./images/portrait-pilot_SW0YN0Z5T0.jpg')
+image.thumbnail(s.resolution)
+# create color palette
+color_palette = s.colors2palette()
+# create image with solid color fields and reduced palette
+posterized = s.reduce_palette(image=image, palette=color_palette, dither=False)
+# create image with dithered color fields and reduced palette
+dithered = s.reduce_palette(image=image, palette=color_palette, dither=True)
+```
+Sample Images
+
+![Posterized Image](./images/portrait-pilot_posterized.png)
+![Dithered Image](./images/portrait-pilot_dithered.png)
+
+#### `writeEPD(image, sleep=True, partial=False)`
+
+Write `image` to the EPD and resets the monotonic `update` timer property.
+
+##### Args
+
+* `image`:`PIL.Image` object that matches the resolution of the screen
+* `sleep`: `bool` put the display to low power mode (deprecated and no longer has any function)
+* `partial`: `bool` update only changed portions of the screen (faster, but only works with black and white pixels) (default: False) on HD screens
+
+##### Returns 
+
+* True on success
+
+###### Example
+```Python
+from Screen import Screen
 import waveshare_epd
 myScreen = Screen()
 myScreen.epd = "epd5in83"
@@ -292,21 +494,25 @@ myScreen.writeEPD('./my_image.png')
 
 
 ## Screen.Update
+
 Create a monotonically aware object that records the passage of time.
 
 *Class* `Screen.Update()`
 
 ### Properties
+
 * `age` (float): age in seconds since creation
 * `now` (float): time in [CLOCK_MONOTONIC](https://linux.die.net/man/3/clock_gettime) time
 * `last_updated` (float): time in seconds since last updated
 * `update` (bool): True - trigger resets last_updated time
 
 ### Methods
+
 * `update(update=True)` - reset last_updated timer to zero
 
 ### Example
-```
+
+```Python
 import Screen
 u = Update()
 u.now
@@ -372,7 +578,10 @@ l = { # basic two row layout
             'hcenter': True,             # horizontally center image
             'vcenter': True,             # vertically center image
             'relative': False,           # this block is not relative to any other. It has an ABSOLUTE position (0, 0)
-            'mode': 'L',                 # treat this image as an 8bit gray-scale image
+            'mode': 'RGB',              # treat this image as an RGB image 
+                                        # note this will be converted to 8bit gray or ('L')
+                                        # 1 bit black/white ('1') if the screen does not support 
+                                        # color output
         },
     'vertical_rule_1' :{
             'type': 'DrawBlock',         # required as of v0.6
