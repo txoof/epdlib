@@ -162,18 +162,16 @@ class Layout:
             
             if not 'type' in values:
                 logging.critical(f'epdlib v{version.__version__}: section "{section}" is missing key "type". As of v0.6 all layout sections must include the key "type". Please see v0.5 changelog')
-                # switch to exception in v0.6
-#                 raise KeyError(f'section "{section}" is missing key "type"! Each section in the layout must have the correct block type')
+                raise KeyError(f'section "{section}" is missing key "type"! Each section in the layout must have the correct block type')
                 
-                ## backwards compatibility for pre v0.5 layouts -- remove this in v0.6
-                logging.warning(f'guessing block type for section "{section}"')
-                if values['image']:
-                    my_type = 'ImageBlock'
-                else: 
-                    my_type = 'TextBlock'
-                
-                logging.warning(f'guessed: {my_type} -- if this is incorrect add the key "type" with the appropriate Block type in this section of the layout.')
-                values['type'] = my_type
+#                 ## backwards compatibility for pre v0.5 layouts -- remove this in v0.6
+#                 logging.warning(f'guessing block type for section "{section}"')
+#                 if values['image']:
+#                     my_type = 'ImageBlock'
+#                 else: 
+#                     my_type = 'TextBlock'              
+#                 logging.warning(f'guessed: {my_type} -- if this is incorrect add the key "type" with the appropriate Block type in this section of the layout.')
+#                 values['type'] = my_type
                 ## end backwards compatibility
                 
             else:
@@ -322,66 +320,5 @@ class Layout:
                 self.image.paste(self.blocks[b].image, self.blocks[b].abs_coordinates)
         return self.image    
             
-
-
-
-
-
-
-# from Screen import Screen
-
-# s = Screen()
-# s.epd = 'epd5in65f'
-
-# s.resolution
-
-# l = Layout(resolution=s.resolution, mode='RGB')
-# l.layout = {
-#     'image' : {
-#         'type': 'ImageBlock',
-#         'image': True,
-#         'padding': 10,
-#         'width': 1,
-#         'height': 0.9,
-#         'abs_coordinates': (0, 0),
-#         'hcenter': True,
-#         'vcenter': True,
-#         'relative': False,
-#         'mode': 'RGB',
-#         'bkground': 'white'
-#     },
-#     'text': {
-#         'type': 'TextBlock',
-#         'image': None,
-#         'max_lines': 3,
-#         'bkground': 'Yellow',
-#         'fill': 'red',
-#         'width': 1,
-#         'height': .1,
-#         'abs_coordinates': (0, None),
-#         'relative': ['text', 'image'],
-#         'font': '../fonts/Open_Sans/OpenSans-Regular.ttf',
-#         'mode': 'RGB',
-#         'vcenter': True,
-#         'hcenter': True,
-        
-        
-#     }
-# }
-# l.update_contents({'image': '../Inrainbowscover.png', 'text': 'Jackdaws love my big sphinx of quartz!'})
-
-# l.update_contents({'image': '../Inrainbowscover.png', 'text': 'Jackdaws love my big sphinx of quartz!'})
-
-# l.concat()
-
-# l.update_block_props('text', props={'fill': 'silver', 'max_lines': 1})
-# l.update_block_props('image', props={'bkground': 'gray', 'rand': True})
-# l.update_contents({'text': 'Jackdaws love my big sphinx of quartz! The quick brown fox jumps over the lazy dog.',
-#                    'image': '../Inrainbowscover.png'})
-
-
-# l.concat()
-
-# # s.writeEPD(l.concat())
 
 

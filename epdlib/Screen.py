@@ -657,7 +657,7 @@ class Screen():
         self.epd.draw_partial(self.constants.DisplayModes.DU)
     
     @staticmethod
-    def colors2pallette(colors=constants.COLORS_7, num_colors=256):
+    def colors2palette(colors=constants.COLORS_7, num_colors=256):
         '''generate a color pallette to be used when reducing an image to a fixed set
         of colors in RGB mode
         
@@ -714,71 +714,6 @@ class Screen():
 
 
 
-# from Screen import Screen
-# from Layout import Layout
-
-# s = Screen()
-# s.epd = 'epd5in65f'
-
-# s.resolution
-
-# l = Layout(resolution=s.resolution, mode='RGB')
-# l.layout = {
-#     'image' : {
-#         'type': 'ImageBlock',
-#         'image': True,
-#         'padding': 10,
-#         'width': 1,
-#         'height': 0.9,
-#         'abs_coordinates': (0, 0),
-#         'hcenter': True,
-#         'vcenter': True,
-#         'relative': False,
-#         'mode': '1',
-#         'bkground': 'white'
-#     },
-#     'text': {
-#         'type': 'TextBlock',
-#         'image': None,
-#         'max_lines': 3,
-#         'bkground': 'Yellow',
-#         'fill': 'red',
-#         'width': 1,
-#         'height': .1,
-#         'abs_coordinates': (0, None),
-#         'relative': ['text', 'image'],
-#         'font': '../fonts/Open_Sans/OpenSans-Regular.ttf',
-#         'mode': 'RGB',
-#         'vcenter': True,
-#         'hcenter': True,
-        
-        
-#     }
-# }
-# # i = s.reduce_palette('../TNYInstagramCartoons2018-Promo.jpg', palette=s.colors2pallette(), dither=False)
-# i = Image.open('../TNYInstagramCartoons2018-Promo.jpg')
-# l.update_contents({'image': i, 'text': 'Jackdaws love my big sphinx of quartz!'})
-
-
-# # l.update_contents({'image': '../Inrainbowscover.png', 'text': 'Jackdaws love my big sphinx of quartz!'})
-
-# l.concat()
-
-# # l.update_block_props('text', props={'fill': 'silver', 'max_lines': 1})
-# # l.update_block_props('image', props={'bkground': 'gray', 'rand': True})
-# # l.update_contents({'text': 'Jackdaws love my big sphinx of quartz! The quick brown fox jumps over the lazy dog.',
-# #                    'image': '../Inrainbowscover.png'})
-
-
-# l.concat()
-
-# s.writeEPD(l.concat())
-
-
-
-
-
-
 def list_compatible_modules(print_modules=True):
     '''list compatible waveshare EPD modules
     
@@ -796,7 +731,7 @@ def list_compatible_modules(print_modules=True):
         display_args = []
         clear_args = []
         reason = []
-        if not 'epd' in i.name:
+        if not 'epd' in i.name or 'epdconfig' in i.name:
             continue
 
             
@@ -929,6 +864,7 @@ def main():
     
     myLayout = {
             'title': {                       # text only block
+                'type': 'TextBlock',
                 'image': None,               # do not expect an image
                 'max_lines': 3,              # number of lines of text
                 'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
@@ -942,6 +878,7 @@ def main():
             },
 
             'artist': {
+                'type': 'TextBlock',
                 'image': None,
                 'max_lines': 2,
                 'width': 1,
@@ -959,12 +896,13 @@ def main():
     print(f"using font: {myLayout['title']['font']}")
     s = Screen(epd=myepd, vcom=voltage)
     
-    for r in [0, 90, -90, 180]:
+    for r in [0, 90, 180]:
         print(f'setup for rotation: {r}')
         s.rotation = r
-
         l = Layout(resolution=s.resolution)
         l.layout = myLayout
+        l.update_block_props('title', {}, force_recalc=True)
+        l.update_block_props('artist', {}, force_recalc=True)
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
 
