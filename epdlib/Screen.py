@@ -9,7 +9,7 @@
 
 
 import logging
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageOps, ImageColor
 from datetime import datetime
 from pathlib import Path
 import time
@@ -311,7 +311,7 @@ class Screen():
             clear_args(dict): arguments required for clearing the screen
             constants(namespace): constants required for read/write of IT8951 screens
             HD(bool): True for IT8951 based screens
-            mode(str): "1" or "L" (note this does not override the mode if already set)'''
+            mode(str): "1", "L", "RGB" (note this does not override the mode if already set)'''
         
         if not epd or epd.lower == 'none':
             self._epd = None
@@ -336,6 +336,9 @@ class Screen():
         self.constants = myepd['constants']
         self.one_bit_display = myepd['one_bit_display']
         self.mode = myepd['mode']
+        
+        if not self.one_bit_display or self.mode != '1':
+            self.buffer_no_image = self.epd.getbuffer(self.blank_image())
         
         logging.debug(f'epd configuration {myepd}')
         
@@ -425,6 +428,8 @@ class Screen():
         except ValueError as e:
             raise ScreenError(f'invalid vcom value: {e}')
         resolution = list(myepd.display_dims)
+        resolution.sort(reverse=true)
+        resolution = resolution
         clear_args = {}
         one_bit_display = False
         
@@ -435,7 +440,6 @@ class Screen():
                 'constants': constants_HD,
                 'mode': 'L'}    
         
-
     def _load_non_hd(self, epd):
         '''configure non IT8951 SPI epd
         
@@ -473,14 +477,22 @@ class Screen():
 
         # check specs
         # check for supported `Clear()` function
+        clear_args ={}
         try:
-            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
-        except AttributeError:
-            raise ScreenError(f'"{epd}" has an unsupported `EPD.Clear()` function')
-        clear_args = {}
-        if 'color' in clear_args_spec:
-            clear_args['color'] = 0xFF
+            clear_sig = inspect.signature(myepd.EPD.Clear)
+        except AttributeError as e:
+            raise ScreenError(f'{epd} has an unsupported `EPD.Clear()` function and is not usable with this module ')
+
+        color_default = clear_sig.parameters.get('color', False)
         
+        # it appears that not all of the older waveshare epd screens have
+        # a default `color` parameter. For those use constants.CLEAR_COLOR (0xFF)
+        if color_default:
+            logging.debug(f'Clear() function has color parameter')
+            if color_default.default is color_default.empty:
+                clear_args['color'] = constants.CLEAR_COLOR
+                logging.debug(f'Clear(color) parameter has no default; using: {clear_args}')       
+
         # check for "standard" `display()` function
         try:
             display_args_spec = inspect.getfullargspec(myepd.EPD.display)
@@ -488,20 +500,31 @@ class Screen():
             raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
 
         logging.debug(f'args_spec: {display_args_spec.args}')
+        
+        # 2 and 3 color displays have >= 2 args
         if len(display_args_spec.args) <= 2:
             one_bit_display = True
+            mode = '1'
         else:
             one_bit_display = False
-            
-        resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
+            mode = 'L'
         
+        # use the presence of `BLUE` and `ORANGE` properties as evidence that this is a color display
+        if vars(myepd.EPD()).get('BLUE', False) and vars(myepd.EPD()).get('ORANGE', False):
+            one_bit_display = False
+            mode = 'RGB'
+        else:
+            mode = '1'
+                    
+        resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
+        resolution.sort(reverse=True)
         
         return {'epd': myepd.EPD(), 
                 'resolution': resolution, 
                 'clear_args': clear_args,
                 'one_bit_display': one_bit_display,
                 'constants': None,
-                'mode': '1'}
+                'mode': mode}
     
     def initEPD(self, *args, **kwargs):
         '''**DEPRICATED** init EPD for wirting
@@ -513,6 +536,8 @@ class Screen():
     def blank_image(self):
         '''retrun a PIL image that is entirely blank that matches the resolution of the screen'''
         return Image.new(self.mode, self.resolution, 255)     
+    
+    
     
     @_spi_handler
     def clearEPD(self):
@@ -606,10 +631,16 @@ class Screen():
         image_buffer = self.epd.getbuffer(image)
         
         try:
-            if self.one_bit_display:
+            if self.one_bit_display: # one bit displays
+                logging.debug('one-bit display')
                 self.epd.display(image_buffer)
-            else:
+            elif self.one_bit_display == False and self.mode != '1': # 7 color displays
+                logging.debug('seven-color display')
+                self.epd.display(image_buffer)
+            else: # bi-color displays that require multiple images
+                logging.debug('bi-color display')
                 self.epd.display(image_buffer, self.buffer_no_image)
+            
         except Exception as e:
             raise ScreenError(f'failed to write image to display: {e}')
 
@@ -624,6 +655,45 @@ class Screen():
             raise ScreenError(f'failed to write partial update to display: {e}')
         self.epd.frame_buf = image
         self.epd.draw_partial(self.constants.DisplayModes.DU)
+    
+    @staticmethod
+    def colors2palette(colors=constants.COLORS_7, num_colors=256):
+        '''generate a color pallette to be used when reducing an image to a fixed set
+        of colors in RGB mode
+        
+        Args:
+            colors(list): list of colors as strings of hex values or CSS3-style color specifiers
+            num_colors(int): number of colors in the color space (default 256)
+            
+        Return:
+            palette(list of int): list of integer values for new pallette space'''
+        
+        # hard code to RGB
+        mode = 'RGB'
+        
+        # palette is a single list of values
+        palette = []
+        for n in colors:
+            # convert color string to RGB tuple
+            v = ImageColor.getcolor(n, mode)
+            # append each tuple value to list
+            for i in v:
+                palette.append(i)
+        
+        # pad out the palette space with zero values
+        palette = palette + [0, 0, 0] * (num_colors - len(palette)//3)
+        
+        return palette
+                                                
+    @staticmethod
+    def reduce_palette(image, palette, dither=False):
+        if isinstance(image, str):
+            image = Image.open(image)
+        p = Image.new('P', (1, 1))
+        p.putpalette(palette)
+        return image.convert("RGB").quantize(palette=p, dither=dither)
+        
+        
     
     @staticmethod
     def list_compatible():
@@ -661,13 +731,24 @@ def list_compatible_modules(print_modules=True):
         display_args = []
         clear_args = []
         reason = []
-        if not 'epd' in i.name:
+        if not 'epd' in i.name or 'epdconfig' in i.name:
             continue
 
+            
         try:
             myepd = import_module(f'waveshare_epd.{i.name}')                
+        
         except ModuleNotFoundError:
             reason.append(f'ModuleNotFound: {i.name}')
+            
+        try:
+            if vars(myepd.EPD()).get('GREEN', False):
+                mode = '"RGB" 8 Color'
+            else:
+                mode = '"1" 1 bit'
+        except AttributeError:
+            mode = False
+            
         
         try:
             clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
@@ -675,8 +756,10 @@ def list_compatible_modules(print_modules=True):
             if len(clear_args) > 2:
                 supported = False
                 reason.append('Non-standard, unsupported `EPD.Clear()` function')
+                mode = 'Unsupported'
         except AttributeError:
             supported = False
+            mode = 'Unsupported'
             reason.append('AttributeError: module does not support `EPD.Clear()`')
             
         try:
@@ -687,24 +770,27 @@ def list_compatible_modules(print_modules=True):
             reason.append('AttributeError: module does not support `EPD.display()`')
             
         
+                
 
 
         panels.append({'name': i.name, 
                        'clear_args': clear_args, 
                        'display_args': display_args,
                        'supported': supported,
-                       'reason': reason})
+                       'reason': reason,
+                       'mode': mode})
         
     panels.append({'name': 'HD IT8951 Based Screens',
                    'display_args': {},
                    'supported': True,
-                   'reason': []})
+                   'reason': [],
+                   'mode': '"L" 8 bit'})
     
     if print_modules:
-        print(f'NN. Board        Supported:')
-        print( '---------------------------')
+        print(f'Board              Supported:      Mode:')
+        print( '-----------------------------------------')
         for idx, i in enumerate(panels):
-            print(f"{idx:02d}. {i['name']:<12s} {i['supported']}")
+            print(f"{idx:02d}. {i['name']:<14s} {i['supported']!s: <15} {i['mode']}")
             if not i['supported']:
                 print(f'    Issues:')
                 for j in i['reason']:
@@ -778,6 +864,7 @@ def main():
     
     myLayout = {
             'title': {                       # text only block
+                'type': 'TextBlock',
                 'image': None,               # do not expect an image
                 'max_lines': 3,              # number of lines of text
                 'width': 1,                  # 1/1 of the width - this stretches the entire width of the display
@@ -791,6 +878,7 @@ def main():
             },
 
             'artist': {
+                'type': 'TextBlock',
                 'image': None,
                 'max_lines': 2,
                 'width': 1,
@@ -808,12 +896,13 @@ def main():
     print(f"using font: {myLayout['title']['font']}")
     s = Screen(epd=myepd, vcom=voltage)
     
-    for r in [0, 90, -90, 180]:
+    for r in [0, 90, 180]:
         print(f'setup for rotation: {r}')
         s.rotation = r
-
         l = Layout(resolution=s.resolution)
         l.layout = myLayout
+        l.update_block_props('title', {}, force_recalc=True)
+        l.update_block_props('artist', {}, force_recalc=True)
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
 
@@ -841,103 +930,6 @@ def main():
     
     print('clear screen')
     s.clearEPD()
-
-
-
-
-
-
-# import Layout
-# l = {
-#     'text_a': {
-#         'image': None,
-#         'padding': 10, 
-#         'width': 1,
-#         'height': .25,
-#         'abs_coordinates': (0, 0),
-#         'mode': '1',
-#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#         'max_lines': 3,
-#         'fill': 0,
-#         'font_size': None},
-    
-#     'text_b': {
-#         'image': None,
-#         'padding': 10,
-#         'inverse': True,
-#         'width': 1,
-#         'height': .25,
-#         'abs_coordinates': (0, None),
-#         'relative': ['text_b', 'text_a'],
-#         'mode': '1',
-#         'font': './fonts/Open_Sans/OpenSans-ExtraBold.ttf',
-#         'max_lines': 3,
-#         'font_size': None},
-    
-#     'image_a': {
-#         'image': True,
-#         'width': 1/2,
-#         'height': 1/2,
-#         'mode': 'L',
-#         'abs_coordinates': (0, None),
-#         'relative': ['image_a', 'text_b'],
-#         'scale_x': 1,
-#         'hcenter': True,
-#         'vcenter': True,
-#         'inverse': True},
-    
-#     'image_b': {
-#         'image': True,
-#         'width': 1/2,
-#         'height': 1/2,
-#         'mode': 'L',
-#         'abs_coordinates': (None, None),
-#         'relative': ['image_a', 'text_b'],
-#         'bkground': 255,
-#         'vcenter': True,
-#         'hcenter': True},
-        
-# }
-
-# # full layout update
-# u1 = {'text_a': 'The quick brown fox jumps over the lazy dog.',
-#      'text_b': 'Pack my box with five dozen liquor jugs. Jackdaws love my big sphinx of quartz.',
-#      'image_a': '../images/PIA03519_small.jpg',
-#      'image_b': '../images/portrait-pilot_SW0YN0Z5T0.jpg'}
-
-# # partial layout update (only black/white portions)
-# u2 = {'text_a': 'The five boxing wizards jump quickly. How vexingly quick daft zebras jump!',
-#       'text_b': "God help the noble Claudio! If he have caught the Benedick, it will cost him a thousand pound ere a be cured."}
-
-
-
-
-
-
-# s = Screen(epd='HD', vcom=-1.93, rotation=0)
-# mylayout_hd = Layout.Layout(resolution=s.resolution, layout=l)
-
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(mylayout_hd.concat())
-# time.sleep(5)
-
-# mylayout_hd.update_contents(u2)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# mylayout_hd.update_contents(u1)
-# s.writeEPD(image=mylayout_hd.concat(), partial=True)
-# time.sleep(5)
-# s.clearEPD()
-# # clean up the open SPI handles
-# s.epd.epd.spi.__del__()
-
-
-
-
-
-
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
 
 
 

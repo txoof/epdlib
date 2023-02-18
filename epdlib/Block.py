@@ -11,7 +11,7 @@
 import logging
 import textwrap
 from random import randrange
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageColor
 from pathlib import Path
 
 try:
@@ -36,7 +36,7 @@ def strict_enforce(*types):
     """strictly enforce type compliance within classes
     
     Usage:
-    @strict_enforce(type1, type2, (type3, type4))
+    @strict_enforce(type1, type2, (type4A, type4B))
     def foo(val1, val2, val4):
         ...
     """
@@ -90,9 +90,9 @@ def add_border(img, fill, width, outline=None, outline_width=1, sides=['all']):
     
     Args:
         img(PIL.Image): image to add border to
-        fill(int): border fill color 0..255 8bit gray shade
+        fill(int/str): border fill color integer value or color value
         width(int): number of pixels to use for border
-        outline(int): 0..255 8bit gray shade for outline of border region
+        outline(int/srt): outline color integer value or color value
         outline_width(int): width in pixels of outline
         sides(list of str): sides to add border: "all", "left", "right", "bottom", "top" 
         
@@ -184,14 +184,14 @@ class Block:
 
     @property
     def mode(self):
-        '''string: PIL image color mode "1": 1 bit, "L": 8 bit'''
+        '''string: PIL image color mode'''
         return self._mode
     
     @mode.setter
     @strict_enforce(str)
     def mode(self, mode):
-        if mode not in ['1', 'L']:
-            raise ValueError(f'invalid mode, valid modes are "1": 1 bit, "L": 8 bit: {mode}')
+        if mode not in constants.MODES.keys():
+            raise ValueError(f'invalid mode: {mode}\nvalid modes are {constants.MODES.items()}')
         self._mode = mode
             
     @property
@@ -203,10 +203,10 @@ class Block:
         return self._bkground
     
     @bkground.setter
-    @strict_enforce(int)
+    @strict_enforce((int, str, tuple))
     def bkground(self, bkground):
-        if  bkground < 0 or bkground > 255:
-            raise ValueError(f'bkground must be between 0:255: {bkground}')
+        if isinstance(bkground, str):
+            bkground = ImageColor.getcolor(bkground, self.mode)
         
         # use this as the "original" bkground value
         if not hasattr(self, 'bkground'):
@@ -262,10 +262,11 @@ class Block:
         return self._fill
     
     @fill.setter
-    @strict_enforce(int)
+    @strict_enforce((int, str, tuple))
     def fill(self, fill):
-        if fill < 0 or fill > 255:
-            raise ValueError(f'fill must be between 0:255 {bkground}')
+        if isinstance(fill, str):
+            fill = ImageColor.getcolor(fill, self.mode)
+    
         # use this as the "original" fill value
         if not hasattr(self, 'fill'):
             self._set_fill = fill    
@@ -1048,7 +1049,7 @@ class TextBlock(Block):
             chardist(:obj:str): string representing listed character distribution """
         if not chardist:
             print('available character distributions:')
-            print ([ f'{i}' for i in dir(constants) if not i.startswith("__")])
+            print ([ f'{i}' for i in dir(constants) if not i.startswith("__") and 'CHARDIST' in i])
         else:
             print(f'Character Distribution for {chardist}:')
             char_dict = getattr(constants, chardist)
