@@ -149,8 +149,11 @@ class Layout:
             block = getattr(Block, values['type'])(**values)
 
         except AttributeError:
-            raise AttributeError(f'module "Block" has no attribute {values["type"]}. error in section: {section}')            
-
+            raise AttributeError(f'module "Block" has no attribute {values["type"]}. error in section: {section}')
+        
+        if block.border_config.get('sides', False):
+            block.border_config['fill'] = block.fill
+        
         return block
 
     def _add_defaults(self):
