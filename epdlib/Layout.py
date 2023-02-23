@@ -107,8 +107,9 @@ class Layout:
             self._calculate_layout()
             
             blocks = {}
+            logging.debug(f'layout config: resolution, {self.resolution}, force_onebit: {self.force_onebit}, mode: {self.mode}')
+            logging.info(f'[[{"SETTING SECTION BLOCKS":_^30}]]')
             for name, values in self.layout.items():
-                logging.info('[[____setting blocks____]]')
                 blocks[name] = self.set_block(name, values)
             self.blocks = blocks
 
@@ -140,9 +141,15 @@ class Layout:
         if values['type'] == 'TextBlock':
             values['font_size'] = self._scale_font(values)        
         
+        values['mode'] = values.get('mode', self.mode)
+        
+        if values.get('rgb_support', False) and self.mode == 'RGB':
+            values['mode'] = 'RGB'
+        
         if self.force_onebit:
             values['mode'] = '1'
             logging.debug('forcing block to 1 bit mode')
+            
 
         logging.debug(f'setting block type: {values["type"]}')
         try:

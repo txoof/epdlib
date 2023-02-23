@@ -1,3 +1,26 @@
+## 0.6.1.0 - 2023.02.25
+
+**Documentation**
+
+* Rewrite and reformat documentation
+* Split modules into independent documents
+
+**Block**
+
+* Add `pillow_palette` argument; True: map color names to RGB standard HTML color values, False (default) map color names to WaveShare values. 
+   - WaveShare 7 color panels use different "ORANGE" and "GREEN" values from the standard HTML color values.
+* Blocks now default to `fill='BLACK` and `bkground='WHITE'` instead of `fill=0` and `bkground=255`
+* Fill and bkground colors appropriately map to match the block color mode
+* Resetting font size for `TextBlock` objects now update the font size without redefining the font path
+
+**Screen**
+
+* `colors2palette` uses WaveShare R, O, Y, B, G, Blk, W values by default
+
+**Layout**
+
+* Improve logic for determining block color mode
+
 ## 0.6.0.0 - 2023.02.10
 
 **Screen**
@@ -22,7 +45,7 @@
 
 **Block**
 
-* `Block` superclass for all classes now supports "RGB" mode
+* `Block` superclass for all block classes now supports "RGB" mode
 * All classes support the following for `fill`, `bkground` and `outline` 
     - RGB tuples: `(128, 128, 128)`
     - hex `0x808080`

@@ -12,24 +12,34 @@ MODES = {'1': '1 bit', 'L': '8 bit', 'RGB': 'Red, Green, Blue'}
 
 SCREEN_ROTATIONS = [0, 90, -90, 180, 270]
 
-COLORS_7 = ['RED', 'ORANGE', 'YELLOW', 'GREEN', 'BLUE', 'WHITE', 'BLACK']
+
+COLORS_7_WS = {
+    'BLACK':  (0, 0, 0),
+    'WHITE':  (255, 255, 255),
+    'GREEN':  (0, 255, 0),
+    'BLUE':   (0, 0, 255),
+    'RED':    (255, 0, 0),
+    'YELLOW': (255, 255, 0),
+    'ORANGE': (255, 128, 0)
+}
 
 CLEAR_COLOR = 0xFF
 
-LAYOUT_DEFAULTS = {'type': None,
-                   'image': None,
+LAYOUT_DEFAULTS = {
+#                    'type': None,
+#                    'image': None,
                    'height': 1,
                    'width': 1,
                    'abs_coordinates': (None, None),
                    'relative': False,
-                   'hcenter': False,
-                   'vcenter': False,
-                   'inverse': False,
+#                    'hcenter': False,
+#                    'vcenter': False,
+#                    'inverse': False,
                    'dimensions': None,
                    'padding': 0,
-                   'mode': '1',
-                   'fill': 0,
-                   'bkground': 255,
+#                    'mode': '1',
+#                    'fill': 0,
+#                    'bkground': 255,
                   }
         
                   

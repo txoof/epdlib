@@ -337,7 +337,9 @@ class Screen():
         self.one_bit_display = myepd['one_bit_display']
         self.mode = myepd['mode']
         
-        if not self.one_bit_display or self.mode != '1':
+        
+        if not self.one_bit_display and self.mode not in('L', 'RGB'):
+            logging.debug('setting buffer_no_image for bi-color display')
             self.buffer_no_image = self.epd.getbuffer(self.blank_image())
         
         logging.debug(f'epd configuration {myepd}')
@@ -371,10 +373,11 @@ class Screen():
         
         if rotation in [90, -90, 270]:
             resolution = self.resolution
-            resolution.sort()
+            resolution = sorted(self.resolution)
             self.resolution = resolution
         else:
             resolution = self.resolution
+            resolution = sorted(self.resolution)
             resolution.sort(reverse=True)
             self.resolution = resolution
         
@@ -428,7 +431,7 @@ class Screen():
         except ValueError as e:
             raise ScreenError(f'invalid vcom value: {e}')
         resolution = list(myepd.display_dims)
-        resolution.sort(reverse=true)
+        resolution.sort(reverse=True)
         resolution = resolution
         clear_args = {}
         one_bit_display = False
@@ -657,7 +660,7 @@ class Screen():
         self.epd.draw_partial(self.constants.DisplayModes.DU)
     
     @staticmethod
-    def colors2palette(colors=constants.COLORS_7, num_colors=256):
+    def colors2palette(colors=constants.COLORS_7_WS.values(), num_colors=256):
         '''generate a color pallette to be used when reducing an image to a fixed set
         of colors in RGB mode
         
@@ -674,9 +677,12 @@ class Screen():
         # palette is a single list of values
         palette = []
         for n in colors:
-            # convert color string to RGB tuple
-            v = ImageColor.getcolor(n, mode)
-            # append each tuple value to list
+            if isinstance(n, str):
+                # convert color string to RGB tuple
+                v = ImageColor.getcolor(n, mode)
+                # append each tuple value to list
+            else:
+                v = n
             for i in v:
                 palette.append(i)
         
@@ -714,7 +720,7 @@ class Screen():
 
 
 
-def list_compatible_modules(print_modules=True):
+def list_compatible_modules(print_modules=True, reasons=False):
     '''list compatible waveshare EPD modules
     
         This list includes only modules provided by the waveshare-epd git repo
@@ -743,7 +749,7 @@ def list_compatible_modules(print_modules=True):
             
         try:
             if vars(myepd.EPD()).get('GREEN', False):
-                mode = '"RGB" 8 Color'
+                mode = '"RGB" 7 Color'
             else:
                 mode = '"1" 1 bit'
         except AttributeError:
@@ -767,10 +773,8 @@ def list_compatible_modules(print_modules=True):
             display_args = display_args_spec.args
         except AttributeError:
             supported = False
-            reason.append('AttributeError: module does not support `EPD.display()`')
-            
-        
-                
+            reason.append('AttributeError: module does not support standard `EPD.display()`')
+            mode = 'Unsupported'
 
 
         panels.append({'name': i.name, 
@@ -780,21 +784,24 @@ def list_compatible_modules(print_modules=True):
                        'reason': reason,
                        'mode': mode})
         
-    panels.append({'name': 'HD IT8951 Based Screens',
+    panels.append({'name': 'All HD IT8951',
                    'display_args': {},
                    'supported': True,
                    'reason': [],
                    'mode': '"L" 8 bit'})
     
     if print_modules:
-        print(f'Board              Supported:      Mode:')
-        print( '-----------------------------------------')
+        print(f'|Screen            |Supported      |Mode          |')
+        print( '|:-----------------|:--------------|:-------------|')
         for idx, i in enumerate(panels):
-            print(f"{idx:02d}. {i['name']:<14s} {i['supported']!s: <15} {i['mode']}")
-            if not i['supported']:
-                print(f'    Issues:')
-                for j in i['reason']:
-                    print(f"     * {j}")
+            print(f"|{idx:02d}. {i['name']:<14s}|{i['supported']!s: <15}|{i['mode']:<14s}|")
+            if reasons:
+                if not i['supported']:
+                    print(f'    Issues:')
+                    for j in i['reason']:
+                        print(f"     * {j}")
+        if not reasons:
+            print('\nUse `list_complatible_modules(reasons=True)` for more information.')
                 
     return panels
 
@@ -887,14 +894,16 @@ def main():
                 'hcenter': True,
                 'vcenter': True,
                 'font': str(constants.absolute_path/'../fonts/Font.ttc'),
-                'relative': ['artist', 'title'], # use the X postion from abs_coord from `artist` (this block: 0)
-                                               # calculate the y position based on the size of `title` block
-
+                'relative': ['artist', 'title'],# use the X postion from abs_coord from `artist` (this block: 0)
+                                                # calculate the y position based on the size of `title` block
+                
+                'fill': 'Yellow',
+                'bkground': 'Black'
             }
     }    
     
     print(f"using font: {myLayout['title']['font']}")
-    s = Screen(epd=myepd, vcom=voltage)
+    s = Screen(epd=myepd, vcom=voltage, mode='RGB')
     
     for r in [0, 90, 180]:
         print(f'setup for rotation: {r}')
@@ -938,5 +947,12 @@ def main():
 
 if __name__ == '__main__':
     e= main()
+
+
+
+
+
+
+
 
 

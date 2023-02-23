@@ -141,8 +141,8 @@ class BlockError(Exception):
 
 class Block:
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
-                abs_coordinates=(0, 0), padding=0, fill=0, bkground=255, mode='1', 
-                border_config={}, **kwargs):
+                abs_coordinates=(0, 0), padding=0, fill='BLACK', bkground='WHITE', mode='1', 
+                border_config={}, pillow_palette=False, **kwargs):
         '''Create a Block object
         
         Parent class for other types of blocks
@@ -162,11 +162,14 @@ class Block:
             mode(str): '1': 1 bit color, 'L': 8 bit grayscale ['1']
             border_config(dict): dictonary containing configuration for adding border to image
                 see help(add_border)
+            pillow_palette(bool): False: use waveshare Color Names (constants.COLORS_7_WS)
+                True: use the pillow color pallet for Color Names (HTML colors)
             
         Properties:
             image: None - overridden in child classes
             padded_area(tuple): area less padding to form padded border around block'''
         self.mode = mode
+        self.pillow_palette = pillow_palette
         self.bkground = bkground
         self.border_config = border_config
         self.fill = fill
@@ -179,9 +182,58 @@ class Block:
         self.abs_coordinates = abs_coordinates
         image = None
         logging.debug('creating Block')
-        if self.fill == self.bkground:
-            logging.warning('fill and background are identical, this will likely result in no visible image')    
+#         if self.fill == self.bkground:
+#             logging.warning('fill and background are identical, this will likely result in no visible image')    
 
+            
+    def _get_color(self, color):
+        '''convert color name to RGB values
+        
+        Use waveshare RGB Values for [red, orange, yellow, green, blue, black, white]
+        when `pillow_palette` is False. Otherwise use HTML standard colors'''
+        
+        if isinstance(color, str):
+            if self.pillow_palette:
+                logging.info(f'using standard HTML color: {color}')
+                color = ImageColor.getcolor(color, 'RGB')
+            else:
+                try:
+                    logging.info(f'using WaveShare color: {color}')
+                    color = constants.COLORS_7_WS[color.upper()]
+                except KeyError:
+                    logging.warning(f'color {color} is not a standard WaveShare color; falling back to HTML colors')
+        
+        # hack for converting color to 'L' or '1'
+        if self.mode != 'RGB':
+            logging.debug(f'converting "{color}" to mode: {self.mode}')
+            color = Image.new(size=(10, 10), mode='RGB', color=color).convert(mode=self.mode, dither=False).getpixel((0,0))
+            logging.debug(f'using {color}')
+                
+#         if not isinstance(color, str):
+#             return color
+#         color = color.upper()
+#         if self.pillow_palette:
+#             logging.info(f'using HTML color {color}')
+#             color = ImageColor.getcolor(color, self.mode)
+#         else: 
+#             try:
+#                 logging.info(f'using WaveSahre color {color}: {constants.COLORS_7_WS[color]}')
+#                 color = constants.COLORS_7_WS[color]
+#             except KeyError:
+#                 logging.warning(f'color {color} is not a standard WaveShare color; falling back to HTML colors')
+#                 color = ImageColor.getcolor(color, self.mode)
+        
+        return color
+    
+    def _check_colors(self):
+        '''check if fill & bkground values are the same'''
+        logging.debug('checking fill and background color')
+        try:
+            if self._bkground == self._fill:
+                logging.warning('fill and bkground are identical for this block')
+        except AttributeError:
+            pass
+    
     @property
     def mode(self):
         '''string: PIL image color mode'''
@@ -205,14 +257,10 @@ class Block:
     @bkground.setter
     @strict_enforce((int, str, tuple))
     def bkground(self, bkground):
-        if isinstance(bkground, str):
-            bkground = ImageColor.getcolor(bkground, self.mode)
-        
-        # use this as the "original" bkground value
-        if not hasattr(self, 'bkground'):
-            self._set_bkground = bkground
-        
+        logging.debug(f'set bkground: {bkground}')
+        bkground = self._get_color(bkground)
         self._bkground = bkground
+        self._check_colors()
   
     @property
     def border_config(self):
@@ -225,52 +273,34 @@ class Block:
             if key not in border_config:
                 border_config[key] = default
             
+                border_config['fill'] = self._get_color(border_config['fill'])
+            logging.debug(f'border config: {border_config}')
+            
             self._border_config = border_config
+            
                 
             
-#     @property
-#     def padding_bkground(self):
-#         '''int: bkground color to use in padded area'''
-#         return self._padding_bkground
-    
-#     @padding_bkground.setter
-#     @strict_enforce((type(None), int))
-#     def padding_bkground(self, padding_bkground):
-#         if not padding_bkground:
-#             pass
-#         elif padding_bkground < 0 or padding_bkground > 255:
-#             raise ValueError(f'padding_bkground must be between 0:255: {padding_bkground}')
-        
-#         self._padding_bkground = padding_bkground
-        
-    
-#     @property
-#     def sides(self):
-#         '''list of str: sides to pad
-        
-#         ['all', 'left', 'right', 'top', 'bottom']'''
-#         return self._sides
-    
-#     @sides.setter
-#     @strict_enforce((list, tuple))
-#     def sides(self, sides):
-#         self._sides = sides
     
     @property
     def fill(self):
-        '''int: fill color (foreground text, lines, etc.): (8 bit) 0-255'''
+        '''int: fill color (foreground, shapes text, lines, etc.) provided
+        as any of the following:
+            * RGB tuple of ints from 0-255: (0, 255, 0)
+            * WaveShare Color or HTML color string: 'BLUE'
+            * 8 bit value from 0-255
+            
+        See `Screen.constants.COLORS_7_WS` for waveshare color palette
+        '''
         return self._fill
     
     @fill.setter
     @strict_enforce((int, str, tuple))
     def fill(self, fill):
-        if isinstance(fill, str):
-            fill = ImageColor.getcolor(fill, self.mode)
-    
-        # use this as the "original" fill value
-        if not hasattr(self, 'fill'):
-            self._set_fill = fill    
+        logging.debug(f'set fill: {fill}')        
+        fill = self._get_color(fill)
         self._fill = fill
+        
+        self._check_colors()
     
     @property
     def area(self):
@@ -370,13 +400,11 @@ class Block:
     @strict_enforce(bool)
     def inverse(self, inverse):
         if inverse:
-            self.fill = self._set_bkground
-            self.bkground = self._set_fill
-        else:
-            self.bkground = self._set_bkground
-            self.fill = self._set_fill
-            
-        logging.debug(f'fill: {self.fill}, bkground: {self.bkground}')
+            logging.debug('inverting fill and bkground')
+            fill_bkground = (self.fill, self.bkground)
+            self.fill = fill_bkground[1]
+            self.bkground = fill_bkground[0]
+            logging.debug(f'fill: {self.fill}, bkground: {self.bkground}')
         self._inverse = inverse
     
     @property
@@ -796,6 +824,14 @@ class TextBlock(Block):
             logging.warning('no font size set, using {font_size}')
             
         self._font_size = font_size
+        
+        try:
+            logging.debug(f'resetting font to match size {font_size}')
+            self.font = self._font_path
+        except AttributeError:
+            pass
+        
+        
 
     @property
     def font(self):
@@ -810,17 +846,18 @@ class TextBlock(Block):
     
     @font.setter
     @strict_enforce((Path, str))
-    def font(self, font):   
-        old_font = None
-        logging.debug(f'setting old_font = {old_font}')
-        if hasattr(self, '_font'):
-            old_font = self.font
-            logging.debug(f'old_font now = {old_font}')
-
+    def font(self, font):
+        
+#         old_font = None
+#         logging.debug(f'setting old_font = {old_font}')
+#         if hasattr(self, '_font'):
+#             old_font = self.font
+#             logging.debug(f'old_font now = {old_font}')
+        self._font_path = str(Path(font))
         self._font = ImageFont.truetype(str(Path(font).resolve()), size=self.font_size)
         # trigger a calculation of maxchar if not already set
-        if not self.maxchar or (self.font != old_font):
-            self.maxchar = self._calc_maxchar()          
+        if not self.maxchar:
+            self.maxchar = self._calc_maxchar()
         
     @property
     def chardist(self):
@@ -906,19 +943,19 @@ class TextBlock(Block):
             :obj:int: characters per line"""
         if not self.font:
             raise AttributeError('no font is set - cannot calculate maximum characters per line')
-        logging.debug(f'calculating maximum characters for font {self.font.getname()}')
+        logging.debug(f'calculating maximum characters for font {self.font.getname()} at size {self.font_size}')
         
         # holder for strings
         s = ''
         # max number of characters to sample from the character distribution
-        n = 1000
+        n = 2000
         # create a random string of characters containing the letter distribution
         for char in self.chardist:
             s = s+(char*int(self.chardist[char]*n))
-        s_length = self.font.getsize(s)[0] # string length in Pixles
+        s_length = self.font.getbbox(s)[2] # string length in Pixles
         # find average width of each character
         avg_width = s_length/len(s)
-        logging.debug(f'average character width: {avg_width}')
+        logging.debug(f'calculated average character width: {avg_width}')
         maxchar = round(self.padded_area[0]/avg_width)
         self._maxchar = maxchar
         logging.debug(f'maximum characters per line: {maxchar}')
@@ -1064,9 +1101,10 @@ class TextBlock(Block):
 
 
 # t = TextBlock(area=(800, 180), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=44, max_lines=1,
-#              padding=10, inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right',
-#              border_config={'fill': 0, 'width': 4, 'sides': ['top', 'right']},
+#              padding=10, fill='BLACK', bkground='YELLOW', inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right',
+#              border_config={'fill': 'BLUE', 'width': 4, 'sides': ['top', 'right']},
 #              textwrap=False)
+# t.mode = 'L'
 # t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
 # # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
 # t.update()
@@ -1263,16 +1301,15 @@ class ImageBlock(Block):
 
 
 
-# i = ImageBlock(area=(396, 264), mode='L', 
-#                hcenter=False, vcenter=True, padding=0, rand=False, inverse=False, bkground=255, 
-#                border_config={'fill': 128, 'width': 1, 'sides': ['all']})
+# i = ImageBlock(area=(396, 264), mode='RGB', 
+#                hcenter=False, vcenter=True, padding=0, rand=False, inverse=False, 
+#                border_config={'fill': "orange", 'width': 3, 'sides': ['all']})
 # i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
 # i.update('../images/hubble.jpg')
-# i.update('../tux.png')
-# i.update('../PIA03519_small.jpg')
-# i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
-# i.update(q)
-# i.update('../../epd_display/paperpi/plugins/crypto/prices_sparkline.png')
+# # i.update('../tux.png')
+# # i.update('../PIA03519_small.jpg')
+# # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
+# # i.update('../../epd_display/paperpi/plugins/crypto/prices_sparkline.png')
 # i.image
 
 
