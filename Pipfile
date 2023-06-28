@@ -1,10 +1,15 @@
 [[source]]
+url = "https://www.piwheels.org/simple/"
+verify_ssl = true
+name = "piwheels"
+
+[[source]]
 url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
 [packages]
-ipykernel = "*"
+#ipykernel = "*"
 it8951 = {editable = true, git = "https://github.com/GregDMeyer/IT8951.git"}
 "rpi.gpio" = "*"
 waveshare-epd = {subdirectory = "RaspberryPi_JetsonNano/python", editable = true, git = "https://github.com/waveshare/e-Paper.git"}

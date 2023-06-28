@@ -1,3 +1,9 @@
+## 0.6.1.2 - 2023.06.28
+
+** requirements **
+
+* remove uneeded requests requirement
+
 ## 0.6.1.0 - 2023.02.25
 
 **Documentation**
