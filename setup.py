@@ -1,7 +1,6 @@
 import setuptools
 
 # import most of the setup vars from here
-from constants import *
 
 exec(open('epdlib/version.py').read())
 
@@ -18,7 +17,7 @@ setuptools.setup(
     description="library for creating dynamic layouts for frame-buffered devices",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url=url,
+    url="https://github.com/txoof/epdlib",
     packages=setuptools.find_packages(),
     classifiers=[
         "Intended Audience :: Developers",
