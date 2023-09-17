@@ -85,7 +85,7 @@ def permissive_enforce(*types):
 
 
 
-def add_border(img, fill, width, outline=None, outline_width=1, sides=['all']):
+def add_border(img, fill, width, outline=None, outline_width=1, sides=None):
     '''add a border around an image
     
     Args:
@@ -98,6 +98,10 @@ def add_border(img, fill, width, outline=None, outline_width=1, sides=['all']):
         
     Returns:
         PIL.Image'''
+    
+    if sides is None:
+        sides = ['all']
+    
     if width < 1:
         logging.info(f'"width" is < 1, taking no action: {width}')
         return img
@@ -141,8 +145,8 @@ class BlockError(Exception):
 
 class Block:
     def __init__(self, area, hcenter=False, vcenter=False, rand=False, inverse=False,
-                abs_coordinates=(0, 0), padding=0, fill='BLACK', bkground='WHITE', mode='1', 
-                border_config={}, pillow_palette=False, **kwargs):
+                abs_coordinates=None, padding=0, fill=None, bkground=None, mode=None, 
+                border_config=None, pillow_palette=False, **kwargs):
         '''Create a Block object
         
         Parent class for other types of blocks
@@ -168,6 +172,23 @@ class Block:
         Properties:
             image: None - overridden in child classes
             padded_area(tuple): area less padding to form padded border around block'''
+        
+        if abs_coordinates is None:
+            abs_coordinates = (0, 0)
+            
+        if fill is None:
+            fill = 'BLACK'
+            
+        if bkground is None:
+            bkground = 'WHITE'
+            
+        if mode is None:
+            mode = '1'
+            
+        if border_config is None:
+            border_config = {}
+        
+        
         self.mode = mode
         self.pillow_palette = pillow_palette
         self.bkground = bkground
@@ -761,8 +782,8 @@ class TextBlock(Block):
     Overrides:
         image (:obj:`PIL.Image` or str): PIL image object or string path to image file
         upate (method): update contents of ImageBlock"""                    
-    def __init__(self, area, font, *args, text="NONE", font_size=0, 
-                 chardist=None, max_lines=1, maxchar=None, align='left', 
+    def __init__(self, area, font, *args, text=None, font_size=0, 
+                 chardist=None, max_lines=1, maxchar=None, align=None, 
                  textwrap=True, **kwargs):
         """Intializes TextBlock object
         
@@ -787,6 +808,13 @@ class TextBlock(Block):
             
             """        
         super().__init__(area, *args, **kwargs)
+        
+        if text is None:
+            text = "NONE"
+            
+        if align is None:
+            align = 'left'
+    
         self.align = align
         self.textwrap = textwrap
         self.font_size = font_size
@@ -1102,7 +1130,7 @@ class TextBlock(Block):
 
 # t = TextBlock(area=(800, 180), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=44, max_lines=1,
 #              padding=10, fill='BLACK', bkground='YELLOW', inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right',
-#              border_config={'fill': 'BLUE', 'width': 4, 'sides': ['top', 'right']},
+#              border_config={'fill': 'BLUE', 'width': 4, 'sides': ['top', 'bottom']},
 #              textwrap=False)
 # t.mode = 'L'
 # t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
@@ -1148,7 +1176,7 @@ class ImageBlock(Block):
         self.remove_alpha = remove_alpha
         
     @staticmethod
-    def remove_transparency(im, bg_colour=(255, 255, 255)):
+    def remove_transparency(im, bg_colour=None):
         '''remove transparency from PNG and similar file types
             see: https://stackoverflow.com/a/35859141/5530152
         
@@ -1159,6 +1187,8 @@ class ImageBlock(Block):
         Returns
             PIL image'''
 
+        if bg_colour is None:
+            bg_colour = (255, 255, 255)
         # Only process if image has transparency (http://stackoverflow.com/a/1963146)
         if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
 

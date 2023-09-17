@@ -1,8 +1,24 @@
+## 0.6.2.0 - 2023.09.16
+
+**Block**
+
+* explicitly remove all mutables from default value assignments in methods
+    - no changes to public/private methods
+
+**Layout**
+
+* explicitly remove all mutables from default value assignments in methods
+* deepcopy the user supplied layout into new property: `_master_layout`
+    - resolves [issue #51](https://github.com/txoof/epdlib/issues/51#issuecomment-1722217690)
+    - `_layout` contains the calculated layout with all of the areas and absolute coordinates
+    - `_master_layout` contains the user-supplied raw layout with relative positions
+* small internal changes to `resolution` method
+
 ## 0.6.1.2 - 2023.06.28
 
-** requirements **
+**requirements**
 
-* remove uneeded requests requirement
+* remove unneeded requests requirement
 
 ## 0.6.1.0 - 2023.02.25
 
