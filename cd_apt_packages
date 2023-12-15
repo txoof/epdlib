@@ -1,6 +1,0 @@
-# deb packages required for development environment
-CORE=( "libtiff5" "libopenjp2-7" )
-
-
-# add any additional sets to REQUIRED_DEB
-REQUIRED_DEB=("${CORE[@]}" )
