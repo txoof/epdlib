@@ -1,0 +1,7 @@
+-i https://www.piwheels.org/simple/
+--extra-index-url https://www.pypi.org/simple
+git+https://github.com/GregDMeyer/IT8951.git
+pillow
+rpi.gpio
+gpiozero
+git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python

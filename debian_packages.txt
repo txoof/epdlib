@@ -1,0 +1,2 @@
+# deb packages required for development environment
+DEBPKG=( "libtiff5" "libopenjp2-7" )
