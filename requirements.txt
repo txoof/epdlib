@@ -4,4 +4,6 @@ git+https://github.com/GregDMeyer/IT8951.git
 pillow
 rpi.gpio
 gpiozero
+lgpio
 git+https://github.com/waveshare/e-Paper.git#egg=waveshare_epd&subdirectory=RaspberryPi_JetsonNano/python
+spidev

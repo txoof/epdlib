@@ -1,13 +1,26 @@
-#!/usr/bin/env python3
-# coding: utf-8
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.16.0
+#   kernelspec:
+#     display_name: venv_epdlib-bed2b1faf1
+#     language: python
+#     name: venv_epdlib-bed2b1faf1
+# ---
 
+# +
+# #!/usr/bin/env python3
 
+# %load_ext autoreload
+# %autoreload 2
 
+# %reload_ext autoreload
 
-
-
-
-
+# +
 import logging
 from PIL import Image, ImageDraw, ImageOps, ImageColor
 from datetime import datetime
@@ -22,10 +35,7 @@ except ImportError as e:
     
 
 
-
-
-
-
+# + code_folding=[0]
 def strict_enforce(*types):
     """decorator: strictly enforce type compliance within classes
     
@@ -47,10 +57,7 @@ def strict_enforce(*types):
     return decorator
 
 
-
-
-
-
+# + code_folding=[0]
 class ScreenShot:
     """capture a rolling set of `n` screenshots into specified directory"""
     def __init__(self, path='./', n=2, prefix=None):
@@ -122,19 +129,13 @@ class ScreenShot:
             self.delete(self.img_array.pop())
 
 
-
-
-
-
+# + code_folding=[0]
 class ScreenError(Exception):
     '''general exception for Screen obj errors'''
     pass
 
 
-
-
-
-
+# + code_folding=[0]
 class Update:
     """Class for creating a montotonicaly aware object that records passage of time
     
@@ -192,10 +193,7 @@ class Update:
     
 
 
-
-
-
-
+# + code_folding=[5, 95]
 class Screen():
     '''WaveShare E-Paper screen object for standardizing init, write and clear functions.
     Most WaveShare SPI screens including HD IT8951 base screens are supported.
@@ -716,15 +714,13 @@ class Screen():
             self.epd.sleep()
 
 
-
-
-
-
+# + code_folding=[]
 def list_compatible_modules(print_modules=True, reasons=False):
     '''list compatible waveshare EPD modules
     
         This list includes only modules provided by the waveshare-epd git repo
         and does **NOT** include HD IT8951 based panels'''
+    
     import pkgutil
     import waveshare_epd
     import inspect
@@ -739,21 +735,24 @@ def list_compatible_modules(print_modules=True, reasons=False):
         reason = []
         if not 'epd' in i.name or 'epdconfig' in i.name:
             continue
-
             
         try:
             myepd = import_module(f'waveshare_epd.{i.name}')                
         
         except ModuleNotFoundError:
             reason.append(f'ModuleNotFound: {i.name}')
+            myepd = None
+        except Exception as e:
+            reason.append(f'General Exception: {e}')
+            myepd = None
             
         try:
             if vars(myepd.EPD()).get('GREEN', False):
                 mode = '"RGB" 7 Color'
             else:
                 mode = '"1" 1 bit'
-        except AttributeError:
-            mode = False
+        except AttributeError as e:
+            mode = 'Unsupported'
             
         
         try:
@@ -806,10 +805,7 @@ def list_compatible_modules(print_modules=True, reasons=False):
     return panels
 
 
-
-
-
-
+# + code_folding=[]
 def main():
     '''run a demo/test of attached EPD screen showing rotations and basic writing'''
     import pkgutil
@@ -939,20 +935,7 @@ def main():
     
     print('clear screen')
     s.clearEPD()
-
-
-
-
-
+# -
 
 if __name__ == '__main__':
     e= main()
-
-
-
-
-
-
-
-
-
