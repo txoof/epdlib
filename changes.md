@@ -1,3 +1,14 @@
+## 0.6.3.0 - 2024-01-07
+
+**Development Environment**
+
+* switch from pipenv to plain `requirements.txt`
+* update dependencies to follow waveshare repo:
+    - `gpiozero`
+    - `lgpio`
+    - `spidev`
+* add `init_devel_environment.sh` to create virtual environment, install requirements, and optionally add jupyter kernel.
+
 ## 0.6.2.0 - 2023.09.16
 
 **Block**
