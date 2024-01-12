@@ -713,6 +713,18 @@ class Screen():
         else:
             self.epd.sleep()
 
+    def module_exit(self):
+        '''shtudown the interface completely
+        
+        Note: it is necessary to completely reinit non HD interfaces after calling this method.
+        This should primarily be used to completely shutdown the interface at the end of
+        program execution.'''
+        
+        if self.HD:
+            pass
+        else:
+            self.epd.module_exit(cleanup=True)
+
 
 # + code_folding=[]
 def list_compatible_modules(print_modules=True, reasons=False):
@@ -729,6 +741,8 @@ def list_compatible_modules(print_modules=True, reasons=False):
 
     panels = []
     for i in pkgutil.iter_modules(waveshare_epd.__path__):
+
+        breakpoint()
         supported = True
         display_args = []
         clear_args = []
@@ -935,6 +949,7 @@ def main():
     
     print('clear screen')
     s.clearEPD()
+    s.module_exit()
 # -
 
 if __name__ == '__main__':
