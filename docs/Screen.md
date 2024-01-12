@@ -57,9 +57,10 @@ Static method to generate a palette that can be used in reducing an image to a f
 #### Args
 
 * `colors` (list of tuples of RGB values): colors to use in defining the pallet. The default are the 'standard' values of the 7 color epd screens.
-* `num_colors`: total number of colors to use in remapping. For RGB, 256 should sufficient. 
+* `num_colors`: total number of colors to use in remapping. For RGB, 256 should sufficient.
 
 
+<!-- #region -->
 #### Returns
 
 * list of RGB values 
@@ -192,6 +193,35 @@ Create a monotonically aware object that records the passage of time. Monotonic 
 2.484465518995421
 ```
 
+### `close_spi()`
+
+Close the most recently opened SPI file handles. 
+
+#### Args
+
+* None
+
+#### Returns
+
+* None
+
+### `module_exit()`
+
+Shutdown the interface completely
+
+    Note: it is necessary to completely reinit non HD interfaces after calling this method.
+    This should primarily be used to completely shutdown the interface at the end of
+    program execution.
+
+#### Args
+
+* None
+
+#### Returns
+
+* None
+
+
 ## *Class* `Screen.ScreenShot(path='./', n=2, prefix=None)`
 
 Capture a rolling set of screenshots. When the total number of screenshots exceeds `n` the oldest is deleted. Images are stored as .png.
@@ -228,7 +258,7 @@ Saves img immediately
 #### Args
 
 * `img` (Path): path to save image
-
+<!-- #endregion -->
 
 #### Returns
 

@@ -9,6 +9,12 @@
     - `spidev`
 * add `init_devel_environment.sh` to create virtual environment, install requirements, and optionally add jupyter kernel.
 
+**Screen**
+
+* add `module_cleanup` method for final shutdown of screen
+    * this method needs to be called prior to final exit 
+    * see [I#315 for more details](https://github.com/waveshareteam/e-Paper/issues/315)] 
+
 ## 0.6.2.0 - 2023.09.16
 
 **Block**
