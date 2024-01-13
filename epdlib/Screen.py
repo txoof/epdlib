@@ -742,7 +742,6 @@ def list_compatible_modules(print_modules=True, reasons=False):
     panels = []
     for i in pkgutil.iter_modules(waveshare_epd.__path__):
 
-        breakpoint()
         supported = True
         display_args = []
         clear_args = []
