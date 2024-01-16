@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 
+# create a development environment for this project
+# this script will create a virtual environment and install the required python modules
+# it will also install the required debian packages for development
+
+# required debian packages can be added to files located anywhere in the project tree with the name "debian_packages-*.txt"
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-PROJECT_DIR=$(dirname "$SCRIPT_DIR/.")
+PROJECT_DIR=$(dirname "$SCRIPT_DIR")
 PROJECT_NAME="epdlib"
 
 # get the currently installed python version
@@ -18,7 +24,6 @@ VENV=$PROJECT_DIR/venv_$PROJECT_NAME-$VENV_HASH
 JUPYTER_DPKG="$PROJECT_DIR/utilities/debian_packages-jupyter_devel.txt"
 # jupyter python modules
 JUPYTER_MODS=( "jupytext" )
-
 
 
 function abort {
@@ -50,7 +55,7 @@ exit 0
 # check for underlying debian packages required for development
 function check_deb_system {
 
-    CHECK_PATH="$PROJECT_DIR/paperpi"
+    CHECK_PATH="$PROJECT_DIR"
     find "$CHECK_PATH" -name "debian_packages-*.txt" >>tmpfile
     mapfile -t array < tmpfile
     rm -f tmpfile
@@ -93,7 +98,7 @@ Remove them at your own risk!"
 
     for i in "${array[@]}"
     do
-        echo "Checking debian system packages for PaperPi found in: '$(basename $i)'"
+        echo "Checking debian system packages for $PROJECT_NAME found in: '$(basename $i)'"
         source "${i}"
         for i in "${DEBPKG[@]}"
         do
@@ -138,7 +143,7 @@ function check_spi {
         if [[ $(sudo raspi-config nonint get_spi) = "1" ]]
         then
             echo ""
-            echo "SPI is not enabled and is required for PaperPi to function"
+            echo "SPI is not enabled and is required for $PROJECT_NAME to function"
             echo "enable with:"
             echo "$ sudo raspi-config nonint do_spi 0"
             abort
