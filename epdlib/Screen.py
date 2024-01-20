@@ -26,6 +26,7 @@ import logging
 from PIL import Image, ImageDraw, ImageOps, ImageColor
 from datetime import datetime
 from pathlib import Path
+from gpiozero import GPIODeviceError
 import time
 
 try:
@@ -33,7 +34,7 @@ try:
 except ImportError as e:
     import constants
 
-    
+from waveshare_epd import epdconfig
 
 
 # + code_folding=[0]
@@ -724,7 +725,13 @@ class Screen():
         if self.HD:
             pass
         else:
-            self.epd.module_exit(cleanup=True)
+            # self.epd.module_exit(cleanup=True)
+            logging.info('shutting down epd interface')
+            try:
+                epdconfig.module_exit(cleanup=True)
+            except GPIODeviceError as e:
+                logging.warning(f'failed to sleep module: {e}')
+                raise ScreenError(e)
 
 
 # + code_folding=[]
@@ -915,7 +922,9 @@ def main():
     print(f"using font: {myLayout['title']['font']}")
     s = Screen(epd=myepd, vcom=voltage, mode='RGB')
     
-    for r in [0, 90, 180]:
+    # for r in [0, 90, 180]:
+    for r in [0]:
+        do_exit = False
         print(f'setup for rotation: {r}')
         s.rotation = r
         l = Layout(resolution=s.resolution)
@@ -931,11 +940,19 @@ def main():
             print(f'{e}')
             print('Try: $ raspi-config > Interface Options > SPI')
             do_exit = True
+        except ScreenError as e:
+            print(f'failed to write to screen: {e}')
+            do_ext = True
         else:
             do_exit = False
         
         if do_exit:
+            try:
+                s.module_exit()
+            except Exception:
+                 pass   
             sys.exit()
+            
         print('sleeping for 2 seconds')
         time.sleep(2)
 
@@ -944,13 +961,25 @@ def main():
     print('mirror output')
     s.mirror = True
     s.rotation = 0
-    s.writeEPD(l.concat())
+    try:
+        s.writeEPD(l.concat())
+    except ScreenError as e:
+        print(f'failed to write to screen: {e}')
+        sys.exit()
     time.sleep(3)
     
     print('clear screen')
-    s.clearEPD()
-    s.module_exit()
+    try:
+        s.clearEPD()
+        print('shutting down interface')
+        s.module_exit()
+    except Exception as e:
+        print(e)
 # -
 
 if __name__ == '__main__':
     e= main()
+
+
+
+
