@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.16.0
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: venv_epdlib-bed2b1faf1
 #     language: python
@@ -20,6 +20,13 @@
 # %autoreload 2
 
 # %reload_ext autoreload
+# -
+
+import os
+import logging
+import sys
+import time
+import subprocess
 
 # +
 import logging
@@ -34,8 +41,7 @@ try:
 except ImportError as e:
     import constants
 
-from waveshare_epd import epdconfig
-
+# from waveshare_epd import epdconfig
 
 # + code_folding=[0]
 def strict_enforce(*types):
@@ -460,6 +466,7 @@ class Screen():
                 '''
         
         import waveshare_epd
+        # from waveshare_epd import epdconfig
         import pkgutil
         import inspect
         from importlib import import_module
@@ -728,7 +735,8 @@ class Screen():
             # self.epd.module_exit(cleanup=True)
             logging.info('shutting down epd interface')
             try:
-                epdconfig.module_exit(cleanup=True)
+                # epdconfig.module_exit(cleanup=True)
+                pass
             except GPIODeviceError as e:
                 logging.warning(f'failed to sleep module: {e}')
                 raise ScreenError(e)
