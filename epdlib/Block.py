@@ -1,10 +1,16 @@
-#!/usr/bin/env python3
-# coding: utf-8
-
-
-
-
-
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.16.1
+#   kernelspec:
+#     display_name: venv_epdlib-bed2b1faf1
+#     language: python
+#     name: venv_epdlib-bed2b1faf1
+# ---
 
 
 
@@ -20,16 +26,8 @@ except ImportError as e:
     import constants
 
 
-
-
-
-
 logger = logging.getLogger(__name__)
 # logger.root.setLevel('DEBUG')
-
-
-
-
 
 
 def strict_enforce(*types):
@@ -51,10 +49,6 @@ def strict_enforce(*types):
             return f(self, *args, **kwds)
         return new_f
     return decorator
-
-
-
-
 
 
 def permissive_enforce(*types):
@@ -79,10 +73,6 @@ def permissive_enforce(*types):
             return f(self, *newargs, **kwds)
         return new_f
     return decorator
-
-
-
-
 
 
 def add_border(img, fill, width, outline=None, outline_width=1, sides=None):
@@ -126,21 +116,11 @@ def add_border(img, fill, width, outline=None, outline_width=1, sides=None):
         logging.debug(f'adding border to side {each}')
         draw.rectangle(xy=sides_dict[each], fill=fill, outline=outline, width=outline_width)
     return img
-    
-
-
-
-
 
 
 class BlockError(Exception):
     '''General error class for Blocks'''
     pass
-    
-
-
-
-
 
 
 class Block:
@@ -230,20 +210,6 @@ class Block:
             color = Image.new(size=(10, 10), mode='RGB', color=color).convert(mode=self.mode, dither=False).getpixel((0,0))
             logging.debug(f'using {color}')
                 
-#         if not isinstance(color, str):
-#             return color
-#         color = color.upper()
-#         if self.pillow_palette:
-#             logging.info(f'using HTML color {color}')
-#             color = ImageColor.getcolor(color, self.mode)
-#         else: 
-#             try:
-#                 logging.info(f'using WaveSahre color {color}: {constants.COLORS_7_WS[color]}')
-#                 color = constants.COLORS_7_WS[color]
-#             except KeyError:
-#                 logging.warning(f'color {color} is not a standard WaveShare color; falling back to HTML colors')
-#                 color = ImageColor.getcolor(color, self.mode)
-        
         return color
     
     def _check_colors(self):
@@ -298,9 +264,7 @@ class Block:
             logging.debug(f'border config: {border_config}')
             
             self._border_config = border_config
-            
-                
-            
+           
     
     @property
     def fill(self):
@@ -373,14 +337,6 @@ class Block:
         if self.padded_area[0] < .25* self.area[0] or self.padded_area[1] < .25*self.area[1]:
             logging.warning(f'the padded area available may be too small to display any content: Area: {self.area}, Padded Area: {self.padded_area}')
     
-#     @property
-#     def scale(self):
-#         return self._scale
-    
-#     @scale.setter
-#     @strict_enforce(bool)
-#     def scale(self, scale):
-#         self._scale = scale
         
     @property
     def hcenter(self):
@@ -445,10 +401,6 @@ class Block:
         
         This method is overriden in child classes with methods that are specific to the type of block'''
         pass
-
-
-
-
 
 
 class DrawBlock(Block):
@@ -741,10 +693,6 @@ class DrawBlock(Block):
             self.draw_image()
 
 
-
-
-
-
 class TextBlock(Block):
     """Constructor for TextBlock Class
     
@@ -875,12 +823,6 @@ class TextBlock(Block):
     @font.setter
     @strict_enforce((Path, str))
     def font(self, font):
-        
-#         old_font = None
-#         logging.debug(f'setting old_font = {old_font}')
-#         if hasattr(self, '_font'):
-#             old_font = self.font
-#             logging.debug(f'old_font now = {old_font}')
         self._font_path = str(Path(font))
         self._font = ImageFont.truetype(str(Path(font).resolve()), size=self.font_size)
         # trigger a calculation of maxchar if not already set
@@ -1024,9 +966,9 @@ class TextBlock(Block):
         
         Returns:
             (PIL.Image, tuple of bounding box) """
-        
-#         # max area for rendering text
-#         text_image = Image.new(mode=self.mode, size=self.padded_area, color=self.bkground)
+
+        # max area for rendering text
+        # text_image = Image.new(mode=self.mode, size=self.padded_area, color=self.bkground)
         # scratch image for measuring text 
         scratch_image = Image.new(mode=self.mode, size=(1, 1), color=self.bkground)
         draw = ImageDraw.Draw(scratch_image)
@@ -1064,7 +1006,7 @@ class TextBlock(Block):
         
         paste_x = self.padding
         paste_y = self.padding
-        
+        breakpoint()
         if self.rand:
 
             x_max = self.padded_area[0] - textsize[0]
@@ -1091,6 +1033,10 @@ class TextBlock(Block):
         if self.vcenter:
             paste_y = int((self.area[1] - textsize[1])/2)
             logging.debug('pasting vcentered')
+
+        if self.align == 'right':
+            paste_x = int((self.area[0] - textsize[0] - self.padding))
+            logging.debug('pasting right aligned')
             
         
         logging.debug(f'paste coordinates: {paste_x, paste_y}')
@@ -1121,27 +1067,6 @@ class TextBlock(Block):
             
             for i in char_dict:
                 print(f'{i}:     {char_dict[i]:.5f}')
-        
-
-
-
-
-
-
-# t = TextBlock(area=(800, 180), font='../fonts/Open_Sans/OpenSans-Regular.ttf', font_size=44, max_lines=1,
-#              padding=10, fill='BLACK', bkground='YELLOW', inverse=False, hcenter=False, vcenter=True, rand=False, mode='L', align='right',
-#              border_config={'fill': 'BLUE', 'width': 4, 'sides': ['top', 'bottom']},
-#              textwrap=False)
-# t.mode = 'L'
-# t.text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. QqWYZAXEtiam sed nunc et neque lobortis condimentum. Mauris tortor mi, dictum aliquet sapien auctor, facilisis aliquam metus. Mauris lacinia turpis sit amet ex fringilla aliquet.'
-# # t.text = 'the quick brown fox jumps over the lazy dog. Pack my boxes with a dozen jugs of liquor.'
-# t.update()
-# t.image
-
-
-
-
-
 
 class ImageBlock(Block):
     """Constructor for TextBlock Class
@@ -1243,12 +1168,6 @@ class ImageBlock(Block):
             if self.remove_alpha:
                 im = self.remove_transparency(im)
 
-#             if max(im.size) > min(self.padded_area):
-#                 logging.debug(f'resizing image to fit area: {self.padded_area}')
-# #                 max_size = min(self.padded_area)
-# #                 resize = [max_size, max_size]
-#                 im.thumbnail(self.padded_area, Image.BICUBIC)
-#                 logging.debug(f'new image size: {im.size}')
 
             logging.debug(f'image dimensions: {im.size}')
             thumbnail = False
@@ -1327,35 +1246,11 @@ class ImageBlock(Block):
             return False        
 
 
-
-
-
-
-# i = ImageBlock(area=(396, 264), mode='RGB', 
-#                hcenter=False, vcenter=True, padding=0, rand=False, inverse=False, 
-#                border_config={'fill': "orange", 'width': 3, 'sides': ['all']})
-# i.update('../images/portrait-pilot_SW0YN0Z5T0.jpg')
-# i.update('../images/hubble.jpg')
-# # i.update('../tux.png')
-# # i.update('../PIA03519_small.jpg')
-# # i.update('/tmp/j_d7ukil/librespot_client/3KfbEIOC7YIv90FIfNSZpo')
-# # i.update('../../epd_display/paperpi/plugins/crypto/prices_sparkline.png')
-# i.image
-
-
-
-
-
-
 def dir2dict(obj):
     d = {}
     for i in dir(obj):
         d[i] = id(i)
     return d
-
-
-
-
 
 
 def compare_obj(a, b):
@@ -1366,20 +1261,3 @@ def compare_obj(a, b):
                 d.append((key, a[key]))
                 
     return d
-
-
-
-
-
-
-# logger = logging.getLogger(__name__)
-# logger.root.setLevel('DEBUG')
-
-
-
-
-
-
-
-
-
