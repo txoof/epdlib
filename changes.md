@@ -1,3 +1,9 @@
+## 0.6.5.0 - 2024-03-20
+
+**Block**
+
+* Update logic for placing right aligned text to resolve [I#65](https://github.com/txoof/epdlib/issues/65#issuecomment-2004589703). Right aligned text now appears both right aligned and visually aligned with right side of text block.
+
 ## 0.6.3.0 - 2024-01-07
 
 **Development Environment**
