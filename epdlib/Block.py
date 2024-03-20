@@ -51,6 +51,7 @@ def strict_enforce(*types):
     return decorator
 
 
+
 def permissive_enforce(*types):
     """decorator to enforce type compliance within classes
     
@@ -116,6 +117,7 @@ def add_border(img, fill, width, outline=None, outline_width=1, sides=None):
         logging.debug(f'adding border to side {each}')
         draw.rectangle(xy=sides_dict[each], fill=fill, outline=outline, width=outline_width)
     return img
+
 
 
 class BlockError(Exception):
@@ -1068,6 +1070,7 @@ class TextBlock(Block):
             for i in char_dict:
                 print(f'{i}:     {char_dict[i]:.5f}')
 
+
 class ImageBlock(Block):
     """Constructor for TextBlock Class
     
@@ -1246,11 +1249,14 @@ class ImageBlock(Block):
             return False        
 
 
+
+
 def dir2dict(obj):
     d = {}
     for i in dir(obj):
         d[i] = id(i)
     return d
+
 
 
 def compare_obj(a, b):
