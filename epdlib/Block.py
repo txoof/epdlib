@@ -1008,7 +1008,6 @@ class TextBlock(Block):
         
         paste_x = self.padding
         paste_y = self.padding
-        breakpoint()
         if self.rand:
 
             x_max = self.padded_area[0] - textsize[0]
