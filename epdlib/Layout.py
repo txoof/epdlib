@@ -1,5 +1,17 @@
-#!/usr/bin/env python3
-# coding: utf-8
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.16.1
+#   kernelspec:
+#     display_name: epdlib-AIMLabQa
+#     language: python
+#     name: epdlib-aimlabqa
+# ---
+
 
 
 
@@ -24,8 +36,8 @@ try:
 except ImportError as e:
     import constants
     import version
-    
-    
+
+
 try: 
     from . import Block as Block
 except ImportError as e:
@@ -323,12 +335,18 @@ class Layout:
         
         if not isinstance(update, dict):
             raise TypeError('update must be of type `dict`')
-        
+
+        unknown_keys = {}
         for key, val in update.items():
             if key in self.blocks:
                 self.blocks[key].update(val)
             else:
-                logging.debug(f'"{key}" is not a recognized block, skipping')
+                unknown_keys[key] = val
+                # logging.debug(f'"{key}" is not a recognized block, skipping')
+
+        if len(unknown_keys) > 0:
+            logging.debug(f'{len(unknown_keys)} unrecognized keys were provided, but not used')
+            
                 
     def concat(self):
         self.image = Image.new(self.mode, self.resolution, 'white')
@@ -336,7 +354,7 @@ class Layout:
             for b in self.blocks:
                 self.image.paste(self.blocks[b].image, self.blocks[b].abs_coordinates)
         return self.image    
-            
+
 
 
 
@@ -462,7 +480,7 @@ class Layout:
 # print(f'l.layout: {l.resolution}')
 # for k, v in l.blocks.items():
 #     print(f'{k}\n   a: {v.area}\n   c: {v.abs_coordinates}')
-    
+
 # print(f'\n\np.layout: {p.resolution}')
 # for k, v in p.blocks.items():
 #     print(f'{k}\n   a: {v.area}\n   c: {v.abs_coordinates}')
@@ -474,7 +492,7 @@ class Layout:
 # print(f'l.layout: {l.resolution}')
 # for k, v in l.blocks.items():
 #     print(f'{k}\n   a: {v.area}\n   c: {v.abs_coordinates}')
-    
+
 # print(f'\n\np.layout: {p.resolution}')
 # for k, v in p.blocks.items():
 #     print(f'{k}\n   a: {v.area}\n   c: {v.abs_coordinates}')
