@@ -23,6 +23,26 @@ COLORS_7_WS = {
     'ORANGE': (255, 128, 0)
 }
 
+COLORS_4GRAY_WS = {
+    'BLACK': (0, 0, 0),
+    'DARK_GRAY': (0x80, 0x80, 0x80),
+    'BRIGHT_GRAY': (0xc0, 0xc0, 0xc0),
+    'WHITE': (0xff, 0xff, 0xff)
+}
+
+'''
+"natural" display colors of 4 grayscale displays.
+Tweaking these may improve image rendering.
+The present values are based on experiments with a 2.7" e-Paper HAT,  
+using various photographs and graphics as test inputs.
+'''
+COLORS_4GRAY_NATURAL = {
+    'BLACK': (0x1b, 0x1b, 0x13),
+    'DARK_GRAY': (0x4d, 0x4d, 0x44),
+    'BRIGHT_GRAY': (0xa9, 0xac, 0xa3),
+    'WHITE': (0xeb, 0xea, 0xdf)
+}
+
 CLEAR_COLOR = 0xFF
 
 LAYOUT_DEFAULTS = {

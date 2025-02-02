@@ -666,18 +666,18 @@ class Screen():
     def _full_writeEPD_non_hd(self, image):
         '''wipe screen and write an image'''
         if self.screen_type == ScreenType.FOUR_GRAYS:
-            image_buffer = self.epd.getbuffer_4Gray(image)
+            image_buffer = self.epd.getbuffer_4Gray(Screen.image_to_4_grays(image))
         else:
             image_buffer = self.epd.getbuffer(image)
 
         try:
             if self.screen_type == ScreenType.FOUR_GRAYS:
-                logging.debug('one-bit display')
+                logging.debug('4 grayscale display')
                 self.epd.display_4Gray(image_buffer)
             elif self.screen_type == ScreenType.THREE_COLORS: # displays that require multiple images
                 logging.debug('bi-color display')
                 self.epd.display(image_buffer, self.buffer_no_image)
-            else: # 7 color displays
+            else: # 7 color or monochrome displays
                 logging.debug('seven-color or monochrome display')
                 self.epd.display(image_buffer)
 
@@ -770,6 +770,25 @@ class Screen():
             except GPIODeviceError as e:
                 logging.warning(f'failed to sleep module: {e}')
                 raise ScreenError(e)
+
+    @staticmethod
+    def image_to_4_grays(image):
+        logging.debug('converting image to 4 grays')
+
+        '''
+        Waveshare displays do not render colors accurately.
+        For example, an input color of "#808080" looks more like "#a9aca3" on the ePaper.
+        Therefore, we convert our images to grayscale in 2 steps:
+        1. Convert colors to their actual displayed output
+        2. Update palette to reverse the error
+        '''
+        palette = Screen.colors2palette(constants.COLORS_4GRAY_NATURAL.values())
+        image_gs = Screen.reduce_palette(image, palette, True)
+
+        ws_palette = Screen.colors2palette(constants.COLORS_4GRAY_WS.values())
+        image_gs.putpalette(ws_palette)
+        return image_gs
+
 
 
 # + code_folding=[]
