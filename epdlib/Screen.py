@@ -440,7 +440,7 @@ class Screen():
                 clear_args: [arg1: val, arg2: val],
                 constants: None            
         '''
-        
+
         from IT8951.display import AutoEPDDisplay
         from IT8951 import constants as constants_HD
         
@@ -467,7 +467,8 @@ class Screen():
                 'screen_type': screen_type,
                 'constants': constants_HD}
 
-    def _load_non_hd(self, epd):
+    @staticmethod
+    def _load_non_hd(epd):
         '''configure non IT8951 SPI epd
         
         For a complete list see the list_compatible_modules() functon
@@ -494,7 +495,7 @@ class Screen():
         non_hd = []
         for i in pkgutil.iter_modules(waveshare_epd.__path__):
             non_hd.append(i.name)
-        
+
         if epd in non_hd:
             try:
                 myepd = import_module(f'waveshare_epd.{epd}')
@@ -514,7 +515,7 @@ class Screen():
             raise ScreenError(f'{epd} has an unsupported `EPD.Clear()` function and is not usable with this module ')
 
         color_default = clear_sig.parameters.get('color', False)
-        
+
         # it appears that not all of the older waveshare epd screens have
         # a default `color` parameter. For those use constants.CLEAR_COLOR (0xFF)
         if color_default:
@@ -665,7 +666,7 @@ class Screen():
     def _full_writeEPD_non_hd(self, image):
         '''wipe screen and write an image'''
         if self.screen_type == ScreenType.FOUR_GRAYS:
-            image_buffer = self.epd.getbuffer_4Gray(Screen.image_to_4_grays(image))
+            image_buffer = self.epd.getbuffer_4Gray(self.image_to_4_grays(image))
         else:
             image_buffer = self.epd.getbuffer(image)
 
@@ -814,46 +815,26 @@ def list_compatible_modules(print_modules=True, reasons=False):
             continue
             
         try:
-            myepd = import_module(f'waveshare_epd.{i.name}')                
+            myepd = Screen._load_non_hd(i.name)
         
-        except ModuleNotFoundError:
-            reason.append(f'ModuleNotFound: {i.name}')
+        except ScreenError as e:
+            reason.append(f'ScreenError: {e}')
             myepd = None
         except Exception as e:
             reason.append(f'General Exception: {e}')
             myepd = None
-            
-        try:
-            if vars(myepd.EPD()).get('GREEN', False):
-                mode = '"RGB" 7 Color'
-            else:
-                mode = '"1" 1 bit'
-        except AttributeError as e:
-            mode = 'Unsupported'
-            
-        
-        try:
-            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
-            clear_args = clear_args_spec.args
-            if len(clear_args) > 2:
-                supported = False
-                reason.append('Non-standard, unsupported `EPD.Clear()` function')
-                mode = 'Unsupported'
-        except AttributeError:
+
+        if myepd == None:
             supported = False
             mode = 'Unsupported'
-            reason.append('AttributeError: module does not support `EPD.Clear()`')
-            
-        try:
-            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
-            display_args = display_args_spec.args
-        except AttributeError:
-            supported = False
-            reason.append('AttributeError: module does not support standard `EPD.display()`')
-            mode = 'Unsupported'
+        elif myepd["screen_type"] == ScreenType.SEVEN_COLORS:
+            mode = '"RGB" Color'
+        elif myepd["screen_type"] == ScreenType.FOUR_GRAYS:
+            mode = '"L" 2 bit grayscale'
+        else:
+            mode = '"1" 1 bit b/w'
 
-
-        panels.append({'name': i.name, 
+        panels.append({'name': i.name,
                        'clear_args': clear_args, 
                        'display_args': display_args,
                        'supported': supported,
@@ -864,13 +845,13 @@ def list_compatible_modules(print_modules=True, reasons=False):
                    'display_args': {},
                    'supported': True,
                    'reason': [],
-                   'mode': '"L" 8 bit'})
+                   'mode': '"L" 8 bit grayscale'})
     
     if print_modules:
-        print(f'|Screen            |Supported      |Mode          |')
-        print( '|:-----------------|:--------------|:-------------|')
+        print(f'|Screen              |Supported |Mode                |')
+        print( '|:-------------------|:---------|:-------------------|')
         for idx, i in enumerate(panels):
-            print(f"|{idx:02d}. {i['name']:<14s}|{i['supported']!s: <15}|{i['mode']:<14s}|")
+            print(f"|{idx:02d}. {i['name']:<16s}|{i['supported']!s: <10}|{i['mode']:<20s}|")
             if reasons:
                 if not i['supported']:
                     print(f'    Issues:')
@@ -983,7 +964,7 @@ def main():
         do_exit = False
         print(f'setup for rotation: {r}')
         s.rotation = r
-        l = Layout(resolution=s.resolution)
+        l = Layout(resolution=s.resolution, mode=s.mode)
         l.layout = myLayout
         l.update_block_props('title', {}, force_recalc=True)
         l.update_block_props('artist', {}, force_recalc=True)
