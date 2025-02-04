@@ -1,3 +1,10 @@
+## 0.??? - ???
+
+**Screen**
+
+* Implement support for monochrome screens with 4 grays
+* Replace explicit `mode` with autodetection based on screen type
+
 ## 0.6.5.0 - 2024-03-20
 
 **Block**
