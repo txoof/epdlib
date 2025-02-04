@@ -508,7 +508,9 @@ class Screen():
         clear_args ={}
         try:
             clear_sig = inspect.signature(myepd.EPD.Clear)
-        except AttributeError as e:
+            # epd3in7 (currently not supported) needs an additional "mode" parameter
+            assert len(clear_sig.parameters) <= 2
+        except (AttributeError, AssertionError):
             raise ScreenError(f'{epd} has an unsupported `EPD.Clear()` function and is not usable with this module ')
 
         color_default = clear_sig.parameters.get('color', False)
@@ -519,30 +521,15 @@ class Screen():
             logging.debug(f'Clear() function has color parameter')
             if color_default.default is color_default.empty:
                 clear_args['color'] = constants.CLEAR_COLOR
-                logging.debug(f'Clear(color) parameter has no default; using: {clear_args}')       
-
-        # check for "standard" `display()` function
-        try:
-            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
-        except AttributeError:
-            raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
-
-        logging.debug(f'args_spec: {display_args_spec.args}')
+                logging.debug(f'Clear(color) parameter has no default; using: {clear_args}')
 
         # use the presence of `BLUE` and `ORANGE` properties as evidence that this is a color display
         if vars(myepd.EPD()).get('BLUE', False) and vars(myepd.EPD()).get('ORANGE', False):
             # 7 colors
             screen_type = ScreenType.SEVEN_COLORS
-        elif vars(myepd.EPD()).get('YELLOW', False):
-            if vars(myepd.EPD()).get('RED', False):
-                # B/W/Y/R
-                screen_type = ScreenType.FOUR_COLORS
-            else:
-                # B/W/Y
-                screen_type = ScreenType.THREE_COLORS
-        elif vars(myepd.EPD()).get('RED', False):
-            # B/W/R
-            screen_type = ScreenType.THREE_COLORS
+        elif vars(myepd.EPD()).get('YELLOW', False) and vars(myepd.EPD()).get('RED', False):
+            # B/W/Y/R
+            screen_type = ScreenType.FOUR_COLORS
         elif hasattr(myepd.EPD(), 'display_4Gray'):
             # B/W with grayscale (4 shades)
             screen_type = ScreenType.FOUR_GRAYS
@@ -550,10 +537,22 @@ class Screen():
             # default to B/W
             screen_type = ScreenType.MONOCHROME
 
-        if screen_type == ScreenType.THREE_COLORS:
-            assert len(display_args_spec.args) == 3
-        else:
-            assert len(display_args_spec.args) == 2
+        # check for "standard" `display()`/`display_4Gray()` function
+        try:
+            if screen_type == ScreenType.FOUR_GRAYS:
+                display_args_spec = inspect.getfullargspec(myepd.EPD.display_4Gray)
+            else:
+                display_args_spec = inspect.getfullargspec(myepd.EPD.display)
+            if screen_type == ScreenType.MONOCHROME and len(display_args_spec.args) == 3:
+                screen_type = ScreenType.THREE_COLORS
+            if screen_type == ScreenType.THREE_COLORS:
+                assert len(display_args_spec.args) == 3
+            else:
+                assert len(display_args_spec.args) == 2
+        except (AttributeError, AssertionError):
+            raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
+
+        logging.debug(f'args_spec: {display_args_spec.args}')
 
         resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
         resolution.sort(reverse=True)
@@ -977,7 +976,7 @@ def main():
     }    
     
     print(f"using font: {myLayout['title']['font']}")
-    s = Screen(epd=myepd, vcom=voltage, mode='RGB')
+    s = Screen(epd=myepd, vcom=voltage)
     
     # for r in [0, 90, 180]:
     for r in [0]:
