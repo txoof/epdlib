@@ -418,6 +418,15 @@ class Screen():
         self._mirror = mirror
         logging.debug(f'mirror output: {mirror}')
         
+    @property
+    def mode(self):
+        '''determine the internal color mode, depending on the screen type'''
+        if self.screen_type == ScreenType.HD or self.screen_type == ScreenType.FOUR_GRAYS:
+            return 'L' # grayscale
+        if self.screen_type == ScreenType.SEVEN_COLORS:
+            return 'RGB'
+        return '1' # monochrome
+
     def _load_hd(self, epd, timeout=20):
         '''configure IT8951 (HD) SPI epd 
         
@@ -565,15 +574,6 @@ class Screen():
     def blank_image(self):
         '''return a PIL image that is entirely blank that matches the resolution of the screen'''
         return Image.new('1', self.resolution, 0xff)
-
-    @property
-    def mode(self):
-        '''determine the internal color mode, depending on the screen type'''
-        if self.screen_type == ScreenType.HD or self.screen_type == ScreenType.FOUR_GRAYS:
-            return 'L' # grayscale
-        if self.screen_type == ScreenType.SEVEN_COLORS:
-            return 'RGB'
-        return '1' # monochrome
 
 
     @_spi_handler
