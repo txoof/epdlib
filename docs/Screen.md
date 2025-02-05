@@ -19,7 +19,7 @@ $ python -m Screen
 * `resolution` (list): X x Y pixels
 * `clear_args` (dict): kwargs dict of any additional kwargs that are needed for clearing a display
 * `buffer_no_image` (PIL:Image): "blank" image for clearing bi-color panels (empty for all others)
-* `vcom (float): negative vcom voltage from panel ribon cable
+* `vcom (float)`: negative vcom voltage from panel ribon cable
 * `HD` (bool): True for IT8951 panels
 * `rotation` (int): rotation of screen (0, -90, 90, 180)
 * `mirror` (bool): mirror the output 

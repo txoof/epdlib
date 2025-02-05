@@ -27,6 +27,7 @@ import logging
 import sys
 import time
 import subprocess
+from enum import Enum
 
 # +
 import logging
@@ -200,6 +201,14 @@ class Update:
         self._last_updated = self.now
     
 
+# + code_folding=[0]
+class ScreenType(Enum):
+    HD = 0
+    MONOCHROME = 1
+    FOUR_GRAYS = 2
+    THREE_COLORS = 3 # black/white and 1 additional color; currently only supported in BW mode
+    FOUR_COLORS = 4 # black/white/yellow/red
+    SEVEN_COLORS = 5
 
 # + code_folding=[5, 95]
 class Screen():
@@ -235,7 +244,7 @@ class Screen():
         self.clear_args  = kwargs.get('clear_args', {})
         self.buffer_no_image = kwargs.get('buffer_no_image', [])
         self.constants = kwargs.get('constants', None)
-        self.mode = kwargs.get('mode', None)
+        self.screen_type = kwargs.get('screen_type', None)
         self.HD = kwargs.get('HD', False)
         self.epd = epd
         self.rotation = rotation
@@ -262,7 +271,12 @@ class Screen():
             if not obj.HD:
                 logging.debug('Non HD display')
                 try:
-                    obj.epd.init()
+                    if obj.screen_type == ScreenType.FOUR_GRAYS:
+                        # unfortunately, naming is not consistent
+                        initializer = getattr(obj.epd, 'Init_4Gray') or getattr(obj.epd, 'init_4Gray')
+                    else:
+                        initializer = obj.epd.init
+                    initializer()
                 except FileNotFoundError as e:
                     raise FileNotFoundError(f'It appears SPI is not enabled on this Pi: {e}')
                 except Exception as e:
@@ -317,8 +331,8 @@ class Screen():
             clear_args(dict): arguments required for clearing the screen
             constants(namespace): constants required for read/write of IT8951 screens
             HD(bool): True for IT8951 based screens
-            mode(str): "1", "L", "RGB" (note this does not override the mode if already set)'''
-        
+            screen_type(Enum): type of screen regarding color support'''
+
         if not epd or epd.lower == 'none':
             self._epd = None
             return
@@ -340,12 +354,10 @@ class Screen():
         self.resolution = myepd['resolution']
         self.clear_args = myepd['clear_args']
         self.constants = myepd['constants']
-        self.one_bit_display = myepd['one_bit_display']
-        self.mode = myepd['mode']
-        
-        
-        if not self.one_bit_display and self.mode not in('L', 'RGB'):
-            logging.debug('setting buffer_no_image for bi-color display')
+        self.screen_type = myepd['screen_type']
+
+        if self.screen_type == ScreenType.THREE_COLORS:
+            logging.debug('setting buffer_no_image for one-color display')
             self.buffer_no_image = self.epd.getbuffer(self.blank_image())
         
         logging.debug(f'epd configuration {myepd}')
@@ -378,19 +390,17 @@ class Screen():
             raise ValueError(f'valid rotation values are {constants.SCREEN_ROTATIONS}')
         
         if rotation in [90, -90, 270]:
-            resolution = self.resolution
             resolution = sorted(self.resolution)
             self.resolution = resolution
         else:
-            resolution = self.resolution
             resolution = sorted(self.resolution)
             resolution.sort(reverse=True)
             self.resolution = resolution
         
         # set an image if the epd is defined
-        if self.epd:            
-            self.image = Image.new(self.mode, self.resolution, 255)
-            if not self.HD:
+        if self.epd:
+            self.image = Image.new(self.mode, self.resolution, 0xff)
+            if self.screen_type == ScreenType.THREE_COLORS:
                 self.buffer_no_image = self.epd.getbuffer(self.blank_image())
 
         self._rotation = rotation
@@ -408,6 +418,15 @@ class Screen():
         self._mirror = mirror
         logging.debug(f'mirror output: {mirror}')
         
+    @property
+    def mode(self):
+        '''determine the internal color mode, depending on the screen type'''
+        if self.screen_type == ScreenType.HD or self.screen_type == ScreenType.FOUR_GRAYS:
+            return 'L' # grayscale
+        if self.screen_type == ScreenType.SEVEN_COLORS:
+            return 'RGB'
+        return '1' # monochrome
+
     def _load_hd(self, epd, timeout=20):
         '''configure IT8951 (HD) SPI epd 
         
@@ -421,7 +440,7 @@ class Screen():
                 clear_args: [arg1: val, arg2: val],
                 constants: None            
         '''
-        
+
         from IT8951.display import AutoEPDDisplay
         from IT8951 import constants as constants_HD
         
@@ -440,16 +459,16 @@ class Screen():
         resolution.sort(reverse=True)
         resolution = resolution
         clear_args = {}
-        one_bit_display = False
-        
-        return {'epd': myepd, 
-                'resolution': resolution, 
-                'clear_args': clear_args, 
-                'one_bit_display': one_bit_display,
-                'constants': constants_HD,
-                'mode': 'L'}    
-        
-    def _load_non_hd(self, epd):
+        screen_type = ScreenType.HD
+
+        return {'epd': myepd,
+                'resolution': resolution,
+                'clear_args': clear_args,
+                'screen_type': screen_type,
+                'constants': constants_HD}
+
+    @staticmethod
+    def _load_non_hd(epd):
         '''configure non IT8951 SPI epd
         
         For a complete list see the list_compatible_modules() functon
@@ -476,7 +495,7 @@ class Screen():
         non_hd = []
         for i in pkgutil.iter_modules(waveshare_epd.__path__):
             non_hd.append(i.name)
-        
+
         if epd in non_hd:
             try:
                 myepd = import_module(f'waveshare_epd.{epd}')
@@ -490,97 +509,106 @@ class Screen():
         clear_args ={}
         try:
             clear_sig = inspect.signature(myepd.EPD.Clear)
-        except AttributeError as e:
+            # epd3in7 (currently not supported) needs an additional "mode" parameter
+            # see https://github.com/txoof/epdlib/issues/73
+            assert len(clear_sig.parameters) <= 2
+        except (AttributeError, AssertionError):
             raise ScreenError(f'{epd} has an unsupported `EPD.Clear()` function and is not usable with this module ')
 
         color_default = clear_sig.parameters.get('color', False)
-        
+
         # it appears that not all of the older waveshare epd screens have
         # a default `color` parameter. For those use constants.CLEAR_COLOR (0xFF)
         if color_default:
             logging.debug(f'Clear() function has color parameter')
             if color_default.default is color_default.empty:
                 clear_args['color'] = constants.CLEAR_COLOR
-                logging.debug(f'Clear(color) parameter has no default; using: {clear_args}')       
+                logging.debug(f'Clear(color) parameter has no default; using: {clear_args}')
 
-        # check for "standard" `display()` function
+        # use the presence of `BLUE` and `ORANGE` properties as evidence that this is a color display
+        if vars(myepd.EPD()).get('BLUE', False) and vars(myepd.EPD()).get('ORANGE', False):
+            # 7 colors
+            screen_type = ScreenType.SEVEN_COLORS
+        elif vars(myepd.EPD()).get('YELLOW', False) and vars(myepd.EPD()).get('RED', False):
+            # B/W/Y/R
+            screen_type = ScreenType.FOUR_COLORS
+        elif hasattr(myepd.EPD(), 'display_4Gray'):
+            # B/W with grayscale (4 shades)
+            screen_type = ScreenType.FOUR_GRAYS
+        else:
+            # default to B/W
+            screen_type = ScreenType.MONOCHROME
+
+        # check for "standard" `display()`/`display_4Gray()` function
         try:
-            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
-        except AttributeError:
+            if screen_type == ScreenType.FOUR_GRAYS:
+                display_args_spec = inspect.getfullargspec(myepd.EPD.display_4Gray)
+            else:
+                display_args_spec = inspect.getfullargspec(myepd.EPD.display)
+            if screen_type == ScreenType.MONOCHROME and len(display_args_spec.args) == 3:
+                screen_type = ScreenType.THREE_COLORS
+            if screen_type == ScreenType.THREE_COLORS:
+                assert len(display_args_spec.args) == 3
+            else:
+                assert len(display_args_spec.args) == 2
+        except (AttributeError, AssertionError):
             raise ScreenError(f'"{epd}" has an unsupported `EPD.display()` function and is not usable with this module')
 
         logging.debug(f'args_spec: {display_args_spec.args}')
-        
-        # 2 and 3 color displays have >= 2 args
-        if len(display_args_spec.args) <= 2:
-            one_bit_display = True
-            mode = '1'
-        else:
-            one_bit_display = False
-            mode = 'L'
-        
-        # use the presence of `BLUE` and `ORANGE` properties as evidence that this is a color display
-        if vars(myepd.EPD()).get('BLUE', False) and vars(myepd.EPD()).get('ORANGE', False):
-            one_bit_display = False
-            mode = 'RGB'
-        else:
-            mode = '1'
-                    
+
         resolution = [myepd.EPD_HEIGHT, myepd.EPD_WIDTH]
         resolution.sort(reverse=True)
         
         return {'epd': myepd.EPD(), 
                 'resolution': resolution, 
                 'clear_args': clear_args,
-                'one_bit_display': one_bit_display,
-                'constants': None,
-                'mode': mode}
-    
+                'screen_type': screen_type,
+                'constants': None}
+
     def initEPD(self, *args, **kwargs):
-        '''**DEPRICATED** init EPD for wirting
-        
+        '''**DEPRECATED** init EPD for wirting
+
         For non IT8951 boards use `epd.init()` at your own risk -- SPI file handles are NOT automatically closed
         '''
-        logging.warning('this method is depricated and does nothing. If you really know what you are doing, use `epd.init()` at your own risk')
-    
+        logging.warning('this method is deprecated and does nothing. If you really know what you are doing, use `epd.init()` at your own risk')
+
     def blank_image(self):
-        '''retrun a PIL image that is entirely blank that matches the resolution of the screen'''
-        return Image.new(self.mode, self.resolution, 255)     
-    
-    
-    
-    @_spi_handler
+        '''return a PIL image that is entirely blank that matches the resolution of the screen'''
+        return Image.new('1', self.resolution, 0xff)
+
+
     def clearEPD(self):
         '''wipe epd screen entirely'''
+        try:
+            if self.screen_type == ScreenType.FOUR_GRAYS:
+                # the 4 gray capable screens' Clear() method is designed for 1 bit mode, and does not work in grayscale
+                # mode. So we just display a blank image, which is what Clear() does internally anyway
+                self.writeEPD(self.blank_image())
+            else:
+                return self._clearEPD_SPI()
+        except Exception as e:
+            raise ScreenError(f'failed to clear screen: {e}')
+
+
+    @_spi_handler
+    def _clearEPD_SPI(self):
+        '''clear HD or non-grayscale screens'''
         logging.debug('clearing screen')
         if self.HD:
             clear_function = self._clearEPD_hd
         else:
             clear_function = self._clearEPD_non_hd
-        
-        return clear_function()
+        clear_function()
         
     
     def _clearEPD_hd(self):
         '''clear IT8951 screens entirely'''
-        status = False
-        try:
-            self.epd.clear()
-        except Exception as e:
-            raise ScreenError(f'failed to clear screen: {e}')
-        return status
-    
+        self.epd.clear()
+
     def _clearEPD_non_hd(self):
-        '''clear non IT8951 screens'''
-        status = False
-        try:
-            self.epd.Clear(**self.clear_args)
-            status = True
-        except Exception as e:
-            raise ScreenError(f'failed to clear screen: {e}')
-        return status
-        
-        
+        '''clear non IT8951 non-grayscale screens'''
+        self.epd.Clear(**self.clear_args)
+
     
     @_spi_handler
     def writeEPD(self, image, sleep=True, partial=False):
@@ -638,19 +666,22 @@ class Screen():
             
     def _full_writeEPD_non_hd(self, image):
         '''wipe screen and write an image'''
-        image_buffer = self.epd.getbuffer(image)
-        
+        if self.screen_type == ScreenType.FOUR_GRAYS:
+            image_buffer = self.epd.getbuffer_4Gray(self.image_to_4_grays(image))
+        else:
+            image_buffer = self.epd.getbuffer(image)
+
         try:
-            if self.one_bit_display: # one bit displays
-                logging.debug('one-bit display')
-                self.epd.display(image_buffer)
-            elif self.one_bit_display == False and self.mode != '1': # 7 color displays
-                logging.debug('seven-color display')
-                self.epd.display(image_buffer)
-            else: # bi-color displays that require multiple images
+            if self.screen_type == ScreenType.FOUR_GRAYS:
+                logging.debug('4 grayscale display')
+                self.epd.display_4Gray(image_buffer)
+            elif self.screen_type == ScreenType.THREE_COLORS: # displays that require multiple images
                 logging.debug('bi-color display')
                 self.epd.display(image_buffer, self.buffer_no_image)
-            
+            else: # 7 color or monochrome displays
+                logging.debug('seven-color or monochrome display')
+                self.epd.display(image_buffer)
+
         except Exception as e:
             raise ScreenError(f'failed to write image to display: {e}')
 
@@ -741,6 +772,25 @@ class Screen():
                 logging.warning(f'failed to sleep module: {e}')
                 raise ScreenError(e)
 
+    @staticmethod
+    def image_to_4_grays(image):
+        logging.debug('converting image to 4 grays')
+
+        '''
+        Waveshare displays do not render colors accurately.
+        For example, an input color of "#808080" looks more like "#a9aca3" on the ePaper.
+        Therefore, we convert our images to grayscale in 2 steps:
+        1. Convert colors to their actual displayed output
+        2. Update palette to reverse the error
+        '''
+        palette = Screen.colors2palette(constants.COLORS_4GRAY_NATURAL.values())
+        image_gs = Screen.reduce_palette(image, palette, True)
+
+        ws_palette = Screen.colors2palette(constants.COLORS_4GRAY_WS.values())
+        image_gs.putpalette(ws_palette)
+        return image_gs
+
+
 
 # + code_folding=[]
 def list_compatible_modules(print_modules=True, reasons=False):
@@ -766,46 +816,26 @@ def list_compatible_modules(print_modules=True, reasons=False):
             continue
             
         try:
-            myepd = import_module(f'waveshare_epd.{i.name}')                
+            myepd = Screen._load_non_hd(i.name)
         
-        except ModuleNotFoundError:
-            reason.append(f'ModuleNotFound: {i.name}')
+        except ScreenError as e:
+            reason.append(f'ScreenError: {e}')
             myepd = None
         except Exception as e:
             reason.append(f'General Exception: {e}')
             myepd = None
-            
-        try:
-            if vars(myepd.EPD()).get('GREEN', False):
-                mode = '"RGB" 7 Color'
-            else:
-                mode = '"1" 1 bit'
-        except AttributeError as e:
-            mode = 'Unsupported'
-            
-        
-        try:
-            clear_args_spec = inspect.getfullargspec(myepd.EPD.Clear)
-            clear_args = clear_args_spec.args
-            if len(clear_args) > 2:
-                supported = False
-                reason.append('Non-standard, unsupported `EPD.Clear()` function')
-                mode = 'Unsupported'
-        except AttributeError:
+
+        if myepd == None:
             supported = False
             mode = 'Unsupported'
-            reason.append('AttributeError: module does not support `EPD.Clear()`')
-            
-        try:
-            display_args_spec = inspect.getfullargspec(myepd.EPD.display)
-            display_args = display_args_spec.args
-        except AttributeError:
-            supported = False
-            reason.append('AttributeError: module does not support standard `EPD.display()`')
-            mode = 'Unsupported'
+        elif myepd["screen_type"] == ScreenType.SEVEN_COLORS:
+            mode = '"RGB" Color'
+        elif myepd["screen_type"] == ScreenType.FOUR_GRAYS:
+            mode = '"L" 2 bit grayscale'
+        else:
+            mode = '"1" 1 bit b/w'
 
-
-        panels.append({'name': i.name, 
+        panels.append({'name': i.name,
                        'clear_args': clear_args, 
                        'display_args': display_args,
                        'supported': supported,
@@ -816,13 +846,13 @@ def list_compatible_modules(print_modules=True, reasons=False):
                    'display_args': {},
                    'supported': True,
                    'reason': [],
-                   'mode': '"L" 8 bit'})
+                   'mode': '"L" 8 bit grayscale'})
     
     if print_modules:
-        print(f'|Screen            |Supported      |Mode          |')
-        print( '|:-----------------|:--------------|:-------------|')
+        print(f'|Screen              |Supported |Mode                |')
+        print( '|:-------------------|:---------|:-------------------|')
         for idx, i in enumerate(panels):
-            print(f"|{idx:02d}. {i['name']:<14s}|{i['supported']!s: <15}|{i['mode']:<14s}|")
+            print(f"|{idx:02d}. {i['name']:<16s}|{i['supported']!s: <10}|{i['mode']:<20s}|")
             if reasons:
                 if not i['supported']:
                     print(f'    Issues:')
@@ -857,7 +887,6 @@ def main():
     
     
     
-    panels = []
     panels = list_compatible_modules()
 
 #     print(f"{len(panels)-1}. {panels[-1]['name']}")
@@ -928,20 +957,20 @@ def main():
     }    
     
     print(f"using font: {myLayout['title']['font']}")
-    s = Screen(epd=myepd, vcom=voltage, mode='RGB')
+    s = Screen(epd=myepd, vcom=voltage)
     
     # for r in [0, 90, 180]:
     for r in [0]:
-        do_exit = False
         print(f'setup for rotation: {r}')
         s.rotation = r
-        l = Layout(resolution=s.resolution)
+        l = Layout(resolution=s.resolution, mode=s.mode)
         l.layout = myLayout
         l.update_block_props('title', {}, force_recalc=True)
         l.update_block_props('artist', {}, force_recalc=True)
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
 
+        do_exit = False
         try:
             s.writeEPD(l.concat())
         except FileNotFoundError as e:
@@ -950,10 +979,8 @@ def main():
             do_exit = True
         except ScreenError as e:
             print(f'failed to write to screen: {e}')
-            do_ext = True
-        else:
-            do_exit = False
-        
+            do_exit = True
+
         if do_exit:
             try:
                 s.module_exit()
@@ -974,6 +1001,7 @@ def main():
     except ScreenError as e:
         print(f'failed to write to screen: {e}')
         sys.exit()
+    print('sleeping for 3 seconds')
     time.sleep(3)
     
     print('clear screen')
