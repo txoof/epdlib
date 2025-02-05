@@ -510,6 +510,7 @@ class Screen():
         try:
             clear_sig = inspect.signature(myepd.EPD.Clear)
             # epd3in7 (currently not supported) needs an additional "mode" parameter
+            # see https://github.com/txoof/epdlib/issues/73
             assert len(clear_sig.parameters) <= 2
         except (AttributeError, AssertionError):
             raise ScreenError(f'{epd} has an unsupported `EPD.Clear()` function and is not usable with this module ')
@@ -576,38 +577,38 @@ class Screen():
         return Image.new('1', self.resolution, 0xff)
 
 
-    @_spi_handler
     def clearEPD(self):
         '''wipe epd screen entirely'''
+        try:
+            if self.screen_type == ScreenType.FOUR_GRAYS:
+                # the 4 gray capable screens' Clear() method is designed for 1 bit mode, and does not work in grayscale
+                # mode. So we just display a blank image, which is what Clear() does internally anyway
+                self.writeEPD(self.blank_image())
+            else:
+                return self._clearEPD_SPI()
+        except Exception as e:
+            raise ScreenError(f'failed to clear screen: {e}')
+
+
+    @_spi_handler
+    def _clearEPD_SPI(self):
+        '''clear HD or non-grayscale screens'''
         logging.debug('clearing screen')
         if self.HD:
             clear_function = self._clearEPD_hd
         else:
             clear_function = self._clearEPD_non_hd
-        
-        return clear_function()
+        clear_function()
         
     
     def _clearEPD_hd(self):
         '''clear IT8951 screens entirely'''
-        status = False
-        try:
-            self.epd.clear()
-        except Exception as e:
-            raise ScreenError(f'failed to clear screen: {e}')
-        return status
-    
+        self.epd.clear()
+
     def _clearEPD_non_hd(self):
-        '''clear non IT8951 screens'''
-        status = False
-        try:
-            self.epd.Clear(**self.clear_args)
-            status = True
-        except Exception as e:
-            raise ScreenError(f'failed to clear screen: {e}')
-        return status
-        
-        
+        '''clear non IT8951 non-grayscale screens'''
+        self.epd.Clear(**self.clear_args)
+
     
     @_spi_handler
     def writeEPD(self, image, sleep=True, partial=False):
@@ -886,7 +887,6 @@ def main():
     
     
     
-    panels = []
     panels = list_compatible_modules()
 
 #     print(f"{len(panels)-1}. {panels[-1]['name']}")
@@ -961,7 +961,6 @@ def main():
     
     # for r in [0, 90, 180]:
     for r in [0]:
-        do_exit = False
         print(f'setup for rotation: {r}')
         s.rotation = r
         l = Layout(resolution=s.resolution, mode=s.mode)
@@ -971,6 +970,7 @@ def main():
         l.update_contents({'title': 'item: spam, spam, spam, spam & ham', 'artist': 'artist: monty python'})
         print('print some text on the display')
 
+        do_exit = False
         try:
             s.writeEPD(l.concat())
         except FileNotFoundError as e:
@@ -979,10 +979,8 @@ def main():
             do_exit = True
         except ScreenError as e:
             print(f'failed to write to screen: {e}')
-            do_ext = True
-        else:
-            do_exit = False
-        
+            do_exit = True
+
         if do_exit:
             try:
                 s.module_exit()
@@ -1003,6 +1001,7 @@ def main():
     except ScreenError as e:
         print(f'failed to write to screen: {e}')
         sys.exit()
+    print('sleeping for 3 seconds')
     time.sleep(3)
     
     print('clear screen')
