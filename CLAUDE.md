@@ -32,15 +32,17 @@ These rules apply to every person and agent working in this repository. The proc
   gh issue edit <n> -R txoof/epdlib --add-label in-progress
   gh issue comment <n> -R txoof/epdlib --body "claimed by epdlib-<n>-<short-name>"
   ```
+  Then move its card on the project board to **In Progress** (see "Project board" below).
 - **Release a claim** when the PR is merged (GitHub closes the issue) or when you stop working on it:
   ```bash
   gh issue edit <n> -R txoof/epdlib --remove-label in-progress
   gh issue comment <n> -R txoof/epdlib --body "released: <reason>"
   ```
+  If you stop without finishing, move its card back to **Todo**.
 - Shared files (`pyproject.toml`, `uv.lock`, `.python-version`, `.github/`) are changed only in their own small issue.
 
 ## Project board
-All PaperPi and epdlib work is shown on one board: https://github.com/users/txoof/projects/4 (columns Todo, In Progress, In Review, Done).
+All PaperPi and epdlib work is shown on one board, where each issue or PR is a card (one entry on the board) in a column: https://github.com/users/txoof/projects/4 (columns Todo, In Progress, In Review, Done).
 - PaperPi issues and PRs are added automatically. **epdlib issues and PRs are not** (GitHub's free plan allows automatic adding from one repo only), so agents add them.
 - GitHub moves cards to **Done** when an issue is closed or a PR is merged. Agents move cards at the other steps:
 
