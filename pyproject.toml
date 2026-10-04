@@ -1,0 +1,38 @@
+[project]
+name = "epdlib"
+version = "1.0.0.dev0"
+description = "Draw layouts and show them on e-paper and other frame-buffered displays"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Aaron Ciuffo" }]
+dependencies = []
+
+[project.urls]
+Source = "https://github.com/txoof/epdlib"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-html>=4",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "hardware: needs a real display attached; run only on the Pi with `uv run pytest -m hardware`",
+]
+addopts = "--strict-markers -m 'not hardware'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
