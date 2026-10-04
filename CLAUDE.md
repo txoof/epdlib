@@ -21,6 +21,7 @@ These rules apply to every person and agent working in this repository. The proc
 
 ## How work is tracked
 - **GitHub Issues are the only to-do list.** Every change starts from an issue in a milestone.
+- Exception: Dependabot (GitHub's bot for dependency updates) opens update PRs without an issue. Agents do not claim or change them; txoof reviews and merges them.
 - Each issue has an **Area**: the folders it is allowed to change (see the area map below).
 - **Do not start** an issue that is already claimed (has the `in-progress` label), or whose Area overlaps a claimed issue. Check with:
   ```bash
@@ -37,6 +38,26 @@ These rules apply to every person and agent working in this repository. The proc
   gh issue comment <n> -R txoof/epdlib --body "released: <reason>"
   ```
 - Shared files (`pyproject.toml`, `uv.lock`, `.python-version`, `.github/`) are changed only in their own small issue.
+
+## Project board
+All PaperPi and epdlib work is shown on one board: https://github.com/users/txoof/projects/4 (columns Todo, In Progress, In Review, Done).
+- PaperPi issues and PRs are added automatically. **epdlib issues and PRs are not** (GitHub's free plan allows automatic adding from one repo only), so agents add them.
+- GitHub moves cards to **Done** when an issue is closed or a PR is merged. Agents move cards at the other steps:
+
+| When | Set the issue (and its PR) to |
+|---|---|
+| You create an issue | Todo |
+| You claim it | In Progress |
+| You open its PR | In Review |
+| You release a claim without finishing | Todo |
+
+Add or move a card (adding a card that is already on the board just returns it, so the same commands do both):
+```bash
+item=$(gh project item-add 4 --owner txoof --url <issue-or-PR-URL> --format json --jq .id)
+gh project item-edit --project-id PVT_kwHOANmg6c4BlqOG --id "$item" \
+  --field-id PVTSSF_lAHOANmg6c4BlqOGzhkWLj8 --single-select-option-id <column-id>
+```
+Column IDs: Todo `f75ad846`, In Progress `47fc9ee4`, In Review `b470c173`, Done `98236657`.
 
 ## Area map
 | Area | Folders |
