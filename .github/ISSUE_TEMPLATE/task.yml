@@ -6,7 +6,7 @@ body:
     attributes:
       label: Area
       description: Which folders this task may change (see the area map in CLAUDE.md).
-      placeholder: "core: src/paperpi/config/"
+      placeholder: "layout: src/epdlib/"
     validations:
       required: true
   - type: textarea

@@ -7,9 +7,9 @@ These rules apply to every person and agent working in this repository. The proc
 - When guiding the maintainer (txoof) through manual steps, give one short step at a time.
 
 ## What epdlib is, and is not
-- epdlib draws layouts and sends images to displays. It must work with **any frame-buffered display**, not only the ones PaperPi uses.
+- epdlib draws layouts and sends images to displays. It must work with **any frame-buffered display** (a display that shows a complete image sent to it from memory), not only the ones PaperPi uses.
 - **epdlib never imports or depends on PaperPi**, and has no PaperPi ideas in it (plugins, priorities, schedules).
-- Drawing must work **without hardware**: importing the layout code must not import GPIO or SPI libraries. Hardware libraries are only imported by the driver that needs them.
+- Drawing must work **without hardware**: importing the layout code must not import GPIO or SPI libraries (the libraries that control the Raspberry Pi's pins and the wired connection to the display). Hardware libraries are only imported by the driver that needs them.
 - epdlib is published on PyPI. Changes to its public interface need a note in the changelog once one exists (M3).
 
 ## The old code (v0.6)
