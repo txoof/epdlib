@@ -15,6 +15,10 @@ This branch (`main`) holds epdlib **version 1**, which is being written from scr
 - Time limits on every wait for the display, so a stuck display gives an error instead of freezing the program
 - Tests and generated documentation with example images
 
+### What works so far
+- Layouts and drawing without a display: see [Writing layouts](docs/layouts.md).
+- The virtual driver, which saves images as PNG files.
+
 Progress is tracked in [milestones](https://github.com/txoof/epdlib/milestones).
 
 ## Development
