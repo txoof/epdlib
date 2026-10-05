@@ -145,3 +145,11 @@ def test_size_with_sample_does_not_depend_on_real_text():
     size = page.font_sizes["t"]
     for value in ["1:05", "12:47", "88:88"]:
         assert fit_text(None, size, value, 300, 150, 1, False, "…").font.size == size
+
+
+def test_fonts_use_basic_layout_on_every_computer(italic_font):
+    """Pillow would use libraqm when installed, which measures text differently."""
+    from PIL import ImageFont
+
+    for path in (None, italic_font):
+        assert load_font(path, 20).layout_engine == ImageFont.Layout.BASIC

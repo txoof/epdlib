@@ -127,6 +127,13 @@ What v0.6 did badly:
 ### Fonts
 - The default font is DejaVu Sans, shipped with epdlib (free licence, covers most
   European scripts). Pillow's built-in font has no letters such as *Å*.
+- epdlib always uses Pillow's basic text layout. Pillow would otherwise switch to its
+  "raqm" layout on computers that have the libraqm library installed. That layout places
+  letters at fractional positions, so the same text measured and wrapped differently on
+  this Pi (no libraqm) and on GitHub's test machines (libraqm installed). With the basic
+  layout, a layout looks the same on every computer, and the image tests compare pixel by
+  pixel. The cost: scripts that need letter shaping (such as Arabic or Devanagari) are not
+  drawn correctly. That can be added later as an option.
 
 ### Layout files and safety
 - A plugin's `layouts.py` is Python code, so loading it runs it. It has the same trust as

@@ -1,20 +1,18 @@
 """Image tests: render the example layouts and compare them with saved reference images.
 
 After an intended change in how things look (or a new Pillow version), update the
-references on the Pi and check them by eye:
+references and check them by eye:
 
     EPDLIB_UPDATE_IMAGES=1 uv run pytest tests/test_images.py
 
-The references are made on Linux with an ARM processor (the Raspberry Pi; CI uses ARM
-machines too). Pillow's font drawing places letters a pixel apart on other processors,
-so on other computers these tests are skipped.
+The images are the same on every computer because epdlib always uses Pillow's basic text
+layout (see ``epdlib.text.load_font``). The test output's first lines show the Pillow and
+FreeType versions; a new version of either can change the images slightly.
 """
 
 import base64
 import io
 import os
-import platform
-import sys
 from pathlib import Path
 
 import pytest
@@ -36,13 +34,6 @@ SCREENS = {"7in5": (800, 480), "2in7": (264, 176)}
 TOLERANCE = 0.002
 
 
-SAME_AS_PI = True  # TEMPORARY
-
-
-@pytest.mark.skipif(
-    not SAME_AS_PI,
-    reason="reference images are made on Linux ARM (the Pi); font drawing differs elsewhere",
-)
 @pytest.mark.parametrize("screen", SCREENS)
 @pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize("example", EXAMPLES)
