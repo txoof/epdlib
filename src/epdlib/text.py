@@ -35,8 +35,14 @@ DEFAULT_FONT = str(Path(__file__).parent / "fonts" / "DejaVuSans.ttf")
 
 @lru_cache(maxsize=256)
 def load_font(path: str | None, size: int) -> FontType:
-    """Load a font at ``size`` pixels; ``None`` is :data:`DEFAULT_FONT`. Results are kept."""
-    return ImageFont.truetype(path or DEFAULT_FONT, size)
+    """Load a font at ``size`` pixels; ``None`` is :data:`DEFAULT_FONT`. Results are kept.
+
+    Always uses Pillow's basic text layout. Pillow would otherwise switch to the "raqm"
+    layout whenever the computer has libraqm installed, which places letters at
+    fractional positions: the same layout would then measure and wrap differently on
+    different computers.
+    """
+    return ImageFont.truetype(path or DEFAULT_FONT, size, layout_engine=ImageFont.Layout.BASIC)
 
 
 def line_height(font: FontType) -> int:

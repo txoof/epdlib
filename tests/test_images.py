@@ -36,7 +36,7 @@ SCREENS = {"7in5": (800, 480), "2in7": (264, 176)}
 TOLERANCE = 0.002
 
 
-SAME_AS_PI = sys.platform == "linux" and platform.machine() in ("aarch64", "arm64")
+SAME_AS_PI = True  # TEMPORARY
 
 
 @pytest.mark.skipif(

@@ -37,12 +37,13 @@ jobs:
   # differs by a pixel here and there between processor types, and the image tests compare
   # pixel by pixel (see tests/test_images.py).
   test:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         # Oldest supported (Raspberry Pi OS bookworm) and current (trixie)
         python: ["3.11", "3.13"]
+        os: [ubuntu-24.04-arm, ubuntu-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,7 +59,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: test-report-py${{ matrix.python }}
+          name: test-report-py${{ matrix.python }}-${{ matrix.os }}
           path: reports/test-report.html
           if-no-files-found: error
       - name: Link the report on the run summary page
