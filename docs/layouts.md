@@ -26,7 +26,7 @@ layout = Layout(
 )
 
 page = layout.prepare(800, 480, ScreenMode.gray(16))  # once per screen
-image = page.render({"title": "Hello", "body": "Some text", "art": "cat.png"})
+image = page.render({"title": "Hello", "body": "Some text", "art": "cat.png"})  # any picture file
 
 with VirtualDriver(800, 480, ScreenMode.gray(16), "out") as display:
     display.write(image)  # saves out/latest.png
@@ -44,7 +44,7 @@ with VirtualDriver(800, 480, ScreenMode.gray(16), "out") as display:
 ## Rows, columns and sizes
 
 - `{"row": [...]}` puts items side by side; `{"column": [...]}` puts them on top of each
-  other. Items are blocks or more rows and columns, up to 10 levels deep.
+  other. Items are blocks or more rows and columns, up to 10 levels of rows and columns.
 - `size` is an item's share of the free space (default 1). `{"size": 1}` and
   `{"size": 3}` split the space 1:3. Shares need not add up to 1.
 - `pixels` gives an item a fixed size, taken before the shares: `{"pixels": 2}` for a
@@ -69,7 +69,7 @@ Every block has a unique `name` and a `type`. Options for all blocks:
 | `border` | none | a line around the block's edge (a length) |
 | `inverse` | `false` | swap `fill` and `background` |
 | `padding` | none | space inside the block (a length) |
-| `rgb_support` | `false` | use colour on colour screens; otherwise black, white and gray |
+| `rgb_support` | `false` | use colour on colour screens. Without it, the block is black and white on palette screens (such as the 7-colour ones) and gray on full-colour screens |
 
 ### text
 
@@ -78,7 +78,7 @@ Every block has a unique `name` and a `type`. Options for all blocks:
 | `text` | `""` | text shown when `render` gets no value for this block (for labels) |
 | `max_lines` | 1 | how many lines the block is sized for |
 | `sample` | none | the longest text the block normally shows, used to choose the size |
-| `font_size` | automatic | a fixed size (a length); always wins |
+| `font_size` | automatic | a fixed size (a length). Wins over the automatic size, but is made smaller if one line would be taller than the block |
 | `shrink` | `false` | allow 80% and 60% of the size when the text does not fit |
 | `font` | DejaVu Sans | path to a `.ttf` or `.otf` font file |
 | `align` | `"left"` | `left`, `center`, `right` or `random` |
@@ -88,11 +88,13 @@ Every block has a unique `name` and a `type`. Options for all blocks:
 ### image
 
 `render` takes a Pillow image or a file path. `image` in the layout sets a default path.
+Transparent parts of the image get the block's `background`. Image files larger than
+24 million pixels are refused, to protect the Pi's memory.
 
 | Option | Default | Meaning |
 |---|---|---|
 | `fit` | `"contain"` | `contain`: whole image, shape kept. `cover`: fills the block, sides cut. `stretch`: fills the block, shape changed. `none`: original size |
-| `align` / `valign` | `"center"` | which side the image sits on, and which side is kept when it is cut |
+| `align` / `valign` | `"center"` | which side the image sits on, and which side is kept when it is cut. Also `random` |
 
 ### shape
 
@@ -112,21 +114,25 @@ from one refresh to the next. It is worked out once, by `layout.prepare()`:
    the sample fits the block's width in `max_lines` lines. Use the longest text the block
    normally shows: `"88:88"` for a clock, `"Wednesday 30 September"` for a date. A block
    with fixed `text` (a label) uses that text as its sample.
-3. **Fixed:** `font_size` replaces both steps.
+3. **Fixed:** `font_size` replaces both steps. If one line at that size would be taller
+   than the block, the size is made smaller until it fits.
 
-Without a sample, a one-line block in a wide, low space can get a font that is too large
-for its text. Add a `sample`, or `shrink: true`.
+Without a sample, a block that is tall compared with its width can get a font that is far
+too large for its text: in a narrow, tall one-line block, a date may show only as "…".
+Add a `sample`, or `shrink: true`.
 
 ### Text that does not fit
 
 1. Words are moved to the next line. A word longer than a whole line is broken between
-   letters. `\n` in the text always starts a new line.
+   letters. `\n` in the text always starts a new line (newlines at the very end are
+   ignored). Only as many lines are used as fit the block's height.
 2. With `shrink: true`, if the text still does not fit, it is tried at 80% and then 60% of
    the size. A smaller size may use extra lines when they fit the block's height.
 3. Whatever does not fit after the last line is cut, and the last line ends with "…".
 
-Text never spills out of its block, and letters that lean (italics) or hang below the line
-are never cut off.
+Text never spills out of its block's content area (inside the padding and border). Letters
+that lean (italics) or hang below the line are not cut off. The only exception is a block
+narrower than a single letter: that letter is cut at the edge.
 
 ## Colour and gray
 
@@ -149,9 +155,26 @@ layout = Layout.from_json("layout.json", asset_dirs=["/usr/share/my-fonts"])
 ```
 
 A JSON layout has the same shape as the dictionary. Because JSON files may come from other
-people, fonts and images must be inside `asset_dirs`, and files over 1 MB are refused.
+people, they are checked more strictly:
+- Fonts and images must be existing files inside one of the `asset_dirs` folders. A
+  relative path such as `"fonts/a.ttf"` is looked up in each folder in turn. Paths that
+  lead out of the folders (with `..` or through a link) are refused.
+- Files over 1 MB are refused.
+
+The same path check works for a dictionary: `Layout(data, asset_dirs=[...])`. **Any layout
+that did not come from your own code** (for example one sent from a web page and read with
+`json.loads`) must be loaded with `asset_dirs`. Without it, paths are not checked.
+
+Layouts in a plugin's `layouts.py` are Python code. Loading one runs it, so it has the same
+trust as the plugin itself.
 
 ## Errors
 
 A mistake in a layout raises `LayoutError` with the block's name and the problem, for
 example `block 'body': unknown key 'colour' (did you mean 'fill'?)`.
+
+`render()` raises `LayoutError` too, for example:
+- `no block named 'titel' in layout`: the data names a block that does not exist.
+- `block 's': takes a dictionary with 'fill' and/or 'background'`: a wrong value for a
+  shape block.
+- `block 'art': could not draw it: ...`: an image file that is missing or broken.

@@ -17,7 +17,7 @@ from PIL import ImageColor
 
 #: Deepest allowed nesting of rows and columns.
 MAX_DEPTH = 10
-#: Largest layout file that :func:`load_json` reads, in bytes.
+#: Largest layout file that :func:`read_json` reads, in bytes.
 MAX_JSON_BYTES = 1_000_000
 #: Largest fixed size in pixels anywhere in a layout.
 MAX_PIXELS = 20_000
@@ -90,7 +90,7 @@ def parse(data: Any, *, asset_dirs: list[Path] | None = None) -> Container:
     """Check a layout and return its tree.
 
     ``asset_dirs``: when given, font and image paths must be inside one of these folders.
-    Used for layouts from files that are not trusted code (see :func:`load_json`).
+    Used for layouts from files that are not trusted code (see :func:`read_json`).
     """
     parser = _Parser(asset_dirs)
     if not isinstance(data, dict):
@@ -103,20 +103,26 @@ def parse(data: Any, *, asset_dirs: list[Path] | None = None) -> Container:
     return root
 
 
-def load_json(source: str | Path, *, asset_dirs: list[str | Path]) -> Container:
-    """Read a layout from a JSON file.
+def read_json(source: str | Path) -> Any:
+    """Read the data of a JSON layout file, with clear errors and a size limit.
 
-    JSON layouts may come from people other than the program's author, so they are read as
-    data only, and fonts and images must be inside ``asset_dirs``.
+    JSON files are read as data only. Pass the result to ``Layout(data, asset_dirs=...)``
+    so that font and image paths are checked too (``Layout.from_json`` does both).
     """
     path = Path(source)
-    if path.stat().st_size > MAX_JSON_BYTES:
+    try:
+        with path.open("rb") as file:
+            raw = file.read(MAX_JSON_BYTES + 1)
+    except OSError as err:
+        raise LayoutError(f"{path}: cannot read it: {err}") from None
+    if len(raw) > MAX_JSON_BYTES:
         raise LayoutError(f"{path}: larger than {MAX_JSON_BYTES} bytes")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as err:
-        raise LayoutError(f"{path}: not valid JSON: {err}") from None
-    return parse(data, asset_dirs=[Path(d) for d in asset_dirs])
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, RecursionError) as err:
+        # ValueError covers bad JSON, bad UTF-8 and numbers with thousands of digits.
+        message = "nested too deeply" if isinstance(err, RecursionError) else err
+        raise LayoutError(f"{path}: not valid JSON: {message}") from None
 
 
 def blocks(root: Container) -> list[Block]:
@@ -136,11 +142,11 @@ class _Parser:
         self.names: set[str] = set()
 
     def node(self, data: Any, where: str, depth: int) -> Node:
-        if depth > MAX_DEPTH:
-            raise LayoutError(f"{where}: rows and columns nested deeper than {MAX_DEPTH}")
         if not isinstance(data, dict):
             raise LayoutError(f"{where}: must be a dictionary, got {type(data).__name__}")
         if "row" in data or "column" in data:
+            if depth > MAX_DEPTH:
+                raise LayoutError(f"{where}: rows and columns nested deeper than {MAX_DEPTH}")
             return self.container(data, where, depth)
         if "name" in data:
             return self.block(data, where)
@@ -194,8 +200,8 @@ class _Parser:
 
     def options(self, kind: str, data: dict, where: str) -> dict[str, Any]:
         o: dict[str, Any] = {
-            "background": _color(data.get("background", "white"), "background", where),
-            "fill": _color(data.get("fill", "black"), "fill", where),
+            "background": check_color(data.get("background", "white"), "background", where),
+            "fill": check_color(data.get("fill", "black"), "fill", where),
             "border": _length(data.get("border"), "border", where),
             "inverse": _bool(data.get("inverse", False), "inverse", where),
             "rgb_support": _bool(data.get("rgb_support", False), "rgb_support", where),
@@ -230,17 +236,22 @@ class _Parser:
             raise LayoutError(f"{where}: '{key}' must be a file path")
         if self.asset_dirs is None:
             return value
-        # Relative paths are looked up in each allowed folder in turn; resolve() follows
-        # "..", so a path that climbs out of the folder is refused.
-        allowed = []
+        # Relative paths are looked up in each allowed folder in turn. resolve() follows
+        # ".." and links, so a path that leads out of the folder is refused.
+        inside = False
         for d in self.asset_dirs:
-            candidate = (d / value).resolve()
-            if candidate.is_relative_to(d):
-                allowed.append(candidate)
-        if not allowed:
+            try:
+                candidate = (d / value).resolve()
+            except (OSError, ValueError):
+                raise LayoutError(f"{where}: '{key}' {value!r} is not a valid path") from None
+            if not candidate.is_relative_to(d):
+                continue
+            inside = True
+            if candidate.is_file():
+                return str(candidate)
+        if not inside:
             raise LayoutError(f"{where}: '{key}' {value!r} is outside the allowed folders")
-        existing = [p for p in allowed if p.exists()]
-        return str((existing or allowed)[0])
+        raise LayoutError(f"{where}: '{key}' {value!r} is not a file in the allowed folders")
 
 
 def _child_where(item: Any, fallback: str) -> str:
@@ -311,7 +322,8 @@ def _choice(value: Any, choices: tuple[str, ...], key: str, where: str) -> str:
     return value
 
 
-def _color(value: Any, key: str, where: str) -> str:
+def check_color(value: Any, key: str, where: str) -> str:
+    """Return ``value`` if it is a colour name or ``#rrggbb``; raise :class:`LayoutError` if not."""
     try:
         ImageColor.getrgb(value)
     except (ValueError, AttributeError, TypeError):

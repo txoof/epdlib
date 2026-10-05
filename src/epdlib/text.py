@@ -1,6 +1,6 @@
 """Measuring, wrapping and placing text.
 
-Rules (see ``docs/text-size.md``):
+Rules (see "Measuring text" in ``docs/decisions/layout.md``):
 
 - Every measurement and every drawing call uses the same reference point: the left end
   of the line the text sits on (the "baseline"; Pillow anchor ``ls``). What is measured is
@@ -118,10 +118,10 @@ def wrap(
     """Break ``text`` into at most ``max_lines`` lines that fit ``width`` pixels.
 
     Returns the lines and whether all of the text fitted. When it did not, the last line
-    ends with ``ellipsis``.
+    ends with ``ellipsis``. Newlines at the very end of the text are ignored.
     """
     lines: list[str] = []
-    for paragraph in text.split("\n"):
+    for paragraph in text.rstrip("\n").split("\n"):
         lines.extend(_wrap_paragraph(font, paragraph, width, max_lines - len(lines)))
         if len(lines) > max_lines:
             break
@@ -177,9 +177,15 @@ def _wrap_words(
     return lines
 
 
-@lru_cache(maxsize=4096)
 def _overhang(font: FontType, first: str, last: str) -> int:
     """How far ink reaches left of the first letter and right of the last letter's width."""
+    return _overhang_cached(font.path, font.size, first, last)
+
+
+@lru_cache(maxsize=4096)
+def _overhang_cached(path: str, size: int, first: str, last: str) -> int:
+    # Kept by font file and size, not by font object, so old fonts can be freed.
+    font = load_font(path, size)
     left = -min(0, font.getbbox(first, anchor="ls")[0])
     right = max(0, font.getbbox(last, anchor="ls")[2] - int(-(-font.getlength(last) // 1)))
     return left + right
@@ -255,13 +261,15 @@ def fit_text(
 ) -> TextFit:
     """Wrap ``text`` at ``base_size``; with ``shrink``, try the smaller fixed steps too.
 
-    A smaller step may use more lines than ``max_lines`` when they fit in ``height``.
+    Never uses more lines than fit in ``height`` (at least one). A smaller step may use
+    more lines than ``max_lines`` when they fit.
     """
     steps = SHRINK_STEPS if shrink else (1.0,)
     result = None
     for step in steps:
         font = load_font(path, max(1, round(base_size * step)))
-        allowed = max(max_lines, height // line_height(font)) if step < 1 else max_lines
+        by_height = max(1, height // line_height(font))
+        allowed = by_height if step < 1 else min(max_lines, by_height)
         lines, complete = wrap(font, text, width, allowed, ellipsis)
         result = TextFit(font, lines, complete)
         if complete:

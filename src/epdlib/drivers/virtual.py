@@ -34,6 +34,8 @@ class VirtualDriver(Driver):
         timeout: float = 60.0,
     ):
         super().__init__(timeout=timeout)
+        if keep < 1:
+            raise ValueError("keep must be at least 1")
         self.info = DisplayInfo(
             model=f"virtual {width}x{height} {mode.kind}",
             width=width,

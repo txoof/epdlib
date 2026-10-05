@@ -48,6 +48,23 @@ def test_border_is_drawn_at_the_edge():
     assert image.getpixel((3, 25)) == 255
 
 
+@pytest.mark.parametrize("axis", ["align", "valign"])
+def test_random_alignment_moves_text_and_stays_inside(axis):
+    block = text_block("a", font_size={"pixels": 20}, **{axis: "random"})
+    page = Layout(column(block)).prepare(400, 200, MODE)
+    boxes = {ink(page.render({"a": "x"}, seed=s)) for s in range(8)}
+    assert len(boxes) > 1
+    for box in boxes:
+        assert box[0] >= 0 and box[1] >= 0 and box[2] <= 400 and box[3] <= 200
+
+
+def test_random_alignment_moves_images():
+    page = image_page(fit="none", align="random", valign="random")
+    boxes = {ink(page.render({"img": black(20, 20)}, seed=s)) for s in range(8)}
+    assert len(boxes) > 1
+    assert all(b[2] - b[0] == 20 and b[3] - b[1] == 20 for b in boxes)
+
+
 def test_random_alignment_is_repeatable_with_seed():
     page = Layout(column(text_block("a", align="random", valign="random"))).prepare(400, 200, MODE)
     page_small = Layout(column(text_block("a", align="random", font_size={"pixels": 20})))
@@ -147,6 +164,31 @@ def test_shape_colour_can_change_while_running():
 def test_shape_bad_value():
     with pytest.raises(LayoutError, match="'fill' and/or 'background'"):
         shape_page("rectangle").render({"s": "red"})
+    with pytest.raises(LayoutError, match="block 's': 'fill' 'blurple' is not a colour"):
+        shape_page("rectangle").render({"s": {"fill": "blurple"}})
+
+
+def test_huge_image_file_is_refused(tmp_path, monkeypatch):
+    from epdlib import layout as layout_module
+
+    monkeypatch.setattr(layout_module, "MAX_IMAGE_PIXELS", 100)
+    path = tmp_path / "big.png"
+    black(20, 20).save(path)
+    with pytest.raises(LayoutError, match="block 'img': image is 20x20 pixels"):
+        image_page().render({"img": str(path)})
+
+
+def test_broken_image_file_gives_layout_error(tmp_path):
+    path = tmp_path / "broken.png"
+    path.write_bytes(b"not a picture")
+    with pytest.raises(LayoutError, match="block 'img': could not draw it"):
+        image_page().render({"img": str(path)})
+
+
+def test_image_with_transparent_colour_gets_background():
+    picture = black(20, 20).convert("P")
+    picture.info["transparency"] = 0
+    assert ink(image_page().render({"img": picture})) is None
 
 
 def test_block_smaller_than_padding_is_skipped_quietly():

@@ -86,7 +86,12 @@ class Driver(ABC):
             raise DisplayError(
                 f"image is {image.size[0]}x{image.size[1]}, screen is {size[0]}x{size[1]}"
             )
-        return self.info.mode.convert(image) if image.mode != self.info.mode.pil_mode else image
+        mode = self.info.mode
+        if image.mode == mode.pil_mode and mode.kind in ("bw", "rgb"):
+            return image  # the Pillow mode already says the image fits the screen
+        # Gray and palette screens: an "L" or "RGB" image may still use shades or colours
+        # the screen does not have, so it is always reduced.
+        return mode.convert(image)
 
     def __enter__(self) -> Driver:
         self.init()

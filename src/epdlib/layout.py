@@ -23,8 +23,12 @@ from PIL import Image, ImageDraw
 
 from . import spec, text
 from .geometry import Box, align_offset, place
-from .modes import ScreenMode, _flatten
+from .modes import ScreenMode, flatten, has_transparency
 from .spec import Block, LayoutError
+
+#: Largest image file a block will read, in pixels (about 3 times a 9.7" screen photo,
+#: and small enough for a Raspberry Pi 3's memory).
+MAX_IMAGE_PIXELS = 24_000_000
 
 
 class Layout:
@@ -38,10 +42,7 @@ class Layout:
     @classmethod
     def from_json(cls, path: str | Path, *, asset_dirs: list[str | Path]) -> Layout:
         """Read a layout from a JSON file. Fonts and images must be inside ``asset_dirs``."""
-        layout = cls.__new__(cls)
-        layout.root = spec.load_json(path, asset_dirs=asset_dirs)
-        layout.blocks = {b.name: b for b in spec.blocks(layout.root)}
-        return layout
+        return cls(spec.read_json(path), asset_dirs=asset_dirs)
 
     def prepare(self, width: int, height: int, mode: ScreenMode) -> PreparedLayout:
         """Work out block positions and font sizes for one screen. Done once, then reused."""
@@ -71,11 +72,12 @@ class PreparedLayout:
         return Box(0, 0, box.width, box.height).inset(edge)
 
     def _font_size(self, block: Block) -> int:
-        fixed = block.options["font_size"]
-        if fixed is not None:
-            return max(1, fixed.to_pixels(self.short_side))
         o = block.options
         inner = self._inner(block)
+        tallest = text.size_for_height(o["font"], inner.height)
+        if o["font_size"] is not None:
+            # A fixed size wins, but never makes one line taller than the block.
+            return max(1, min(o["font_size"].to_pixels(self.short_side), tallest))
         size = text.size_for_height(o["font"], inner.height // o["max_lines"])
         # The sample (or else the block's fixed text) must also fit the width.
         sample = o["sample"] or o["text"]
@@ -102,7 +104,12 @@ class PreparedLayout:
             box = self.boxes[name]
             if box.width <= 0 or box.height <= 0:
                 continue
-            image = self._draw_block(block, box, data.get(name), rng)
+            try:
+                image = self._draw_block(block, box, data.get(name), rng)
+            except (OSError, ValueError, Image.DecompressionBombError) as err:
+                if isinstance(err, LayoutError):
+                    raise
+                raise LayoutError(f"block '{name}': could not draw it: {err}") from err
             page.paste(image, (box.x, box.y))
         return self.mode.finish(page)
 
@@ -113,7 +120,7 @@ class PreparedLayout:
             (o["background"], o["fill"]) if o["inverse"] else (o["fill"], o["background"])
         )
         if block.type == "shape":
-            fill, background = self._shape_colors(value, fill, background)
+            fill, background = self._shape_colors(block, value, fill, background)
         canvas = Image.new(self.mode.work_mode(color), box.size, self.mode.ink(background, color))
         draw = ImageDraw.Draw(canvas)
         border = o["border"].to_pixels(self.short_side)
@@ -126,7 +133,7 @@ class PreparedLayout:
         inner = self._inner(block)
         if inner.width > 0 and inner.height > 0:
             if block.type == "text":
-                self._draw_text(block, draw, inner, value, fill, color, rng)
+                self._draw_text(block, canvas, inner, value, fill, color, rng)
             elif block.type == "shape":
                 self._draw_shape(block, draw, inner, fill, color)
         # Text is never dithered, so it stays sharp. Shapes are, so a gray fill on a
@@ -141,7 +148,7 @@ class PreparedLayout:
                 result.paste(reduced, pos)
         return result
 
-    def _draw_text(self, block, draw, inner: Box, value, fill, color, rng) -> None:
+    def _draw_text(self, block, canvas, inner: Box, value, fill, color, rng) -> None:
         o = block.options
         content = o["text"] if value is None else str(value)
         result = text.fit_text(
@@ -158,22 +165,24 @@ class PreparedLayout:
         lines = text.arrange(
             result.font, result.lines, inner.width, inner.height, o["align"], o["valign"], offset
         )
+        # Draw on a canvas the size of the content area, so that text can never reach the
+        # block's padding or border, even when a single letter is wider than the block.
+        area = canvas.crop((inner.x, inner.y, inner.x + inner.width, inner.y + inner.height))
+        draw = ImageDraw.Draw(area)
         ink = self.mode.ink(fill, color)
         for line in lines:
-            draw.text(
-                (inner.x + line.x, inner.y + line.baseline),
-                line.text,
-                font=result.font,
-                fill=ink,
-                anchor="ls",
-            )
+            draw.text((line.x, line.baseline), line.text, font=result.font, fill=ink, anchor="ls")
+        canvas.paste(area, (inner.x, inner.y))
 
-    def _shape_colors(self, value, fill, background):
+    def _shape_colors(self, block, value, fill, background):
         if value is None:
             return fill, background
+        where = f"block '{block.name}'"
         if not isinstance(value, dict) or set(value) - {"fill", "background"}:
-            raise LayoutError("a shape block takes a dictionary with 'fill' and/or 'background'")
-        return value.get("fill", fill), value.get("background", background)
+            raise LayoutError(f"{where}: takes a dictionary with 'fill' and/or 'background'")
+        fill = spec.check_color(value.get("fill", fill), "fill", where)
+        background = spec.check_color(value.get("background", background), "background", where)
+        return fill, background
 
     def _draw_shape(self, block, draw, inner: Box, fill, color) -> None:
         o = block.options
@@ -200,16 +209,26 @@ class PreparedLayout:
         if isinstance(value, Image.Image):
             return value
         if isinstance(value, (str, Path)):
-            with Image.open(value) as img:
-                img.load()
-                return img.copy()
+            img = Image.open(value)
+            width, height = img.size
+            if width * height > MAX_IMAGE_PIXELS:
+                img.close()
+                raise LayoutError(
+                    f"block '{block.name}': image is {width}x{height} pixels; "
+                    f"the largest allowed is {MAX_IMAGE_PIXELS:,} pixels"
+                )
+            # JPEG files can be read at a smaller size directly, which saves memory.
+            box = self._inner(block)
+            img.draft("RGB", (box.width, box.height))
+            img.load()  # reads the pixels and closes the file
+            return img
         raise LayoutError(f"block '{block.name}': expected a Pillow image or a file path")
 
 
 def _fit_image(picture: Image.Image, inner: Box, o: dict, background: str, rng: random.Random):
     """Scale an image into ``inner``; return it and where to paste it in the block."""
-    if picture.mode in ("RGBA", "LA", "P", "PA") or "transparency" in picture.info:
-        picture = _flatten(picture, background)
+    if has_transparency(picture):
+        picture = flatten(picture, background)
     else:
         picture = picture.convert("RGB")
     w, h = picture.size

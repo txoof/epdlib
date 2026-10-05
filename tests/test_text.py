@@ -2,17 +2,26 @@ import pytest
 from PIL import Image, ImageChops, ImageDraw
 
 from epdlib import Layout, ScreenMode
-from epdlib.text import SHRINK_STEPS, arrange, fit_text, line_height, load_font, size_for_height
+from epdlib.text import (
+    SHRINK_STEPS,
+    arrange,
+    fit_text,
+    fits,
+    line_height,
+    load_font,
+    size_for_height,
+    wrap,
+)
 
-from .conftest import column, text_block
+from .conftest import column, row, text_block
 
 TRICKY = ["jump fjord", "gjpqy", "Åsa Ölçü", "ffj", "Hello, World!", "jjjj ffff", "Wy"]
 
 
-def ink_box(font_path, text, width, height, max_lines, align, valign, shrink=False):
+def ink_box(font_path, text, width, height, max_lines, align, valign):
     """Draw text the way a text block does, with a wide margin, and return the ink's box."""
     size = size_for_height(font_path, height // max_lines)
-    fit = fit_text(font_path, size, text, width, height, max_lines, shrink, "…")
+    fit = fit_text(font_path, size, text, width, height, max_lines, False, "…")
     margin = 200
     canvas = Image.new("L", (width + 2 * margin, height + 2 * margin), 255)
     draw = ImageDraw.Draw(canvas)
@@ -84,6 +93,7 @@ def test_too_long_text_is_cut_with_ellipsis():
     fit = fit_text(None, 40, "one two three four five six seven", 200, 100, 2, False, "…")
     assert len(fit.lines) == 2
     assert fit.lines[-1].endswith("…")
+    assert all(fits(fit.font, line, 200) for line in fit.lines)
     assert not fit.complete
 
 
@@ -101,6 +111,7 @@ def test_newlines_start_a_new_line():
 def test_long_word_is_broken():
     fit = fit_text(None, 30, "x" * 80, 200, 300, 10, False, "…")
     assert len(fit.lines) > 1
+    assert all(fits(fit.font, line, 200) for line in fit.lines)
     assert "".join(fit.lines) == "x" * 80
 
 
@@ -153,3 +164,85 @@ def test_fonts_use_basic_layout_on_every_computer(italic_font):
 
     for path in (None, italic_font):
         assert load_font(path, 20).layout_engine == ImageFont.Layout.BASIC
+
+
+def test_cut_line_fits_even_when_last_word_is_long():
+    font = load_font(None, 30)
+    lines, complete = wrap(font, "a " + "W" * 40, 150, 1, "…")
+    assert not complete
+    assert fits(font, lines[0], 150)
+
+
+def test_trailing_newline_is_not_an_extra_line():
+    font = load_font(None, 20)
+    assert wrap(font, "hello\n", 500, 1, "…") == (["hello"], True)
+    assert wrap(font, "\n", 500, 1, "…") == ([""], True)
+
+
+def test_shrink_step_may_use_extra_lines():
+    """max_lines 1, but smaller steps fit more lines in the height: the text is complete."""
+    base = 50
+    text = "several words that need two lines"
+    fit = fit_text(None, base, text, 300, 120, 1, True, "…")
+    assert fit.complete
+    assert len(fit.lines) > 1
+    assert fit.font.size in {round(base * s) for s in SHRINK_STEPS[1:]}
+
+
+def test_lines_never_exceed_block_height():
+    """A fixed size with too many max_lines uses only the lines that fit."""
+    fit = fit_text(None, 30, "one two three four five six", 80, 60, 5, False, "…")
+    assert len(fit.lines) * line_height(fit.font) <= 60
+
+
+def rendered_ink_inside(block, width=300, height=120):
+    """Render one block through Layout.render; return (ink box, content box)."""
+    page = Layout(row(block)).prepare(width, height, ScreenMode.gray(16))
+    content = page._inner(page.layout.blocks[block["name"]])
+    image = page.render()
+    if block.get("border"):
+        # Paint the border white so only text ink is left.
+        border = page.layout.blocks[block["name"]].options["border"].to_pixels(height)
+        image.paste(255, (0, 0, width, border))
+        image.paste(255, (0, height - border, width, height))
+        image.paste(255, (0, 0, border, height))
+        image.paste(255, (width - border, 0, width, height))
+    return ImageChops.invert(image).getbbox(), content
+
+
+@pytest.mark.parametrize("max_lines", [1, 2, 3])
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"padding": {"pixels": 10}},
+        {"border": {"pixels": 4}, "padding": {"pixels": 6}},
+        {"font_size": {"pixels": 60}, "padding": {"pixels": 10}},
+        {"font_size": {"pixels": 40}, "shrink": True, "padding": {"pixels": 10}},
+    ],
+)
+def test_rendered_text_stays_in_content_area(max_lines, extra, italic_font):
+    block = text_block(
+        "t",
+        text="jump fjord gjpqy Åsa " * 3,
+        max_lines=max_lines,
+        font=italic_font,
+        **extra,
+    )
+    ink, content = rendered_ink_inside(block)
+    assert ink is not None
+    assert ink[0] >= content.x and ink[1] >= content.y
+    assert ink[2] <= content.x + content.width and ink[3] <= content.y + content.height
+
+
+def test_letter_wider_than_block_stays_inside():
+    block = text_block("t", text="WWW", font_size={"pixels": 40}, padding={"pixels": 10})
+    ink, content = rendered_ink_inside(block, width=45, height=80)
+    assert ink is None or (ink[0] >= content.x and ink[2] <= content.x + content.width)
+
+
+def test_fixed_font_size_is_capped_at_block_height():
+    page = Layout(column(text_block("t", font_size={"pixels": 5000}))).prepare(
+        200, 100, ScreenMode.gray(16)
+    )
+    assert line_height(load_font(None, page.font_sizes["t"])) <= 100
+    page.render({"t": "Hi"})  # must not try to draw a 5000 px font

@@ -50,6 +50,13 @@ def test_rgb_support_block_keeps_colour_on_colour_screens():
     assert (255, 0, 0) in colors(label)
 
 
+def test_block_without_rgb_support_is_gray_on_full_colour_screen():
+    image = LAYOUT.prepare(360, 80, ScreenMode.rgb()).render({"photo": GRADIENT})
+    plain = image.crop((240, 0, 360, 80))
+    assert all(r == g == b for r, g, b in colors(plain))
+    assert len(colors(plain)) > 2  # anti-aliased text edges in gray
+
+
 def test_block_without_rgb_support_is_black_and_white_on_palette_screen():
     image = render(ScreenMode.palette())
     plain = image.crop((240, 0, 360, 80))
@@ -67,11 +74,19 @@ def test_text_is_never_dithered():
     assert colors(corner) == {255}
 
 
+def changes_along_row(image, y):
+    row = [image.getpixel((x, y)) for x in range(image.width)]
+    return sum(1 for a, b in zip(row, row[1:], strict=False) if a != b)
+
+
 def test_images_are_dithered():
+    """A smooth gradient shown in black and white becomes a dot pattern.
+
+    Without dithering, each row would be all black or all white (no changes along it).
+    """
     image = render(ScreenMode.bw()).convert("L")
-    photo = image.crop((140, 10, 220, 70))
-    # A smooth gradient shown with two values needs both, mixed in a pattern.
-    assert colors(photo) == {0, 255}
+    photo = image.crop((130, 30, 230, 50))  # middle of the gradient
+    assert changes_along_row(photo, 10) > 10
 
 
 def test_convert_any_image():

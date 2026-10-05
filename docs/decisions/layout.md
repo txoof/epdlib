@@ -1,6 +1,7 @@
 # Layout engine
 
-Status: proposed (M3, issue #79). Decided with txoof in the terminal on 2026-10-05.
+Status: proposed (M3, issue #79). Agreed with txoof in the terminal on 2026-10-05; final
+when PR #80 is approved.
 
 This note records how epdlib v1 describes and draws layouts. How to write a layout is in
 [`../layouts.md`](../layouts.md).
@@ -36,10 +37,12 @@ What v0.6 did badly:
    stays.
 2. A grid of named cells, like CSS "grid template areas". Rejected: exact proportions need
    many cells or extra size lists, and deep nesting is hard to draw.
-3. Render HTML in a headless browser (InkyPi, TRMNL). Rejected: Chromium needs a few
+3. Write layouts as web pages (HTML) and take a picture of them with a headless browser (a
+   web browser that runs without a window), as InkyPi and TRMNL do. Rejected: Chromium needs a few
    hundred MB and seconds to start, too heavy for a Pi 3, and it breaks the
    draw-each-block-in-the-screen's-colours rule.
-4. **Rows and columns that nest**, like CSS flexbox, Home Assistant's horizontal and
+4. **Rows and columns that nest**, like CSS flexbox (the row-and-column method of web
+   pages), Home Assistant's horizontal and
    vertical stacks, and Qt/Kivy box layouts. **Chosen.** It is the most common method, and
    the arithmetic is about 50 lines, so no library is needed for it.
 
@@ -92,12 +95,16 @@ What v0.6 did badly:
   2. If the block has a `sample` (the longest text it normally shows, e.g. `"88:88"` for a
      clock), the size is reduced until the sample fits the width as well. A block with
      fixed `text` (a label) uses that text as its sample.
-- A `font_size` in the layout always wins (old issue 58).
+- A `font_size` in the layout wins over the automatic size (old issue 58). It is only made
+  smaller if one line would be taller than the block. That keeps text inside the block,
+  and stops a huge size in a layout file from using a lot of memory (found in review).
 - `shrink: true`: when the text does not fit, try 80% and then 60% of the size, and no
   other sizes. A smaller step may use extra lines if they fit the height. The size changes
   only between these three steps.
-- Too long at the final size: wrapped, then cut with "…". Text never spills out of its
-  block.
+- Text never uses more lines than fit the block's height.
+- Too long at the final size: wrapped, then cut with "…". Text is drawn on its own canvas
+  the size of the block's content area, so it can never reach the padding or border. Only
+  a block narrower than one letter cuts that letter.
 
 ### Measuring text
 - Every measurement and every drawing call uses the same reference point: the left end of
@@ -120,7 +127,8 @@ What v0.6 did badly:
 - **Text is never dithered**: each pixel goes to the nearest available shade, so it stays
   sharp. **Images and shapes are dithered**, so a gray fill shows as a dot pattern on a
   black-and-white screen instead of disappearing.
-- Without `rgb_support`, a block on a colour screen is drawn in black and white.
+- Without `rgb_support`, a block on a colour screen is drawn without colour: in black and
+  white on palette screens (they have no grays), and in gray on full-colour screens.
 - `ScreenMode.convert()` turns any finished image (for example one a program drew itself)
   into the screen's mode as a last step.
 
@@ -139,9 +147,17 @@ What v0.6 did badly:
 - A plugin's `layouts.py` is Python code, so loading it runs it. It has the same trust as
   the plugin itself: install plugins only from sources you trust.
 - JSON layouts are data only. They are read with Python's `json` module, never with
-  `eval` or `pickle`. Limits: font and image paths must be inside the allowed folders
-  (paths with `..` that climb out are refused), at most 10 levels of nesting, at most
-  1 MB per file, and fixed sizes of at most 20,000 pixels.
+  `eval` or `pickle`. Limits: font and image paths must be existing files inside the
+  allowed folders (paths that lead out with `..` or through a link are refused), at most
+  10 levels of rows and columns, at most 1 MB per file (read with a hard limit, so a pipe
+  or device file can't get around it), and fixed sizes of at most 20,000 pixels.
+- Any layout that did not come from the program's own code must be loaded with
+  `asset_dirs`, also when it is a dictionary (for example from a web page). Without
+  `asset_dirs`, paths are not checked.
+- Image files larger than 24 million pixels are refused before they are read, and JPEG
+  files are read at about the block's size, to protect a Pi's memory.
+- Problems while drawing (a broken image file, for example) are reported as `LayoutError`
+  with the block's name.
 
 ### Driver interface and the virtual driver
 - `epdlib.drivers.Driver` defines `init`, `write(image, fast)`, `clear`, `sleep` and

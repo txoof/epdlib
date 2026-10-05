@@ -36,6 +36,35 @@ def test_write_after_sleep_needs_init(tmp_path):
         display.write(Image.new("1", (10, 10)))
 
 
+def test_fast_refresh_when_supported(tmp_path):
+    with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path, fast_refresh=True) as display:
+        display.write(Image.new("1", (10, 10)), fast=True)
+    assert ("write", "fast") in display.log
+
+
+@pytest.mark.parametrize("options", [{"timeout": 0}, {"timeout": -1}, {"keep": 0}])
+def test_bad_settings(tmp_path, options):
+    with pytest.raises(ValueError):
+        VirtualDriver(10, 10, ScreenMode.bw(), tmp_path, **options)
+
+
+def test_gray_image_is_reduced_to_screen_levels(tmp_path):
+    with VirtualDriver(10, 10, ScreenMode.gray(4), tmp_path) as display:
+        display.write(Image.new("L", (10, 10), 100))
+    assert {c for _, c in display.image.getcolors()} <= {0, 85, 170, 255}
+
+
+def test_palette_screen_gets_only_its_colours(tmp_path):
+    from PIL import ImageColor
+
+    from epdlib import SEVEN_COLORS
+
+    allowed = {ImageColor.getrgb(c) for c in SEVEN_COLORS}
+    with VirtualDriver(10, 10, ScreenMode.palette(), tmp_path) as display:
+        display.write(Image.new("RGB", (10, 10), (123, 45, 200)))
+    assert {c for _, c in display.image.getcolors()} <= allowed
+
+
 def test_fast_is_only_a_request(tmp_path):
     with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path, fast_refresh=False) as display:
         display.write(Image.new("1", (10, 10)), fast=True)

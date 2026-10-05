@@ -1,8 +1,8 @@
 """What a screen can show, and how drawn images are reduced to that.
 
 Every block is drawn in a working image ("L" for gray, "RGB" for colour) and then reduced
-to the screen's mode. Text and shapes are reduced without dithering (each pixel goes to
-the nearest colour the screen has), so they stay sharp. Images are dithered: dot patterns
+to the screen's mode. Text is reduced without dithering (each pixel goes to the nearest
+colour the screen has), so it stays sharp. Images and shapes are dithered: dot patterns
 fake the in-between shades.
 """
 
@@ -114,8 +114,8 @@ class ScreenMode:
 
     def convert(self, image: Image.Image) -> Image.Image:
         """Convert any image (for example one a program drew itself) to this mode, dithered."""
-        if image.mode in ("RGBA", "LA", "P", "PA"):
-            image = _flatten(image)
+        if has_transparency(image):
+            image = flatten(image)
         return self.finish(self.reduce(image, dither=True, color=True))
 
 
@@ -135,7 +135,12 @@ def _quantize(image: Image.Image, colors, dither: bool) -> Image.Image:
     return image.quantize(palette=pal, dither=method)
 
 
-def _flatten(image: Image.Image, background: str = "white") -> Image.Image:
+def has_transparency(image: Image.Image) -> bool:
+    """True when the image has see-through parts (an alpha channel or a transparent colour)."""
+    return image.mode in ("RGBA", "LA", "PA", "RGBa", "La") or "transparency" in image.info
+
+
+def flatten(image: Image.Image, background: str = "white") -> Image.Image:
     """Put a transparent image on a plain background."""
     rgba = image.convert("RGBA")
     base = Image.new("RGBA", rgba.size, background)
