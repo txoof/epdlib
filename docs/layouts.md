@@ -98,10 +98,12 @@ Transparent parts of the image get the block's `background`. Image files larger 
 
 ### shape
 
-`shape` is `rectangle` (default), `circle`, `ellipse`, `hline` or `vline`:
-- `circle` is the largest circle that fits the block, so it stays round on any screen. It
-  is placed by `align` and `valign` (default `center`; `random` also works).
-- `ellipse` fills the whole block, so it is only round when the block is square.
+`shape` is `rectangle` (default), `square`, `circle`, `ellipse`, `hline` or `vline`:
+- `square` and `circle` are the largest square or circle that fits the block, so they
+  keep their shape on any screen. They are placed by `align` and `valign` (default
+  `center`; `random` also works).
+- `rectangle` and `ellipse` fill the whole block, so their shape changes with the block's
+  shape, which depends on the screen.
 - Lines are `line_width` thick (default 1 pixel) and drawn across the middle of the block. `render` can take
 `{"fill": "red", "background": "black"}` to change colours while running.
 

@@ -192,12 +192,17 @@ class PreparedLayout:
         line = max(1, o["line_width"].to_pixels(self.short_side))
         if o["shape"] == "rectangle":
             draw.rectangle((x0, y0, x1, y1), fill=ink)
-        elif o["shape"] == "circle":
-            # The largest circle that fits, so it stays round whatever the block's shape.
+        elif o["shape"] in ("square", "circle"):
+            # The largest square or circle that fits, so it keeps its shape whatever the
+            # block's shape (and so on any screen).
             d = min(inner.width, inner.height)
             left = x0 + align_offset(inner.width - d, o["align"], rng.random())
             top = y0 + align_offset(inner.height - d, o["valign"], rng.random())
-            draw.ellipse((left, top, left + d - 1, top + d - 1), fill=ink)
+            box = (left, top, left + d - 1, top + d - 1)
+            if o["shape"] == "square":
+                draw.rectangle(box, fill=ink)
+            else:
+                draw.ellipse(box, fill=ink)
         elif o["shape"] == "ellipse":
             draw.ellipse((x0, y0, x1, y1), fill=ink)
         elif o["shape"] == "hline":

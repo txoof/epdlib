@@ -23,7 +23,7 @@ MAX_JSON_BYTES = 1_000_000
 MAX_PIXELS = 20_000
 
 BLOCK_TYPES = ("text", "image", "shape")
-SHAPES = ("rectangle", "circle", "ellipse", "hline", "vline")
+SHAPES = ("rectangle", "square", "circle", "ellipse", "hline", "vline")
 H_ALIGN = ("left", "center", "right", "random")
 V_ALIGN = ("top", "center", "bottom", "random")
 FITS = ("contain", "cover", "stretch", "none")

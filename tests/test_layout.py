@@ -155,9 +155,10 @@ def test_ellipse_fills_block():
     assert ink(shape_page("ellipse").render()) == (0, 0, 100, 50)
 
 
+@pytest.mark.parametrize("shape", ["circle", "square"])
 @pytest.mark.parametrize("size", [(100, 50), (50, 100), (264, 80)])
-def test_circle_is_round_in_any_block(size):
-    block = {"name": "s", "type": "shape", "shape": "circle"}
+def test_circle_and_square_keep_their_shape_in_any_block(shape, size):
+    block = {"name": "s", "type": "shape", "shape": shape}
     box = ink(Layout(column(block)).prepare(*size, MODE).render())
     assert box[2] - box[0] == box[3] - box[1] == min(size)
 
