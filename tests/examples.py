@@ -106,7 +106,7 @@ EXAMPLES = {
                 {
                     "size": 1,
                     "column": [
-                        {"name": "dot", "type": "shape", "shape": "ellipse", "padding": 0.03},
+                        {"name": "dot", "type": "shape", "shape": "circle", "padding": 0.03},
                         {"name": "bar", "type": "shape", "shape": "rectangle", "fill": "gray"},
                     ],
                 },

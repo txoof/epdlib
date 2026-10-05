@@ -98,8 +98,11 @@ Transparent parts of the image get the block's `background`. Image files larger 
 
 ### shape
 
-`shape` is `rectangle` (default), `ellipse`, `hline` or `vline`. Lines are `line_width`
-thick (default 1 pixel) and drawn across the middle of the block. `render` can take
+`shape` is `rectangle` (default), `circle`, `ellipse`, `hline` or `vline`:
+- `circle` is the largest circle that fits the block, so it stays round on any screen. It
+  is placed by `align` and `valign` (default `center`; `random` also works).
+- `ellipse` fills the whole block, so it is only round when the block is square.
+- Lines are `line_width` thick (default 1 pixel) and drawn across the middle of the block. `render` can take
 `{"fill": "red", "background": "black"}` to change colours while running.
 
 ## How the text size is chosen

@@ -23,7 +23,7 @@ MAX_JSON_BYTES = 1_000_000
 MAX_PIXELS = 20_000
 
 BLOCK_TYPES = ("text", "image", "shape")
-SHAPES = ("rectangle", "ellipse", "hline", "vline")
+SHAPES = ("rectangle", "circle", "ellipse", "hline", "vline")
 H_ALIGN = ("left", "center", "right", "random")
 V_ALIGN = ("top", "center", "bottom", "random")
 FITS = ("contain", "cover", "stretch", "none")
@@ -35,7 +35,7 @@ _KEYS = {
     | {"text", "sample", "font", "font_size", "max_lines", "shrink", "align", "valign"}
     | {"ellipsis"},
     "image": _COMMON | {"image", "fit", "align", "valign"},
-    "shape": _COMMON | {"shape", "line_width"},
+    "shape": _COMMON | {"shape", "line_width", "align", "valign"},
 }
 _CONTAINER_KEYS = {"row", "column", "size", "pixels", "gap", "padding"}
 # Keys people often try, and the key they probably meant.
@@ -227,6 +227,8 @@ class _Parser:
         else:
             o["shape"] = _choice(data.get("shape", "rectangle"), SHAPES, "shape", where)
             o["line_width"] = _length(data.get("line_width", {"pixels": 1}), "line_width", where)
+            o["align"] = _choice(data.get("align", "center"), H_ALIGN, "align", where)
+            o["valign"] = _choice(data.get("valign", "center"), V_ALIGN, "valign", where)
         return o
 
     def path(self, value: Any, key: str, where: str) -> str | None:

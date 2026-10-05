@@ -151,8 +151,20 @@ def test_vline_is_centred():
     assert ink(shape_page("vline", line_width={"pixels": 4}).render()) == (48, 0, 52, 50)
 
 
-def test_ellipse():
+def test_ellipse_fills_block():
     assert ink(shape_page("ellipse").render()) == (0, 0, 100, 50)
+
+
+@pytest.mark.parametrize("size", [(100, 50), (50, 100), (264, 80)])
+def test_circle_is_round_in_any_block(size):
+    block = {"name": "s", "type": "shape", "shape": "circle"}
+    box = ink(Layout(column(block)).prepare(*size, MODE).render())
+    assert box[2] - box[0] == box[3] - box[1] == min(size)
+
+
+def test_circle_alignment():
+    block = {"name": "s", "type": "shape", "shape": "circle", "align": "right"}
+    assert ink(Layout(column(block)).prepare(100, 50, MODE).render()) == (50, 0, 100, 50)
 
 
 def test_shape_colour_can_change_while_running():

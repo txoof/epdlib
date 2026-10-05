@@ -83,8 +83,9 @@ What v0.6 did badly:
 - **image**: `fit` is `contain` (whole image, keep its shape), `cover` (fill the block,
   cut the sides), `stretch` or `none`. Aligned like text (old issue 23). Transparent parts
   get the block's background.
-- **shape**: `rectangle`, `ellipse`, `hline`, `vline` (a line of `line_width` across the
-  middle).
+- **shape**: `rectangle`, `circle` (the largest circle that fits, so it stays round on
+  any screen; added after txoof saw an oval dot on the 7.5" preview), `ellipse` (fills the
+  block), `hline`, `vline` (a line of `line_width` across the middle).
 - Every block: `fill`, `background` (colour names or `#rrggbb`), `border`, `inverse`
   (swaps fill and background), `rgb_support`.
 

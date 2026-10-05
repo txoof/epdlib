@@ -135,7 +135,7 @@ class PreparedLayout:
             if block.type == "text":
                 self._draw_text(block, canvas, inner, value, fill, color, rng)
             elif block.type == "shape":
-                self._draw_shape(block, draw, inner, fill, color)
+                self._draw_shape(block, draw, inner, fill, color, rng)
         # Text is never dithered, so it stays sharp. Shapes are, so a gray fill on a
         # black-and-white screen shows as a dot pattern instead of disappearing.
         dither = block.type == "shape"
@@ -184,7 +184,7 @@ class PreparedLayout:
         background = spec.check_color(value.get("background", background), "background", where)
         return fill, background
 
-    def _draw_shape(self, block, draw, inner: Box, fill, color) -> None:
+    def _draw_shape(self, block, draw, inner: Box, fill, color, rng) -> None:
         o = block.options
         ink = self.mode.ink(fill, color)
         x0, y0 = inner.x, inner.y
@@ -192,6 +192,12 @@ class PreparedLayout:
         line = max(1, o["line_width"].to_pixels(self.short_side))
         if o["shape"] == "rectangle":
             draw.rectangle((x0, y0, x1, y1), fill=ink)
+        elif o["shape"] == "circle":
+            # The largest circle that fits, so it stays round whatever the block's shape.
+            d = min(inner.width, inner.height)
+            left = x0 + align_offset(inner.width - d, o["align"], rng.random())
+            top = y0 + align_offset(inner.height - d, o["valign"], rng.random())
+            draw.ellipse((left, top, left + d - 1, top + d - 1), fill=ink)
         elif o["shape"] == "ellipse":
             draw.ellipse((x0, y0, x1, y1), fill=ink)
         elif o["shape"] == "hline":
