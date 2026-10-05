@@ -1,8 +1,17 @@
+import platform
 from pathlib import Path
 
 import pytest
+from PIL import __version__ as pillow_version
+from PIL import features
 
 FONTS = Path(__file__).parent / "fonts"
+
+
+def pytest_report_header(config):
+    """Show what the image tests depend on at the top of the test output and report."""
+    freetype = features.version("freetype2")
+    return f"Pillow {pillow_version}, FreeType {freetype}, processor {platform.machine()}"
 
 
 @pytest.fixture

@@ -33,8 +33,11 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
 
+  # Tests run on ARM, the same processor type as the Raspberry Pi. Pillow's font drawing
+  # differs by a pixel here and there between processor types, and the image tests compare
+  # pixel by pixel (see tests/test_images.py).
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       fail-fast: false
       matrix:
