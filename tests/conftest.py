@@ -30,3 +30,18 @@ def column(*items, **options):
 
 def row(*items, **options):
     return {"row": list(items), **options}
+
+
+def pytest_report_header(config):  # TEMPORARY: debug measurements
+    from PIL import Image, ImageChops, ImageDraw
+
+    from epdlib.text import load_font
+
+    f = load_font(None, 200)
+    out = [f"freetype {features.version('freetype2')}"]
+    for t in ["12:47", "12:", ":4", "47"]:
+        out.append(f"{t} len={f.getlength(t)} bbox={f.getbbox(t, anchor='ls')}")
+    im = Image.new("L", (900, 300), 255)
+    ImageDraw.Draw(im).text((10, 250), "12:47", font=f, anchor="ls")
+    out.append(f"ink={ImageChops.invert(im).getbbox()} sum={sum(im.histogram()[:128])}")
+    return out
