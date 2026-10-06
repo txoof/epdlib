@@ -11,6 +11,13 @@ dependencies = [
     "pillow>=11",
 ]
 
+[project.optional-dependencies]
+# Pin and SPI libraries for the IT8951 driver (Raspberry Pi): pip install epdlib[it8951]
+it8951 = [
+    "gpiod>=2.2",
+    "spidev>=3.6",
+]
+
 [project.urls]
 Source = "https://github.com/txoof/epdlib"
 

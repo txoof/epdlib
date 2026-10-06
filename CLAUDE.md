@@ -39,7 +39,13 @@ These rules apply to every person and agent working in this repository. The proc
   gh issue comment <n> -R txoof/epdlib --body "released: <reason>"
   ```
   If you stop without finishing, move its card back to **Todo**.
-- Shared files (`pyproject.toml`, `uv.lock`, `.python-version`, `.github/`) are changed only in their own small issue.
+- Shared files (`pyproject.toml`, `uv.lock`, `.python-version`, `.github/`) are used by everyone, so take care when changing them:
+  - A PR may change `pyproject.toml` and `uv.lock` when its own work needs it (for example a new dependency), so related changes stay together. First check that no other open PR changes them:
+    ```bash
+    for n in $(gh pr list -R txoof/epdlib --json number --jq '.[].number'); do gh pr diff $n -R txoof/epdlib --name-only | grep -qxE 'pyproject.toml|uv.lock' && echo "PR $n"; done
+    ```
+    Once your own PR is open, it shows up in this list too.
+  - The other shared files are changed only in their own small issue.
 
 ## Project board
 All PaperPi and epdlib work is shown on one board, where each issue or PR is a card (one entry on the board) in a column: https://github.com/users/txoof/projects/4 (columns Todo, In Progress, In Review, Done).
@@ -89,6 +95,15 @@ A worktree is a separate folder with its own copy of the repo, so several agents
 2. Review agents check the PR and post their findings as PR comments: code quality, unit tests, security, documentation.
 3. Fix the findings, or explain in a reply why not.
 4. **Only txoof approves and merges. Agents never merge, never approve, and never push to `main`.** GitHub branch protection enforces this.
+
+### Size of a PR
+Every PR costs txoof review time. Too many small PRs and too few huge ones both waste it.
+- **Aim for 300–600 changed lines** (code, tests and docs together; images don't count). This is a guideline and an upper bound: a PR may go a little over, but never much larger. Above about 800 lines, split the work.
+- **Each PR does one thing that works on its own**, with its tests and docs. `main` is never left half-built.
+- **No PR for one small change** (a typo, a one-line rule). Put it in the next related PR.
+- **Plan the split before coding.** Show the planned PRs to txoof together with the design questions. One issue may need several PRs; list them in the issue, and each PR says "Part of #n".
+- **Review fixes:** small fixes go into the same PR. Fixes that add a new feature go into a follow-up PR, so the first one doesn't keep growing.
+- See the size with `git diff --shortstat origin/main...HEAD`.
 
 ## Tools and commands
 - Supports Python 3.11 and newer; develop with 3.13 (`.python-version`). CI tests 3.11 and 3.13.
