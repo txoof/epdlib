@@ -91,7 +91,7 @@ A worktree is a separate folder with its own copy of the repo, so several agents
   ```
 
 ## Pull requests
-1. Open a PR that links the issue (`Closes #<n>`). Fill in the PR template, including test results and before/after images for anything visual. The PR title becomes the commit message on `main` (PRs are squash-merged), so write it as one.
+1. Open a PR that links the issue (`Closes #<n>`, or `Part of #<n>` when the issue needs several PRs). Fill in the PR template, including test results and before/after images for anything visual. The PR title becomes the commit message on `main` (PRs are squash-merged), so write it as one.
 2. Review agents check the PR and post their findings as PR comments: code quality, unit tests, security, documentation.
 3. Fix the findings, or explain in a reply why not.
 4. **Only txoof approves and merges. Agents never merge, never approve, and never push to `main`.** GitHub branch protection enforces this.
