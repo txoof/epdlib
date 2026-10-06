@@ -5,7 +5,8 @@ Install the pin and SPI libraries with ``pip install epdlib[it8951]``. Example::
     from epdlib.drivers.it8951 import IT8951Driver
 
     with IT8951Driver("9.7", vcom=-1.90) as screen:
-        screen.write(image)  # full refresh (GC16)
+        screen.write(image)             # full refresh (GC16)
+        screen.write(image2, fast=True)  # only the changed part, no flash
 
 How the controller talks over SPI: every transfer starts with a 2-byte "preamble" that
 says what follows (a command, data to write, or data to read), then 16-bit words, most
@@ -18,7 +19,7 @@ import time
 from collections.abc import Callable
 from enum import IntEnum
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 from ...modes import ScreenMode
 from .. import DisplayError, DisplayInfo, DisplayTimeout, Driver
@@ -44,7 +45,7 @@ def _model(name: str, width: int, height: int, tested: bool = False) -> DisplayI
         width=width,
         height=height,
         mode=ScreenMode.gray(16),
-        fast_refresh=False,
+        fast_refresh=True,
         tested=tested,
     )
 
@@ -84,6 +85,8 @@ _LOAD_4BPP = (1 << 8) | (2 << 4)
 # Two pixels per byte, the first one in the high half.
 _HIGH = bytes(p & 0xF0 for p in range(256))
 _LOW = bytes(p >> 4 for p in range(256))
+# True for the gray levels DU cannot show (anything but black and white).
+_GRAYS = [0] + [1] * 254 + [0]
 
 
 class IT8951Driver(Driver):
@@ -93,12 +96,20 @@ class IT8951Driver(Driver):
       controller reports this model's size.
     - ``vcom``: the voltage printed on the screen's ribbon cable, e.g. ``-1.90``. Each
       screen has its own; a wrong value gives poor contrast. Required.
+    - ``max_refresh``: after this many fast writes in a row, the next write is a full
+      one, which removes most leftovers of earlier images. Default 4 (recommended); 0
+      means never force a full write. More fast writes leave more faint leftovers.
     - ``timeout``: the longest one operation (init, write, clear) may take, in seconds.
     - ``ready_timeout``: the longest one wait for the busy line may take, in seconds.
 
-    ``fast`` is not supported yet: every write is a full refresh (GC16).
+    A fast write sends only the smallest rectangle that changed since the last image.
+    It uses DU when that rectangle is black and white only, and :attr:`fast_gray_mode`
+    (GC16: a short flash in that rectangle only) when it has grays, which DU cannot show.
+    Nothing is sent when nothing changed.
     """
 
+    #: Mode for a fast write whose changed rectangle has grays.
+    fast_gray_mode = Mode.GC16
     #: How long the reset line is held low in :meth:`init`, in seconds.
     reset_pulse = 0.1
     cmd_hz = 12_000_000
@@ -109,6 +120,7 @@ class IT8951Driver(Driver):
         model: str = "9.7",
         *,
         vcom: float | None = None,
+        max_refresh: int = 4,
         timeout: float = 15.0,
         ready_timeout: float = 2.0,
         bus: Callable[[], Bus] = SpiBus,
@@ -123,15 +135,21 @@ class IT8951Driver(Driver):
             )
         if not -5.0 < vcom < 0.0:
             raise ValueError(f"vcom must be between -5 and 0, got {vcom}")
+        if not isinstance(max_refresh, int) or max_refresh < 0:
+            raise ValueError(f"max_refresh must be a whole number of 0 or more, got {max_refresh}")
         if ready_timeout <= 0:
             raise ValueError("ready_timeout must be above zero")
         self.info = MODELS[model]
         self.vcom = vcom
+        self.max_refresh = max_refresh
         self.ready_timeout = ready_timeout
         self._make_bus = bus
         self._bus: Bus | None = None
         self._deadline = 0.0
         self._img_addr = 0
+        #: What the screen shows now, or None when unknown (then the next write is full).
+        self._shown: Image.Image | None = None
+        self._fast_in_row = 0
         #: Firmware and waveform table names the controller reported in :meth:`init`.
         self.firmware = ""
         self.lut = ""
@@ -159,12 +177,23 @@ class IT8951Driver(Driver):
     def write(self, image: Image.Image, *, fast: bool = False) -> None:
         image = self.check_image(image)
         self._start()
-        self._show(image, 0, 0, Mode.GC16)
+        area, mode = self._plan(image, fast)
+        if area is None:
+            return
+        self._shown = None  # unknown until the write has finished
+        self._show(image.crop(area), area[0], area[1], mode)
+        self._shown = image.copy()
+        full = area == self._full and mode == Mode.GC16
+        self._fast_in_row = 0 if full else self._fast_in_row + 1
 
     def clear(self) -> None:
         self._start()
         size = (self.info.width, self.info.height)
-        self._show(Image.new("L", size, 255), 0, 0, Mode.INIT)
+        white = Image.new("L", size, 255)
+        self._shown = None
+        self._show(white, 0, 0, Mode.INIT)
+        self._shown = white
+        self._fast_in_row = 0
 
     def sleep(self) -> None:
         if self._bus is not None:
@@ -173,8 +202,29 @@ class IT8951Driver(Driver):
 
     def close(self) -> None:
         bus, self._bus = self._bus, None
+        self._shown = None
         if bus is not None:
             bus.close()
+
+    # ------------------------------------------------------------------ refresh plan
+
+    @property
+    def _full(self) -> tuple[int, int, int, int]:
+        return (0, 0, self.info.width, self.info.height)
+
+    def _plan(self, image: Image.Image, fast: bool):
+        """Choose the area to send and the mode: ``(None, None)`` when nothing changed."""
+        forced = self.max_refresh and self._fast_in_row >= self.max_refresh
+        if not fast or self._shown is None or forced:
+            return self._full, Mode.GC16
+        box = ImageChops.difference(self._shown, image).getbbox()
+        if box is None:
+            return None, None
+        x0, y0, x1, y1 = box
+        # The controller loads whole 16-bit words: 4 pixels, so x and width are multiples of 4.
+        area = (x0 // 4 * 4, y0, min(-(-x1 // 4) * 4, self.info.width), y1)
+        has_gray = image.crop(area).point(_GRAYS).getbbox() is not None
+        return area, self.fast_gray_mode if has_gray else Mode.DU
 
     # ------------------------------------------------------------------ drawing
 
