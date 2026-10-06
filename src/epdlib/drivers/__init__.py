@@ -13,6 +13,7 @@ A driver sends finished images to one screen model. See PaperPi
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -52,7 +53,7 @@ class Driver(ABC):
     info: DisplayInfo
 
     def __init__(self, *, timeout: float = 60.0):
-        if timeout <= 0:
+        if not (math.isfinite(timeout) and timeout > 0):
             raise ValueError("timeout must be above zero")
         self.timeout = timeout
 

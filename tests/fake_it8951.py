@@ -31,10 +31,19 @@ class FakeIT8951:
         self.opened = 0
         self.closed = 0
         self.in_reset = False
+        self.resets = 0
+        self.asleep = False
+        #: Reads of the "still drawing" register that answer "busy" after each draw.
+        self.draw_reads = 2
+        self._drawing = 0
+        #: Speed of every command transfer and every pixel transfer, in Hz.
+        self.command_hz: set[int] = set()
+        self.pixel_hz: set[int] = set()
         # Faults
         self.busy_stuck = False  # busy line stays low
-        self.redraw_stuck = False  # LUTAFSR never goes back to 0
+        self.redraw_stuck = False  # the drawing after a draw command never ends
         self.silent = False  # device info is all zeros
+        self.vcom_ignored = False  # reading VCOM back gives 0
         self._pending: tuple[int, list[int], int] | None = None
         self._reply: list[int] = []
         self._load: tuple[int, int, int, int] | None = None
@@ -50,22 +59,32 @@ class FakeIT8951:
         return not self.busy_stuck and not self.in_reset
 
     def set_reset(self, active: bool) -> None:
+        if self.in_reset and not active:
+            self.resets += 1
+            self.asleep = False
         self.in_reset = active
 
     def close(self) -> None:
         self.closed += 1
 
+    def write(self, data: bytes, hz: int) -> None:
+        assert len(data) <= self.block, "transfer larger than the spidev limit"
+        assert data[:2] == b"\x00\x00" and self._load is not None, "pixels outside an image load"
+        assert self._pending is None, "pixels before the load command got its arguments"
+        self.pixel_hz.add(hz)
+        self._pixels += data[2:]
+
     def transfer(self, data: bytes, hz: int) -> bytes:
         assert len(data) <= self.block, "transfer larger than the spidev limit"
+        assert not self.in_reset, "transfer while the reset line is held low"
+        self.command_hz.add(hz)
         preamble = int.from_bytes(data[:2], "big")
         body = data[2:]
         if preamble == 0x6000:
             self._start(int.from_bytes(body, "big"))
         elif preamble == 0x0000:
-            if self._load is not None and self._pending is None:
-                self._pixels += body
-            else:
-                self._argument(int.from_bytes(body, "big"))
+            assert len(body) == 2, "pixels must be sent with write(), not transfer()"
+            self._argument(int.from_bytes(body, "big"))
         elif preamble == 0x1000:
             count = (len(data) - 4) // 2
             words, self._reply = self._reply[:count], self._reply[count:]
@@ -80,7 +99,13 @@ class FakeIT8951:
     def _start(self, cmd: int) -> None:
         assert self._pending is None, f"command {cmd:#06x} before the last one got its arguments"
         self.commands.append(cmd)
-        if cmd == 0x0302:  # device info
+        if self.asleep:
+            assert cmd == 0x0001, f"command {cmd:#06x} while asleep: send SYS_RUN first"
+            self.asleep = False
+        if cmd == 0x0003:
+            self.asleep = True
+        elif cmd == 0x0302:  # device info
+            assert self.resets, "device info read before a reset"
             self._reply = self._device_info()
         elif cmd == 0x0022:  # end of image load
             self._finish_load()
@@ -103,7 +128,10 @@ class FakeIT8951:
         self._pending = None
         if cmd == 0x0010:
             reg = args[0]
-            value = 1 if reg == _LUTAFSR and self.redraw_stuck else self.registers.get(reg, 0)
+            value = self.registers.get(reg, 0)
+            if reg == _LUTAFSR and self._drawing:
+                value = 1
+                self._drawing -= 0 if self.redraw_stuck else 1
             self._reply = [value]
         elif cmd == 0x0011:
             self.registers[args[0]] = args[1]
@@ -113,13 +141,16 @@ class FakeIT8951:
             self._pixels = bytearray()
         elif cmd == 0x0034:
             self.draws.append(tuple(args))
+            self._drawing = self.draw_reads
         elif cmd == 0x0039:
             if args[0] == 1:
                 self.vcom = -args[1] / 1000
             else:
-                self._reply = [round(-(self.vcom or 0) * 1000)]
+                vcom = 0 if self.vcom_ignored else -(self.vcom or 0)
+                self._reply = [round(vcom * 1000)]
 
     def _finish_load(self) -> None:
+        assert self._load is not None, "end of image load without a start"
         x, y, w, h = self._load
         assert x % 4 == 0 and w % 4 == 0, "area not on a 4-pixel boundary"
         assert len(self._pixels) == w * h // 2, "wrong number of pixel bytes"

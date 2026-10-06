@@ -1,6 +1,7 @@
 """Driver for e-paper screens with the IT8951 controller (Waveshare's IT8951 HAT).
 
-Install the pin and SPI libraries with ``pip install epdlib[it8951]``. Example::
+Needs the optional pin and SPI libraries (the ``it8951`` install group, see
+``docs/it8951.md``). Example::
 
     from epdlib.drivers.it8951 import IT8951Driver
 
@@ -14,6 +15,7 @@ significant byte first. Before each transfer the driver waits until the busy lin
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Callable
 from enum import IntEnum
@@ -24,18 +26,19 @@ from ...modes import ScreenMode
 from .. import DisplayError, DisplayInfo, DisplayTimeout, Driver
 from .bus import Bus, SpiBus
 
-__all__ = ["MODELS", "IT8951Driver", "Mode"]
+__all__ = ["MODELS", "VCOM_RANGE", "IT8951Driver", "Mode"]
 
 
 class Mode(IntEnum):
-    """Refresh modes, as numbered by the controller's waveform table."""
+    """Refresh modes, as numbered by the controller's waveform table.
+
+    The numbers of the other modes (A2, GL16, ...) differ between screens; these three are
+    the same on all of them.
+    """
 
     INIT = 0  # long flash to white: removes all leftovers of earlier images
     DU = 1  # fast, black and white only, no flash
     GC16 = 2  # 16 grays with a flash: the full refresh
-    GL16 = 3  # 16 grays, less flash; meant for dark text on white (not tested yet)
-    A2 = 6  # fastest, black and white; leaves lines and stray pixels (M2 test)
-    DU4 = 7  # fast, 4 grays (not tested yet)
 
 
 def _model(name: str, width: int, height: int, tested: bool = False) -> DisplayInfo:
@@ -49,7 +52,8 @@ def _model(name: str, width: int, height: int, tested: bool = False) -> DisplayI
     )
 
 
-#: The screens sold with Waveshare's IT8951 board, by size in inches.
+#: Screens sold with Waveshare's IT8951 board, by size in inches. The 7.8" and 10.3"
+#: have the same size in pixels, so :meth:`IT8951Driver.init` cannot tell them apart.
 MODELS: dict[str, DisplayInfo] = {
     "6": _model("6", 800, 600),
     "7.8": _model("7.8", 1872, 1404),
@@ -78,6 +82,9 @@ _I80CPCR = 0x0004  # 1 = packed pixel mode
 _LISAR = 0x0208  # image buffer address (low word; high word at +2)
 _LUTAFSR = 0x1224  # not zero while the controller is still redrawing
 
+#: VCOM values accepted, in volts. Waveshare's screens are printed with values in this range.
+VCOM_RANGE = (-3.0, -0.5)
+
 # Image loading: big-endian words, 4 bits per pixel, no rotation
 _LOAD_4BPP = (1 << 8) | (2 << 4)
 
@@ -92,9 +99,11 @@ class IT8951Driver(Driver):
     - ``model``: a key of :data:`MODELS`, e.g. ``"9.7"``. :meth:`init` checks that the
       controller reports this model's size.
     - ``vcom``: the voltage printed on the screen's ribbon cable, e.g. ``-1.90``. Each
-      screen has its own; a wrong value gives poor contrast. Required.
+      screen has its own; a wrong value gives poor contrast. Required, between -3.0 and
+      -0.5 (:data:`VCOM_RANGE`).
     - ``timeout``: the longest one operation (init, write, clear) may take, in seconds.
     - ``ready_timeout``: the longest one wait for the busy line may take, in seconds.
+      Only the wait after the reset in :meth:`init` may take up to 5 s.
 
     ``fast`` is not supported yet: every write is a full refresh (GC16).
     """
@@ -121,9 +130,10 @@ class IT8951Driver(Driver):
                 "vcom is not set: use the value printed on the screen's ribbon cable, "
                 "for example -1.90"
             )
-        if not -5.0 < vcom < 0.0:
-            raise ValueError(f"vcom must be between -5 and 0, got {vcom}")
-        if ready_timeout <= 0:
+        low, high = VCOM_RANGE
+        if not low <= vcom <= high:
+            raise ValueError(f"vcom must be between {low} and {high} volts, got {vcom}")
+        if not (math.isfinite(ready_timeout) and ready_timeout > 0):
             raise ValueError("ready_timeout must be above zero")
         self.info = MODELS[model]
         self.vcom = vcom
@@ -151,7 +161,11 @@ class IT8951Driver(Driver):
                     f"{self.info.width}x{self.info.height}: check the selected model"
                 )
             self._write_reg(_I80CPCR, 1)
-            self._command(_VCOM, 1, round(-self.vcom * 1000))
+            millivolts = round(-self.vcom * 1000)
+            self._command(_VCOM, 1, millivolts)
+            self._command(_VCOM, 0)
+            if self._read_words(1)[0] != millivolts:
+                raise DisplayError("the controller did not take the VCOM setting")
         except BaseException:
             self.close()
             raise
@@ -197,7 +211,8 @@ class IT8951Driver(Driver):
         step = (self._bus.block - 2) // 2 * 2  # whole 16-bit words per transfer
         preamble = _WRITE.to_bytes(2, "big")
         for start in range(0, len(packed), step):
-            self._transfer(preamble + packed[start : start + step], self.data_hz)
+            self._wait_ready()
+            self._bus.write(preamble + packed[start : start + step], self.data_hz)
 
     # ------------------------------------------------------------------ low level
 
@@ -223,7 +238,7 @@ class IT8951Driver(Driver):
         """Wait until the controller has finished drawing."""
         while self._read_reg(_LUTAFSR):
             if time.monotonic() > self._deadline:
-                raise DisplayTimeout(f"screen still redrawing after {self.timeout} s")
+                raise DisplayTimeout(f"screen did not finish drawing within {self.timeout} s")
             time.sleep(0.005)
 
     def _transfer(self, data: bytes, hz: int | None = None) -> bytes:

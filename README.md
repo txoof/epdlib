@@ -18,7 +18,7 @@ This branch (`main`) holds epdlib **version 1**, which is being written from scr
 ### What works so far
 - Layouts and drawing without a display: see [Writing layouts](docs/layouts.md).
 - The virtual driver, which saves images as PNG files.
-- The IT8951 driver for the Waveshare 9.7" screen and its siblings: see [IT8951 screens](docs/it8951.md).
+- The IT8951 driver, for the Waveshare 9.7" screen and the other screens sold with Waveshare's IT8951 board: see [IT8951 screens](docs/it8951.md).
 
 Progress is tracked in [milestones](https://github.com/txoof/epdlib/milestones).
 
