@@ -169,6 +169,75 @@ def test_after_a_failed_write_the_next_write_is_full(screen, fake):
     assert fake.draws[-1] == (*FULL, Mode.GC16)
 
 
+def test_unaligned_left_edge_rounds_down(screen, fake):
+    screen.write(page((103, 100)))
+    screen.write(page((105, 100)), fast=True)
+    assert fake.draws[-1] == (100, 100, 56, 50, Mode.DU)
+    assert fake.memory.tobytes() == page((105, 100)).tobytes()
+
+
+def test_unchanged_gray_in_the_widened_edge_uses_gray_mode(screen, fake):
+    """The columns added by rounding to 4 pixels are sent again, so their grays count."""
+    old, new = page((102, 100)), page((104, 100))
+    for image in (old, new):
+        ImageDraw.Draw(image).rectangle((100, 100, 101, 149), fill=136)
+    screen.write(old)
+    screen.write(new, fast=True)
+    assert fake.draws[-1] == (100, 100, 56, 50, Mode.GC16)
+
+
+@pytest.mark.parametrize("level", [17, 238])
+def test_near_black_and_near_white_count_as_gray(screen, fake, level):
+    screen.write(page())
+    image = page()
+    ImageDraw.Draw(image).rectangle((400, 400, 449, 449), fill=level)
+    screen.write(image, fast=True)
+    assert fake.draws[-1][-1] == Mode.GC16
+
+
+def test_unchanged_image_after_the_limit_sends_nothing(fake):
+    with make(fake, max_refresh=1) as screen:
+        screen.write(page((0, 0)))
+        screen.write(page((4, 0)), fast=True)
+        screen.write(page((4, 0)), fast=True)
+        assert len(fake.draws) == 2
+        screen.write(page((8, 0)), fast=True)  # the forced full write comes with the change
+        assert fake.draws[-1][:4] == FULL
+
+
+def test_unchanged_writes_do_not_count(fake):
+    with make(fake, max_refresh=1) as screen:
+        screen.write(page((0, 0)))
+        screen.write(page((0, 0)), fast=True)
+        screen.write(page((4, 0)), fast=True)
+        assert fake.draws[-1][:4] != FULL
+
+
+def test_clear_restarts_the_fast_count(fake):
+    with make(fake, max_refresh=2) as screen:
+        screen.write(page((0, 0)))
+        screen.write(page((4, 0)), fast=True)
+        screen.write(page((8, 0)), fast=True)
+        screen.clear()
+        screen.write(page((12, 0)), fast=True)
+        assert fake.draws[-1][:4] != FULL
+
+
+def test_after_close_and_init_the_next_write_is_full(screen, fake):
+    screen.write(page())
+    screen.close()
+    screen.init()
+    screen.write(page((104, 100)), fast=True)
+    assert fake.draws[-1] == (*FULL, Mode.GC16)
+
+
+def test_unknown_fast_gray_mode_is_refused(screen):
+    screen.fast_gray_mode = 9
+    screen.write(page())
+    with pytest.raises(ValueError):
+        screen.write(page(gray=(400, 400)), fast=True)
+
+
 # ---------------------------------------------------------------------- settings
 
 
@@ -185,6 +254,7 @@ def test_vcom_is_required():
         {"vcom": -3.1},
         {"vcom": -1.9, "max_refresh": -1},
         {"vcom": -1.9, "max_refresh": 2.5},
+        {"vcom": -1.9, "max_refresh": True},
         {"vcom": -1.9, "timeout": 0},
         {"vcom": -1.9, "timeout": float("nan")},
         {"vcom": -1.9, "ready_timeout": 0},

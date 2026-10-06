@@ -1,6 +1,8 @@
 """Tests on a real IT8951 screen. Run on the Pi with the screen attached:
 
 EPDLIB_IT8951_VCOM=-1.90 uv run pytest -m hardware tests/test_it8951_hardware.py
+
+For another screen, also set EPDLIB_IT8951_MODEL (default 9.7).
 """
 
 import os
