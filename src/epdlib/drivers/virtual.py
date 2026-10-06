@@ -49,12 +49,14 @@ class VirtualDriver(Driver):
         self.count = 0
         self.image: Image.Image | None = None
         self.awake = False
+        self.asleep = False
         #: Every operation, in order, for tests: ("write", "full"), ("sleep",), ...
         self.log: list[tuple[str, ...]] = []
 
     def init(self) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
         self.awake = True
+        self.asleep = False
         self.log.append(("init",))
 
     def write(self, image: Image.Image, *, fast: bool = False) -> None:
@@ -71,16 +73,20 @@ class VirtualDriver(Driver):
         self.log.append(("clear",))
 
     def sleep(self) -> None:
-        self.awake = False
+        if self.awake:
+            self.awake, self.asleep = False, True
         self.log.append(("sleep",))
 
     def close(self) -> None:
-        self.awake = False
+        self.awake = self.asleep = False
         self.log.append(("close",))
 
     def _check_awake(self) -> None:
-        if not self.awake:
-            raise DisplayError("screen is asleep or closed: call init() first")
+        if self.asleep:
+            self.awake, self.asleep = True, False
+            self.log.append(("wake",))
+        elif not self.awake:
+            raise DisplayError("screen is closed: call init() first")
 
     def _save(self, image: Image.Image) -> None:
         self.count += 1

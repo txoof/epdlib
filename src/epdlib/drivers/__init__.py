@@ -7,6 +7,10 @@ A driver sends finished images to one screen model. See PaperPi
   :class:`DisplayTimeout`. It never waits forever.
 - :meth:`Driver.close` always releases the screen's connections, even after an error. Use
   the driver in a ``with`` block to make sure it runs.
+- :meth:`Driver.write` and :meth:`Driver.clear` wake a sleeping screen by themselves, so a
+  program can call :meth:`Driver.sleep` after every write. :meth:`Driver.init` is needed
+  only at the first start and after :meth:`Driver.close`. (On some screens ``init`` resets
+  the controller, which then forgets what it shows, so it is not used to wake it.)
 - Importing this module never imports hardware libraries. A driver that needs them imports
   them in its own module.
 """
@@ -59,22 +63,24 @@ class Driver(ABC):
 
     @abstractmethod
     def init(self) -> None:
-        """Wake the screen and check that it answers."""
+        """Start the screen and check that it answers. Needed before the first write and
+        after :meth:`close`, not after :meth:`sleep`."""
 
     @abstractmethod
     def write(self, image: Image.Image, *, fast: bool = False) -> None:
         """Show ``image``. ``fast`` is a request: screens without a fast refresh do a full one.
 
         The image must be the screen's size. It is converted to the screen's mode if needed.
+        A sleeping screen is woken first.
         """
 
     @abstractmethod
     def clear(self) -> None:
-        """Make the screen blank (white)."""
+        """Make the screen blank (white). A sleeping screen is woken first."""
 
     @abstractmethod
     def sleep(self) -> None:
-        """Put the screen into low power."""
+        """Put the screen into low power. The next :meth:`write` or :meth:`clear` wakes it."""
 
     @abstractmethod
     def close(self) -> None:
