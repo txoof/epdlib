@@ -34,6 +34,7 @@ def test_write_and_clear_after_sleep_wake_the_screen(tmp_path):
         display.sleep()
         display.write(Image.new("1", (10, 10)), fast=True)
         display.sleep()
+        display.sleep()  # sleeping again changes nothing
         display.clear()
     assert display.log == [
         ("init",),
@@ -42,17 +43,19 @@ def test_write_and_clear_after_sleep_wake_the_screen(tmp_path):
         ("wake",),
         ("write", "fast"),
         ("sleep",),
+        ("sleep",),
         ("wake",),
         ("clear",),
         ("close",),
     ]
 
 
-@pytest.mark.parametrize("before", [[], ["close"], ["close", "sleep"]])
+@pytest.mark.parametrize(
+    "before",
+    [[], ["sleep"], ["init", "close"], ["init", "close", "sleep"], ["init", "sleep", "close"]],
+)
 def test_write_before_init_or_after_close_needs_init(tmp_path, before):
     display = VirtualDriver(10, 10, ScreenMode.bw(), tmp_path)
-    if before:
-        display.init()
     for name in before:
         getattr(display, name)()
     with pytest.raises(DisplayError, match="closed: call init"):
