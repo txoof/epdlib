@@ -34,15 +34,15 @@ class Mode(IntEnum):
     """Refresh modes, as numbered by the controller's waveform table.
 
     INIT, DU and GC16 have the same numbers on all screens. The numbers of the other modes
-    can differ between screens' waveform tables. GL16 (3) and DU4 (7) are the usual numbers
-    in the 9.7" table, not yet checked on the screen.
+    can differ between screens' waveform tables. GL16 (3) and DU4 (7) were checked on the
+    9.7" (waveform table 8M14T); on other screens they may select a different mode.
     """
 
     INIT = 0  # long flash to white: removes all leftovers of earlier images
     DU = 1  # fast, black and white only, no flash
     GC16 = 2  # 16 grays with a flash: the full refresh
-    GL16 = 3  # 16 grays, less flash; meant for dark text on white
-    DU4 = 7  # fast, 4 grays
+    GL16 = 3  # 16 grays; no flash on light backgrounds, a box flash on dark ones
+    DU4 = 7  # fast, 4 grays, no flash; text edges look jagged
 
 
 def _model(name: str, width: int, height: int, tested: bool = False) -> DisplayInfo:
@@ -120,12 +120,13 @@ class IT8951Driver(Driver):
 
     A fast write sends only the smallest rectangle that changed since the last image.
     It uses DU when that rectangle is black and white only, and :attr:`fast_gray_mode`
-    (GC16: a short flash in that rectangle only) when it has grays, which DU cannot show.
-    Nothing is sent when nothing changed.
+    when it has grays, which DU cannot show. Nothing is sent when nothing changed.
     """
 
-    #: Mode for a fast write whose changed rectangle has grays.
-    fast_gray_mode = Mode.GC16
+    #: Mode for a fast write whose changed rectangle has grays. GL16 (default): sharp text,
+    #: no flash on light backgrounds, a box flash on dark ones. DU4: no flash and faster,
+    #: but text edges look jagged with odd marks. GC16: sharp, always a box flash.
+    fast_gray_mode = Mode.GL16
     #: How long the reset line is held low in :meth:`init`, in seconds.
     reset_pulse = 0.1
     cmd_hz = 12_000_000

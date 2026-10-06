@@ -115,17 +115,17 @@ def test_fast_write_sends_only_the_changed_rectangle(screen, fake):
     assert fake.memory.tobytes() == page((102, 100)).tobytes()
 
 
-def test_fast_write_with_gray_uses_gc16_on_that_rectangle(screen, fake):
+def test_fast_write_with_gray_uses_gl16_on_that_rectangle(screen, fake):
     screen.write(page())
     screen.write(page(gray=(400, 400)), fast=True)
-    assert fake.draws[-1] == (400, 400, 52, 50, Mode.GC16)
+    assert fake.draws[-1] == (400, 400, 52, 50, Mode.GL16)
 
 
 def test_gray_mode_can_be_changed(screen, fake):
-    screen.fast_gray_mode = Mode.GL16
+    screen.fast_gray_mode = Mode.DU4
     screen.write(page())
     screen.write(page(gray=(400, 400)), fast=True)
-    assert fake.draws[-1][-1] == Mode.GL16
+    assert fake.draws[-1][-1] == Mode.DU4
 
 
 def test_nothing_sent_when_nothing_changed(screen, fake):
@@ -183,7 +183,7 @@ def test_unchanged_gray_in_the_widened_edge_uses_gray_mode(screen, fake):
         ImageDraw.Draw(image).rectangle((100, 100, 101, 149), fill=136)
     screen.write(old)
     screen.write(new, fast=True)
-    assert fake.draws[-1] == (100, 100, 56, 50, Mode.GC16)
+    assert fake.draws[-1] == (100, 100, 56, 50, Mode.GL16)
 
 
 @pytest.mark.parametrize("level", [17, 238])
@@ -192,7 +192,7 @@ def test_near_black_and_near_white_count_as_gray(screen, fake, level):
     image = page()
     ImageDraw.Draw(image).rectangle((400, 400, 449, 449), fill=level)
     screen.write(image, fast=True)
-    assert fake.draws[-1][-1] == Mode.GC16
+    assert fake.draws[-1][-1] == Mode.GL16
 
 
 def test_unchanged_image_after_the_limit_sends_nothing(fake):
