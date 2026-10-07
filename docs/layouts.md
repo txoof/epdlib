@@ -96,6 +96,16 @@ Transparent parts of the image get the block's `background`. Image files larger 
 | `fit` | `"contain"` | `contain`: whole image, shape kept. `cover`: fills the block, sides cut. `stretch`: fills the block, shape changed. `none`: original size |
 | `align` / `valign` | `"center"` | which side the image sits on, and which side is kept when it is cut. Also `random` |
 
+Pictures your code draws itself (bars, dots, icons) look best at the exact size they are
+shown, because any resizing blurs their edges. `page.content_size("name")` gives that
+size: the block's width and height inside its border and padding. A picture of this size
+is shown pixel for pixel, with any `fit`:
+
+```python
+width, height = page.content_size("bar")
+page.render({"bar": draw_bar(width, height)})
+```
+
 ### shape
 
 `shape` is `rectangle` (default), `square`, `circle`, `ellipse`, `hline` or `vline`:

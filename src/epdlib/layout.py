@@ -64,6 +64,19 @@ class PreparedLayout:
             if block.type == "text":
                 self.font_sizes[name] = self._font_size(block)
 
+    def content_size(self, name: str) -> tuple[int, int]:
+        """Width and height of the area inside block ``name``'s border and padding.
+
+        A picture drawn at exactly this size is shown pixel for pixel: it is never resized,
+        whatever the block's ``fit``. Draw pictures such as bars or icons at this size
+        instead of drawing them large and letting the layout resize them, which blurs
+        their edges.
+        """
+        block = self.layout.blocks.get(name)
+        if block is None:
+            raise LayoutError(f"no block named {name!r} in layout")
+        return self._inner(block).size
+
     def _inner(self, block: Block) -> Box:
         """The part of a block that content goes in: inside its border and padding."""
         box = self.boxes[block.name]

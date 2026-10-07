@@ -120,6 +120,32 @@ def test_transparent_image_gets_block_background():
     assert ink(image_page().render({"img": clear})) is None
 
 
+def test_content_size_is_inside_border_and_padding():
+    page = image_page(padding={"pixels": 5}, border={"pixels": 2})
+    assert page.content_size("img") == (186, 86)
+
+
+def test_content_size_of_block_smaller_than_padding_is_zero():
+    assert image_page(padding={"pixels": 60}).content_size("img") == (80, 0)
+
+
+def test_content_size_unknown_block_is_an_error():
+    with pytest.raises(LayoutError, match="no block named 'imgg'"):
+        image_page().content_size("imgg")
+
+
+@pytest.mark.parametrize("fit", ["contain", "cover", "stretch", "none"])
+def test_picture_at_content_size_is_not_resized(fit):
+    """A drawn picture at content_size is shown pixel for pixel, with any fit."""
+    page = image_page(fit=fit, padding={"pixels": 5}, border={"pixels": 2})
+    w, h = page.content_size("img")
+    picture = Image.new("L", (w, h), "white")
+    picture.putpixel((0, 0), 0)  # one black pixel in each corner
+    picture.putpixel((w - 1, h - 1), 0)
+    shown = page.render({"img": picture}).crop((7, 7, 7 + w, 7 + h))
+    assert ImageChops.difference(shown, picture).getbbox() is None
+
+
 def test_image_from_path(tmp_path):
     path = tmp_path / "x.png"
     black(20, 20).save(path)
