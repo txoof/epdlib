@@ -168,6 +168,8 @@ class IT8951Driver(Driver):
         #: What the screen shows now, or None when unknown (then the next write is full).
         self._shown: Image.Image | None = None
         self._fast_in_row = 0
+        #: The controller was sent the sleep command and has not been woken since.
+        self._asleep = False
         #: Firmware and waveform table names the controller reported in :meth:`init`.
         self.firmware = ""
         self.lut = ""
@@ -218,13 +220,17 @@ class IT8951Driver(Driver):
         self._fast_in_row = 0
 
     def sleep(self) -> None:
-        if self._bus is not None:
+        """Put the controller into low power; the next write or clear wakes it. Calling it
+        again while the screen sleeps does nothing."""
+        if self._bus is not None and not self._asleep:
             self._start()
             self._command(_SLEEP)
+            self._asleep = True
 
     def close(self) -> None:
         bus, self._bus = self._bus, None
         self._shown = None
+        self._asleep = False
         if bus is not None:
             bus.close()
 
@@ -257,6 +263,7 @@ class IT8951Driver(Driver):
             raise DisplayError("screen is closed: call init() first")
         w, h = image.size
         self._command(_SYS_RUN)
+        self._asleep = False
         self._wait_redraw()
         self._write_reg(_LISAR + 2, self._img_addr >> 16)
         self._write_reg(_LISAR, self._img_addr & 0xFFFF)

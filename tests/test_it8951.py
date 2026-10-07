@@ -359,6 +359,32 @@ def test_sleep_then_write_wakes_the_screen(screen, fake):
     assert fake.memory.tobytes() == page((104, 100)).tobytes()
 
 
+def test_sleep_twice_sends_sleep_once(screen, fake):
+    screen.write(page())
+    screen.sleep()
+    screen.sleep()  # the fake refuses any command but SYS_RUN while asleep
+    assert fake.commands.count(0x0003) == 1
+    screen.write(page((104, 100)))
+    screen.sleep()
+    assert fake.commands.count(0x0003) == 2
+
+
+def test_clear_after_sleep_wakes_the_screen_without_a_reset(screen, fake):
+    screen.write(page())
+    screen.sleep()
+    screen.clear()
+    assert fake.resets == 1
+    assert fake.draws[-1] == (*FULL, Mode.INIT)
+
+
+def test_fast_write_after_sleep_sends_only_the_changed_area(screen, fake):
+    screen.write(page())
+    screen.sleep()
+    screen.write(page((102, 100)), fast=True)
+    assert fake.resets == 1  # woken without a reset, so the last image is still known
+    assert fake.draws[-1] == (100, 100, 52, 50, Mode.DU)
+
+
 def test_import_does_not_load_hardware_libraries():
     import subprocess
     import sys

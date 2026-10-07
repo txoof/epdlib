@@ -28,12 +28,40 @@ def test_wrong_size_is_an_error(tmp_path):
             display.write(Image.new("L", (50, 50)))
 
 
-def test_write_after_sleep_needs_init(tmp_path):
-    display = VirtualDriver(10, 10, ScreenMode.bw(), tmp_path)
-    display.init()
-    display.sleep()
-    with pytest.raises(DisplayError, match="asleep"):
+def test_write_and_clear_after_sleep_wake_the_screen(tmp_path):
+    with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path) as display:
         display.write(Image.new("1", (10, 10)))
+        display.sleep()
+        display.write(Image.new("1", (10, 10)), fast=True)
+        display.sleep()
+        display.sleep()  # sleeping again changes nothing
+        display.clear()
+    assert display.log == [
+        ("init",),
+        ("write", "full"),
+        ("sleep",),
+        ("wake",),
+        ("write", "fast"),
+        ("sleep",),
+        ("sleep",),
+        ("wake",),
+        ("clear",),
+        ("close",),
+    ]
+
+
+@pytest.mark.parametrize(
+    "before",
+    [[], ["sleep"], ["init", "close"], ["init", "close", "sleep"], ["init", "sleep", "close"]],
+)
+def test_write_before_init_or_after_close_needs_init(tmp_path, before):
+    display = VirtualDriver(10, 10, ScreenMode.bw(), tmp_path)
+    for name in before:
+        getattr(display, name)()
+    with pytest.raises(DisplayError, match="closed: call init"):
+        display.write(Image.new("1", (10, 10)))
+    with pytest.raises(DisplayError, match="closed: call init"):
+        display.clear()
 
 
 def test_fast_refresh_when_supported(tmp_path):

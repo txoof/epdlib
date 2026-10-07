@@ -166,6 +166,9 @@ What v0.6 did badly:
   `close`, a `timeout` in seconds, `DisplayTimeout` and `DisplayError`, and the
   `DisplayInfo` description (model, size, mode, fast refresh, tested). Use a driver in a
   `with` block so `close` always runs.
+- `write` and `clear` wake a sleeping screen by themselves, so a program can sleep the
+  screen after every write (as epdlib 0.6 did). `init` is only for the first start and
+  after `close`: on the IT8951 it resets the controller, which forgets the last image.
 - `VirtualDriver` writes numbered PNG files and `latest.png`, and can pretend to be any
   screen size and mode. It is used for tests and previews.
 - Importing epdlib, its drivers package or the virtual driver never imports `spidev`,
