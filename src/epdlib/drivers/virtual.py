@@ -19,7 +19,8 @@ class VirtualDriver(Driver):
 
     Files are numbered (``0001.png``, ``0002.png``, ...) and the newest is also saved as
     ``latest.png``. ``keep`` is how many numbered files are kept; older ones are deleted.
-    The newest image is also available as :attr:`image`.
+    The newest image is also available as :attr:`image`. A PNG file looks the same after a
+    full or a fast refresh, so ``fast`` changes nothing here.
     """
 
     def __init__(
@@ -50,41 +51,31 @@ class VirtualDriver(Driver):
         self.image: Image.Image | None = None
         self.awake = False
         self.asleep = False
-        #: Every operation, in order, for tests: ("write", "full"), ("sleep",), ...
-        self.log: list[tuple[str, ...]] = []
 
     def init(self) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
         self.awake = True
         self.asleep = False
-        self.log.append(("init",))
 
     def write(self, image: Image.Image, *, fast: bool = False) -> None:
         self._check_awake()
-        image = self.check_image(image)
-        refresh = "fast" if fast and self.info.fast_refresh else "full"
-        self._save(image)
-        self.log.append(("write", refresh))
+        self._save(self.check_image(image))
 
     def clear(self) -> None:
         self._check_awake()
         size = (self.info.width, self.info.height)
         self._save(self.info.mode.finish(Image.new("L", size, 255)))
-        self.log.append(("clear",))
 
     def sleep(self) -> None:
         if self.awake:
             self.awake, self.asleep = False, True
-        self.log.append(("sleep",))
 
     def close(self) -> None:
         self.awake = self.asleep = False
-        self.log.append(("close",))
 
     def _check_awake(self) -> None:
         if self.asleep:
             self.awake, self.asleep = True, False
-            self.log.append(("wake",))
         elif not self.awake:
             raise DisplayError("screen is closed: call init() first")
 
