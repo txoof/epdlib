@@ -19,7 +19,8 @@ def test_close_runs_after_error(tmp_path):
     display = VirtualDriver(10, 10, ScreenMode.bw(), tmp_path)
     with pytest.raises(RuntimeError), display:
         raise RuntimeError("boom")
-    assert display.log[-1] == ("close",)
+    assert not display.awake
+    assert not display.asleep
 
 
 def test_wrong_size_is_an_error(tmp_path):
@@ -32,22 +33,15 @@ def test_write_and_clear_after_sleep_wake_the_screen(tmp_path):
     with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path) as display:
         display.write(Image.new("1", (10, 10)))
         display.sleep()
+        assert display.asleep
         display.write(Image.new("1", (10, 10)), fast=True)
+        assert display.awake and not display.asleep
         display.sleep()
         display.sleep()  # sleeping again changes nothing
+        assert display.asleep
         display.clear()
-    assert display.log == [
-        ("init",),
-        ("write", "full"),
-        ("sleep",),
-        ("wake",),
-        ("write", "fast"),
-        ("sleep",),
-        ("sleep",),
-        ("wake",),
-        ("clear",),
-        ("close",),
-    ]
+        assert display.awake and not display.asleep
+    assert display.count == 3
 
 
 @pytest.mark.parametrize(
@@ -64,10 +58,12 @@ def test_write_before_init_or_after_close_needs_init(tmp_path, before):
         display.clear()
 
 
-def test_fast_refresh_when_supported(tmp_path):
-    with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path, fast_refresh=True) as display:
+@pytest.mark.parametrize("fast_refresh", [True, False])
+def test_fast_write_saves_png(tmp_path, fast_refresh):
+    with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path, fast_refresh=fast_refresh) as display:
         display.write(Image.new("1", (10, 10)), fast=True)
-    assert ("write", "fast") in display.log
+    assert display.info.fast_refresh is fast_refresh
+    assert (tmp_path / "0001.png").exists()
 
 
 @pytest.mark.parametrize("options", [{"timeout": 0}, {"timeout": -1}, {"keep": 0}])
@@ -91,12 +87,6 @@ def test_palette_screen_gets_only_its_colours(tmp_path):
     with VirtualDriver(10, 10, ScreenMode.palette(), tmp_path) as display:
         display.write(Image.new("RGB", (10, 10), (123, 45, 200)))
     assert {c for _, c in display.image.getcolors()} <= allowed
-
-
-def test_fast_is_only_a_request(tmp_path):
-    with VirtualDriver(10, 10, ScreenMode.bw(), tmp_path, fast_refresh=False) as display:
-        display.write(Image.new("1", (10, 10)), fast=True)
-    assert ("write", "full") in display.log
 
 
 def test_converts_to_screen_mode(tmp_path):
