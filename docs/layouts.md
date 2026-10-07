@@ -145,6 +145,20 @@ Add a `sample`, or `shrink: true`.
    the size. A smaller size may use extra lines when they fit the block's height.
 3. Whatever does not fit after the last line is cut, and the last line ends with "…".
 
+To find out whether a text was cut or made smaller, ask before (or instead of) drawing.
+`page.text_fit("name", value)` measures `value` in text block `name` the same way
+`render` draws it, and stores nothing:
+
+```python
+report = page.text_fit("title", "A long title")
+report.complete  # False when some text was cut with "…"
+report.shrunk  # True when shrink made it smaller; report.scale is 1.0, 0.8 or 0.6
+report.size  # font size in pixels
+report.lines  # the lines as they are drawn
+```
+
+Without `value`, the block's `text` from the layout is measured.
+
 Text never spills out of its block's content area (inside the padding and border). Letters
 that lean (italics) or hang below the line are not cut off. The only exception is a block
 narrower than a single letter: that letter is cut at the edge.

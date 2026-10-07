@@ -247,6 +247,7 @@ class TextFit:
     font: FontType
     lines: list[str]
     complete: bool
+    scale: float = 1.0  #: the shrink step used: 1.0, 0.8 or 0.6
 
 
 def fit_text(
@@ -271,7 +272,7 @@ def fit_text(
         by_height = max(1, height // line_height(font))
         allowed = by_height if step < 1 else min(max_lines, by_height)
         lines, complete = wrap(font, text, width, allowed, ellipsis)
-        result = TextFit(font, lines, complete)
+        result = TextFit(font, lines, complete, step)
         if complete:
             break
     assert result is not None

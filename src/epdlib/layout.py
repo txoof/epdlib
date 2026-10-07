@@ -16,6 +16,7 @@ Example::
 from __future__ import annotations
 
 import random
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,25 @@ from .spec import Block, LayoutError
 #: Largest image file a block will read, in pixels (about 3 times a 9.7" screen photo,
 #: and small enough for a Raspberry Pi 3's memory).
 MAX_IMAGE_PIXELS = 24_000_000
+
+
+@dataclass(frozen=True)
+class TextReport:
+    """How a text fits its text block; see :meth:`PreparedLayout.text_fit`."""
+
+    #: Font size in pixels.
+    size: int
+    #: Share of the block's normal font size: 1.0, or 0.8 or 0.6 when ``shrink`` made it smaller.
+    scale: float
+    #: The lines as they are drawn; the last one ends with the ellipsis when text was cut.
+    lines: tuple[str, ...]
+    #: True when all of the text is shown, False when some was cut.
+    complete: bool
+
+    @property
+    def shrunk(self) -> bool:
+        """True when the text was made smaller than the block's normal size."""
+        return self.scale < 1
 
 
 class Layout:
@@ -72,10 +92,45 @@ class PreparedLayout:
         instead of drawing them large and letting the layout resize them, which blurs
         their edges.
         """
+        return self._inner(self._block(name)).size
+
+    def text_fit(self, name: str, value: Any = None) -> TextReport:
+        """How ``value`` fits text block ``name``, without drawing it. Nothing is stored.
+
+        ``value`` is what :meth:`render` would get for the block; ``None`` means the
+        block's ``text`` from the layout. The answer always matches what ``render`` draws.
+        Use it to check that a text is not cut (``complete``) or made smaller (``shrunk``).
+        """
+        block = self._block(name)
+        if block.type != "text":
+            raise LayoutError(f"block {name!r} is not a text block (it is {block.type})")
+        fit = self._fit_text(block, value)
+        return TextReport(fit.font.size, fit.scale, tuple(fit.lines), fit.complete)
+
+    def _block(self, name: str) -> Block:
         block = self.layout.blocks.get(name)
         if block is None:
             raise LayoutError(f"no block named {name!r} in layout")
-        return self._inner(block).size
+        return block
+
+    def _fit_text(self, block: Block, value: Any) -> text.TextFit:
+        o = block.options
+        content = o["text"] if value is None else str(value)
+        inner = self._inner(block)
+        if inner.width <= 0 or inner.height <= 0:
+            # No room at all: nothing is drawn, so only an empty text is complete.
+            font = text.load_font(o["font"], self.font_sizes[block.name])
+            return text.TextFit(font, [], not content)
+        return text.fit_text(
+            o["font"],
+            self.font_sizes[block.name],
+            content,
+            inner.width,
+            inner.height,
+            o["max_lines"],
+            o["shrink"],
+            o["ellipsis"],
+        )
 
     def _inner(self, block: Block) -> Box:
         """The part of a block that content goes in: inside its border and padding."""
@@ -163,17 +218,7 @@ class PreparedLayout:
 
     def _draw_text(self, block, canvas, inner: Box, value, fill, color, rng) -> None:
         o = block.options
-        content = o["text"] if value is None else str(value)
-        result = text.fit_text(
-            o["font"],
-            self.font_sizes[block.name],
-            content,
-            inner.width,
-            inner.height,
-            o["max_lines"],
-            o["shrink"],
-            o["ellipsis"],
-        )
+        result = self._fit_text(block, value)
         offset = (rng.random(), rng.random())
         lines = text.arrange(
             result.font, result.lines, inner.width, inner.height, o["align"], o["valign"], offset

@@ -239,3 +239,58 @@ def test_gray_shape_stays_visible_on_black_and_white_screen():
     block = {"name": "s", "type": "shape", "fill": "gray"}
     image = Layout(column(block)).prepare(40, 40, ScreenMode.bw()).render().convert("L")
     assert {c for _, c in image.getcolors()} == {0, 255}
+
+
+def text_page(width=200, height=50, **options):
+    return Layout(column(text_block("a", **options))).prepare(width, height, MODE)
+
+
+def test_text_fit_short_text_fits():
+    page = text_page()
+    report = page.text_fit("a", "Hi")
+    assert report.complete
+    assert not report.shrunk
+    assert report.scale == 1.0
+    assert report.size == page.font_sizes["a"]
+    assert report.lines == ("Hi",)
+
+
+def test_text_fit_reports_cut_text():
+    report = text_page().text_fit("a", "a text that is much too long for this small block")
+    assert not report.complete
+    assert not report.shrunk
+    assert len(report.lines) == 1
+    assert report.lines[-1].endswith("…")
+
+
+def test_text_fit_reports_shrunk_text():
+    page = text_page(shrink=True)
+    report = page.text_fit("a", "a little too long here")
+    assert report.shrunk
+    assert report.scale in (0.8, 0.6)
+    assert report.size < page.font_sizes["a"]
+
+
+def test_text_fit_without_value_uses_the_layout_text():
+    assert text_page(text="Label").text_fit("a").lines == ("Label",)
+
+
+def test_text_fit_of_block_with_no_room():
+    page = text_page(padding={"pixels": 30})
+    assert not page.text_fit("a", "Hi").complete
+    assert page.text_fit("a", "").complete
+
+
+def test_text_fit_changes_nothing():
+    page = text_page(shrink=True)
+    before = page.render({"a": "a little too long here"})
+    page.text_fit("a", "x")
+    after = page.render({"a": "a little too long here"})
+    assert ImageChops.difference(before, after).getbbox() is None
+
+
+def test_text_fit_needs_a_text_block():
+    with pytest.raises(LayoutError, match=r"'img' is not a text block \(it is image\)"):
+        image_page().text_fit("img")
+    with pytest.raises(LayoutError, match="no block named 'b'"):
+        text_page().text_fit("b")
