@@ -16,6 +16,10 @@ These rules apply to every person and agent working in this repository. The proc
 - v0.6 lives on branch `v0.6` (tag `v0.6-final`) and on PyPI as 0.6.5.2. Read it to understand how something behaved.
 - **Do not copy code from v0.6.** Write new code. Good ideas are carried over through the inventory and design notes (milestone M1 in txoof/PaperPi), not by copying.
 
+## Waveshare's files
+- The `epd*.py` files in `src/epdlib/drivers/waveshare/vendor/` are Waveshare's, copied unchanged (`UPSTREAM.txt` says from where). **Never edit them**, not even to fix a bug: a test checks them. A model whose file is broken is marked as not working and reported to Waveshare.
+- `epdconfig.py` in that folder is epdlib's own replacement for Waveshare's helper file, and is changed like any other code.
+
 ## Related repositories
 - `txoof/PaperPi`: the main user of epdlib, developed alongside it, at `~/src/PaperPi`. The overall plan and milestones M0–M10 are tracked there; epdlib has the milestones that need epdlib work.
 
@@ -71,7 +75,7 @@ Column IDs: Todo `f75ad846`, In Progress `47fc9ee4`, In Review `b470c173`, Done 
 | Area | Folders |
 |---|---|
 | layout | `src/epdlib/` (except the folders below) |
-| drivers | `src/epdlib/drivers/` (one sub-area per driver, e.g. `drivers/it8951`) |
+| drivers | `src/epdlib/drivers/` (one sub-area per driver: `drivers/it8951`, `drivers/waveshare`) |
 | docs | `docs/` |
 | ci | `.github/`, `pyproject.toml`, `uv.lock`, `.python-version` |
 

@@ -24,6 +24,10 @@ it8951 = [
     { name = "gpiod" },
     { name = "spidev" },
 ]
+waveshare = [
+    { name = "gpiod" },
+    { name = "spidev" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -35,10 +39,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gpiod", marker = "extra == 'it8951'", specifier = ">=2.2" },
+    { name = "gpiod", marker = "extra == 'waveshare'", specifier = ">=2.2" },
     { name = "pillow", specifier = ">=11" },
     { name = "spidev", marker = "extra == 'it8951'", specifier = ">=3.6" },
+    { name = "spidev", marker = "extra == 'waveshare'", specifier = ">=3.6" },
 ]
-provides-extras = ["it8951"]
+provides-extras = ["it8951", "waveshare"]
 
 [package.metadata.requires-dev]
 dev = [

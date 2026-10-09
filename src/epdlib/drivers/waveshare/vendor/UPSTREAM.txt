@@ -1,0 +1,9 @@
+# Waveshare's files in this folder are copied unchanged from
+# https://github.com/waveshareteam/e-Paper, folder RaspberryPi_JetsonNano/python/lib/waveshare_epd,
+# commit 06e834491bf62023a1b86a481b4530978883d2c4 (2026-07-28). They are MIT-licensed
+# (the licence text is at the top of each file). Never edit them: a test checks them.
+# epdconfig.py and __init__.py are epdlib's own and are not listed.
+#
+# Each line: the file's git fingerprint (`git hash-object <file>`, the same as GitHub's
+# "sha" for the file at that commit), then the file name.
+8a92e16e0f8ef31c6759b879a3bb8fca9837f142 epd7in5_V2.py
