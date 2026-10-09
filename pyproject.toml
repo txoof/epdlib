@@ -17,6 +17,11 @@ it8951 = [
     "gpiod>=2.2",
     "spidev>=3.6",
 ]
+# The same libraries for Waveshare's small screens: pip install epdlib[waveshare]
+waveshare = [
+    "gpiod>=2.2",
+    "spidev>=3.6",
+]
 
 [project.urls]
 Source = "https://github.com/txoof/epdlib"
@@ -25,6 +30,7 @@ Source = "https://github.com/txoof/epdlib"
 dev = [
     "pytest>=8",
     "pytest-html>=4",
+    "pytest-timeout>=2",
     "ruff>=0.6",
 ]
 
@@ -42,6 +48,8 @@ addopts = "--strict-markers -m 'not hardware'"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Waveshare's files are copied unchanged (see the folder's UPSTREAM.txt), so not linted.
+extend-exclude = ["src/epdlib/drivers/waveshare/vendor/epd*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
