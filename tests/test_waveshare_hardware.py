@@ -51,6 +51,15 @@ def test_clear_write_and_sleep(screen):
     assert timed(screen.sleep) < 5
 
 
+def test_fast_writes(screen):
+    screen.write(page_image(screen))
+    for n in range(1, 4):
+        assert timed(screen.write, page_image(screen, n), fast=True) < 6
+    assert timed(screen.write, page_image(screen, 3), fast=True) < 0.5  # nothing changed
+    screen.sleep()
+    assert timed(screen.write, page_image(screen, 4), fast=True) < 6  # wakes in fast mode
+
+
 def test_write_wakes_a_sleeping_screen(screen):
     screen.write(page_image(screen))
     screen.sleep()
