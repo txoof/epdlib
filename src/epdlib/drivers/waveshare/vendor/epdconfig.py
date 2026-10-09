@@ -6,8 +6,9 @@ change, SPI write and wait. Waveshare's own ``epdconfig.py`` uses ``gpiozero`` a
 for the busy pin forever; this one uses a :class:`~epdlib.drivers.waveshare.board.Board`
 (``gpiod`` and ``spidev``) and stops a wait when the operation's time limit has run out.
 
-:class:`~epdlib.drivers.waveshare.WaveshareDriver` connects a board with :func:`attach`
-before it calls the model's code, and disconnects it with :func:`detach`. Only one screen
+:class:`~epdlib.drivers.waveshare.WaveshareDriver` reserves this module with :func:`claim`,
+connects a board with :func:`connect` before it calls the model's code, and disconnects it
+with :func:`detach`. Only one screen
 can be connected at a time in one program, because the model files share this module.
 """
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import math
 import time
+import weakref
 
 from ... import DisplayError, DisplayTimeout
 from ..board import BUSY_PIN, CS_PIN, DC_PIN, PWR_PIN, RST_PIN, Board
@@ -22,24 +24,34 @@ from ..board import BUSY_PIN, CS_PIN, DC_PIN, PWR_PIN, RST_PIN, Board
 __all__ = ["BUSY_PIN", "CS_PIN", "DC_PIN", "PWR_PIN", "RST_PIN"]
 
 _board: Board | None = None
-_owner: object | None = None
+_owner: weakref.ref | None = None
 _use_power = True
 _deadline = math.inf
 _timeout = 0.0
 
 
-def attach(owner: object, board: Board, *, power_pin: bool) -> None:
-    """Connect ``board``. ``power_pin=False`` leaves the PWR pin alone."""
-    global _board, _owner, _use_power
-    if _owner is not None and _owner is not owner:
+def claim(owner: object, *, power_pin: bool) -> None:
+    """Reserve this module for ``owner``, before it claims any pins. ``power_pin=False``
+    leaves the PWR pin alone. A driver that was dropped without ``close()`` no longer
+    holds it."""
+    global _owner, _use_power
+    current = _owner() if _owner is not None else None
+    if current is not None and current is not owner:
         raise DisplayError("another Waveshare screen is open in this program: close it first")
-    _board, _owner, _use_power = board, owner, power_pin
+    _owner, _use_power = weakref.ref(owner), power_pin
+
+
+def connect(owner: object, board: Board) -> None:
+    """Connect ``board`` for ``owner``, which must have called :func:`claim`."""
+    global _board
+    assert _owner is not None and _owner() is owner, "claim() first"
+    _board = board
 
 
 def detach(owner: object) -> None:
-    """Disconnect the board, if ``owner`` connected it."""
+    """Disconnect the board and free this module, if ``owner`` holds it."""
     global _board, _owner
-    if _owner is owner:
+    if _owner is not None and _owner() is owner:
         _board, _owner = None, None
 
 
@@ -122,11 +134,9 @@ def module_exit(cleanup: bool = False) -> None:
 
 
 def _to_bytes(data) -> bytes:
-    if isinstance(data, bytes | bytearray):
-        return bytes(data)
     try:
         return bytes(data)
     except ValueError:
-        # Some model files send inverted values such as ~0x00 == -1; spidev keeps the
-        # lowest 8 bits of each number, so the same is done here.
+        # The normal case for display(): Waveshare's files send inverted values such as
+        # ~0x00 == -1. spidev keeps the lowest 8 bits of each number, so the same is done here.
         return bytes(v & 0xFF for v in data)

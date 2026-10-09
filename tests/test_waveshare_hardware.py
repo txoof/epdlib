@@ -2,8 +2,8 @@
 
 uv run pytest -m hardware tests/test_waveshare_hardware.py
 
-For another screen than the 7.5" V2, set EPDLIB_WAVESHARE_MODEL (e.g. epd7in5_V2). Set
-EPDLIB_WAVESHARE_NO_POWER_PIN=1 to leave GPIO 18 alone.
+For another screen than the 7.5" V2, set EPDLIB_WAVESHARE_MODEL to its name in
+docs/waveshare.md. Set EPDLIB_WAVESHARE_NO_POWER_PIN=1 to leave GPIO 18 alone.
 """
 
 import os

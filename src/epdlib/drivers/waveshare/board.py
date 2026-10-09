@@ -12,6 +12,7 @@ so they run without hardware. ``spidev`` and ``gpiod`` are imported only when a
 
 from __future__ import annotations
 
+import errno
 from collections.abc import Iterable
 from typing import Protocol
 
@@ -24,6 +25,12 @@ DC_PIN = 25  # data (high) or command (low), output
 CS_PIN = 8  # chip select: used by the kernel's SPI driver, never claimed here
 BUSY_PIN = 24  # busy, input
 PWR_PIN = 18  # power for the screen on newer HATs, output
+
+
+_NO_PERMISSION = (
+    "no permission to use {}: add the user to the gpio and spi groups "
+    "(sudo usermod -aG gpio,spi $USER), then log in again"
+)
 
 
 class Board(Protocol):
@@ -71,9 +78,12 @@ class GpioBoard:
             with gpiod.Chip(chip) as c:
                 for name in self._names.values():
                     c.line_offset_from_id(name)  # raises if the chip has no such pin
+        except PermissionError as err:
+            raise DisplayError(_NO_PERMISSION.format(chip)) from err
         except (OSError, ValueError) as err:
             raise DisplayError(
-                f"{chip} is not the Raspberry Pi's 40-pin header: pass the right chip"
+                f"{chip} has no {', '.join(self._names.values())}: "
+                "this does not look like a Raspberry Pi's 40-pin header"
             ) from err
         config = {
             self._names[pin]: gpiod.LineSettings(
@@ -88,14 +98,19 @@ class GpioBoard:
             self._lines = gpiod.request_lines(chip, consumer="epdlib-waveshare", config=config)
         except OSError as err:
             pins = ", ".join(self._names.values())
-            raise DisplayError(
-                f"cannot claim {pins}: another program is using them ({err})"
-            ) from err
+            if err.errno == errno.EBUSY:
+                raise DisplayError(
+                    f"cannot claim {pins}: another program is using them ({err})"
+                ) from err
+            raise DisplayError(f"cannot claim {pins}: {err}") from err
         try:
             self._spi = spidev.SpiDev()
             self._spi.open(*spi)
             self._spi.mode = 0
             self._spi.max_speed_hz = hz
+        except PermissionError as err:
+            self.close()
+            raise DisplayError(_NO_PERMISSION.format(f"/dev/spidev{spi[0]}.{spi[1]}")) from err
         except FileNotFoundError as err:
             self.close()
             raise DisplayError(

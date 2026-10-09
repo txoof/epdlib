@@ -30,6 +30,7 @@ Source = "https://github.com/txoof/epdlib"
 dev = [
     "pytest>=8",
     "pytest-html>=4",
+    "pytest-timeout>=2",
     "ruff>=0.6",
 ]
 

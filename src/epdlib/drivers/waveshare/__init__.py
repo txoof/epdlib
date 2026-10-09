@@ -95,6 +95,9 @@ class WaveshareDriver(Driver):
         self._epd = None
         #: The screen was put to sleep (and its power switched off) and not woken since.
         self._asleep = False
+        #: The next write or clear must run the model's init first: after sleep, or after
+        #: an operation failed part way and left the screen in an unknown state.
+        self._needs_init = False
 
     # ------------------------------------------------------------------ interface
 
@@ -102,9 +105,10 @@ class WaveshareDriver(Driver):
         self.close()
         epdconfig.start(self.timeout)
         try:
+            epdconfig.claim(self, power_pin=self.power_pin is not None)
             outputs = (RST_PIN, DC_PIN) + ((PWR_PIN,) if self.power_pin is not None else ())
             self._board = self._make_board(outputs, BUSY_PIN)
-            epdconfig.attach(self, self._board, power_pin=self.power_pin is not None)
+            epdconfig.connect(self, self._board)
             self._epd = self._module().EPD()
             self._call(self._calls.init)
         except BaseException:
@@ -115,24 +119,25 @@ class WaveshareDriver(Driver):
         image = self.check_image(image)
         self._wake()
         buffer = getattr(self._epd, self._calls.buffer)(image)
-        self._call(self._calls.display, buffer)
+        self._run(self._calls.display, buffer)
 
     def clear(self) -> None:
         self._wake()
-        self._call(self._calls.clear)
+        self._run(self._calls.clear)
 
     def sleep(self) -> None:
         """Put the screen into deep sleep and switch its power off; the next write or clear
         wakes it. Calling it again while the screen sleeps does nothing."""
         if self._epd is not None and not self._asleep:
             epdconfig.start(self.timeout)
+            # Set first: if sleep fails part way, the screen may be off already.
+            self._asleep = self._needs_init = True
             self._epd.sleep()
-            self._asleep = True
 
     def close(self) -> None:
         board, self._board = self._board, None
         self._epd = None
-        self._asleep = False
+        self._asleep = self._needs_init = False
         epdconfig.detach(self)
         if board is not None:
             board.close()
@@ -143,14 +148,22 @@ class WaveshareDriver(Driver):
         return importlib.import_module(f"{__name__}.vendor.{self.model}")
 
     def _wake(self) -> None:
-        """Start the operation's time limit, and wake a sleeping screen. Waking runs the
-        model's init again: after deep sleep the screen needs a reset."""
+        """Start the operation's time limit, and run the model's init again when needed
+        (it starts with a reset): after deep sleep, or after a failed operation."""
         if self._epd is None:
             raise DisplayError("screen is closed: call init() first")
         epdconfig.start(self.timeout)
-        if self._asleep:
-            self._call(self._calls.init)
-            self._asleep = False
+        if self._needs_init:
+            self._run(self._calls.init)
+            self._asleep = self._needs_init = False
+
+    def _run(self, name: str, *args) -> None:
+        """Call the model, and start it again next time if the call fails."""
+        try:
+            self._call(name, *args)
+        except BaseException:
+            self._needs_init = True
+            raise
 
     def _call(self, name: str, *args) -> None:
         result = getattr(self._epd, name)(*args)

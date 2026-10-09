@@ -28,6 +28,8 @@ class FakeBoard:
         self.resets = 0
         self.busy_reads = 0
         self.busy_stuck = False  # the busy pin never says "ready"
+        #: Reads that answer "busy" before the pin says "ready" (then counts down to 0).
+        self.busy_for = 0
 
     def __call__(self, outputs, busy):
         self.opened += 1
@@ -44,11 +46,15 @@ class FakeBoard:
     def read_pin(self, pin: int) -> bool:
         assert pin == self.busy, f"GPIO {pin} is not the busy pin"
         self.busy_reads += 1
+        if self.busy_for:
+            self.busy_for -= 1
+            return bool(1 - self.idle)
         return bool(1 - self.idle if self.busy_stuck else self.idle)
 
     def spi_write(self, data: bytes) -> None:
         assert isinstance(data, bytes)
         assert self.pins.get(PWR_PIN, True), "SPI write while the screen's power is off"
+        assert self.pins[RST_PIN], "SPI write while the reset pin holds the screen in reset"
         self.sent.append(("data" if self.pins[DC_PIN] else "cmd", data))
 
     def close(self) -> None:

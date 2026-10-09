@@ -32,7 +32,7 @@ def fake():
 
 @pytest.fixture
 def screen(fake):
-    with WaveshareDriver("epd7in5_V2", board=fake, timeout=0.5) as driver:
+    with WaveshareDriver("epd7in5_V2", board=fake, timeout=0.2) as driver:
         yield driver
 
 
@@ -96,13 +96,16 @@ def test_clear_makes_the_screen_white(screen, fake):
 
 def test_sleep_switches_power_off_and_write_wakes(screen, fake):
     screen.sleep()
-    assert fake.commands[-1] == DEEP_SLEEP and fake.pins[PWR_PIN] is False
+    assert fake.commands[-1] == DEEP_SLEEP
+    assert fake.pins == {17: False, 25: False, PWR_PIN: False}  # all outputs low
     sent = len(fake.sent)
     screen.sleep()  # already asleep: nothing
     assert len(fake.sent) == sent
     screen.write(page())
     assert fake.commands.count(POWER_ON) == 2 and fake.pins[PWR_PIN] is True  # init again
     assert shown(fake.data_after(NEW_IMAGE)) == screen.check_image(page())
+    screen.write(page())  # awake now: no second start-up
+    assert fake.commands.count(POWER_ON) == 2
 
 
 def test_clear_wakes_a_sleeping_screen(screen, fake):
@@ -115,9 +118,17 @@ def test_power_pin_none_leaves_gpio_18_alone(fake):
     with WaveshareDriver(power_pin=None, board=fake) as screen:
         screen.write(page())
         screen.sleep()
+        epdconfig.digital_write(PWR_PIN, 1)  # a model file switching power: ignored
     assert PWR_PIN not in fake.outputs  # FakeBoard also fails on any write to it
 
 
+def test_screen_busy_for_a_while(screen, fake):
+    fake.busy_for = 20
+    screen.write(page())
+    assert fake.busy_for == 0 and fake.commands[-21:] == [0x71] * 21
+
+
+@pytest.mark.timeout(5)
 def test_stuck_busy_pin_times_out_at_init_and_releases(fake):
     fake.busy_stuck = True
     driver = WaveshareDriver(board=fake, timeout=0.2)
@@ -130,19 +141,32 @@ def test_stuck_busy_pin_times_out_at_init_and_releases(fake):
         driver.write(page())
 
 
-def test_stuck_busy_pin_times_out_in_write(screen, fake):
+@pytest.mark.timeout(5)
+def test_stuck_busy_pin_times_out_in_write_and_next_write_starts_again(screen, fake):
     fake.busy_stuck = True
     with pytest.raises(DisplayTimeout):
         screen.write(page())
     fake.busy_stuck = False
-    screen.init()  # starts again after a timeout
+    screen.write(page())  # the screen's state is unknown: init runs first
+    assert fake.commands.count(POWER_ON) == 2 and fake.resets == 2
+
+
+@pytest.mark.timeout(5)
+def test_failed_sleep_starts_the_screen_again_at_the_next_write(screen, fake):
+    fake.busy_stuck = True
+    with pytest.raises(DisplayTimeout):
+        screen.sleep()
+    fake.busy_stuck = False
+    screen.sleep()  # counts as asleep: nothing sent
     screen.write(page())
+    assert fake.commands.count(POWER_ON) == 2
 
 
 def test_each_operation_gets_its_own_time_limit(screen, fake):
-    time.sleep(0.6)  # longer than the 0.5 s limit, between operations
+    time.sleep(0.3)  # longer than the 0.2 s limit, between operations
     screen.write(page())
     screen.clear()
+    screen.sleep()
 
 
 def test_busy_wait_does_not_spin(screen, fake, monkeypatch):
@@ -173,13 +197,30 @@ def test_init_again_after_close(screen, fake):
 
 
 def test_only_one_screen_at_a_time(screen):
-    other = WaveshareDriver(board=FakeBoard())
+    second = FakeBoard()
+    other = WaveshareDriver(board=second)
     with pytest.raises(DisplayError, match="another Waveshare screen"):
         other.init()
+    assert second.opened == 0  # refused before claiming any pins
     screen.write(page())  # the first one still works
     screen.close()
     other.init()
     other.close()
+
+
+def test_dropped_screen_does_not_block_the_next(fake):
+    WaveshareDriver(board=FakeBoard()).init()  # never closed, then dropped
+    with WaveshareDriver(board=fake) as screen:
+        screen.write(page())
+
+
+def test_model_init_failure_is_an_error(fake, monkeypatch):
+    from epdlib.drivers.waveshare.vendor import epd7in5_V2
+
+    monkeypatch.setattr(epd7in5_V2.EPD, "init", lambda self: -1)
+    with pytest.raises(DisplayError, match=r"init\(\) failed"):
+        WaveshareDriver(board=fake).init()
+    assert fake.closed == 1
 
 
 def test_wrong_image_size(screen):
