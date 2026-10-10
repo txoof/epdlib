@@ -76,7 +76,7 @@ Only the 7.5" V2 has fast writes. Several other screens have a fast mode in Wave
 
 **Colour screens** (4, 6 or 7 colours): epdlib reduces pictures to the screen's colours with dot patterns. For now, grays come out as dots of all colours (mostly yellow and black), and photos use Waveshare's ideal colours rather than the panel's real, darker ones (issue #97).
 
-**Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: that is much faster, because the screen then skips the slow colour refresh.
+**Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: with epdlib 0.6 that was much faster than its own file, because the screen then skips the slow colour refresh. This has not been tried with this driver yet.
 
 **Not working:** `"epd4in2b_V2"` and `"epd4in2b_V2_old"` (4.2" B V2). Waveshare's files for them send data through Waveshare's own compiled helper (software SPI: the data pins switched one by one by a program, instead of by the Pi's SPI hardware), which epdlib does not have. The driver refuses them with a `ValueError`.
 

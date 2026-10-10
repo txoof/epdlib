@@ -128,8 +128,8 @@ _TABLE: dict[str, tuple[int, int, ScreenMode, _Calls]] = {
     "epd2in13bc": (212, 104, _BW, _TWO),
     "epd2in15b": (296, 160, _BW, _TWO),
     "epd2in66b": (296, 152, _BW, _TWO),
-    # The 2.7" B with the 2.7" black-and-white file: much faster than sending an empty
-    # red layer with its own file (txoof's screen).
+    # The 2.7" B with the 2.7" black-and-white file: with epdlib 0.6 this was much faster
+    # than its own file with an empty red layer (txoof's screen; not tried with this driver).
     "epd2in7b": (264, 176, _BW, _Calls(file="epd2in7")),
     "epd2in7b_V2": (264, 176, _BW, _TWO),
     "epd2in9b_V3": (296, 128, _BW, _TWO),
