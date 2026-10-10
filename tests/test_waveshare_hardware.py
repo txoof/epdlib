@@ -39,6 +39,12 @@ def page_image(screen, n=0):
     return image
 
 
+def slow(screen) -> float:
+    """The longest a write or clear may take: measured on the 7.5" V2 (under 7 s); other
+    models only have to finish within the driver's time limit."""
+    return 10 if screen.model == "epd7in5_V2" else screen.timeout
+
+
 def timed(call, *args, **kwargs) -> float:
     start = time.monotonic()
     call(*args, **kwargs)
@@ -46,12 +52,14 @@ def timed(call, *args, **kwargs) -> float:
 
 
 def test_clear_write_and_sleep(screen):
-    assert timed(screen.clear) < 10
-    assert timed(screen.write, page_image(screen)) < 10
+    assert timed(screen.clear) < slow(screen)
+    assert timed(screen.write, page_image(screen)) < slow(screen)
     assert timed(screen.sleep) < 5
 
 
 def test_fast_writes(screen):
+    if not screen.info.fast_refresh:
+        pytest.skip(f"{screen.model} has no fast writes")
     screen.write(page_image(screen))
     for n in range(1, 4):
         assert timed(screen.write, page_image(screen, n), fast=True) < 6
@@ -63,7 +71,7 @@ def test_fast_writes(screen):
 def test_write_wakes_a_sleeping_screen(screen):
     screen.write(page_image(screen))
     screen.sleep()
-    assert timed(screen.write, page_image(screen, 1)) < 10
+    assert timed(screen.write, page_image(screen, 1)) < slow(screen)
 
 
 def test_close_and_init_again(screen):

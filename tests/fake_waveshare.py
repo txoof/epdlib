@@ -14,9 +14,11 @@ class FakeBoard:
     """Pass the instance itself as the driver's ``board`` (it is called to "open" it).
 
     ``idle`` is the level of the busy pin when the screen is ready: 1 for the 7.5" V2.
+    ``None``: the pin changes level at every read, so a wait ends quickly whichever level
+    the model waits for (for testing all models with one fake).
     """
 
-    def __init__(self, idle: int = 1):
+    def __init__(self, idle: int | None = 1):
         self.idle = idle
         self.pins: dict[int, bool] = {}
         self.outputs: tuple[int, ...] = ()
@@ -46,6 +48,8 @@ class FakeBoard:
     def read_pin(self, pin: int) -> bool:
         assert pin == self.busy, f"GPIO {pin} is not the busy pin"
         self.busy_reads += 1
+        if self.idle is None:
+            return bool(self.busy_reads % 2)
         if self.busy_for:
             self.busy_for -= 1
             return bool(1 - self.idle)
