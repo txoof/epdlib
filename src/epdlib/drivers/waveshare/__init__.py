@@ -170,7 +170,7 @@ NOT_WORKING: dict[str, str] = {
 }
 
 #: Models run on a real screen (see docs/waveshare.md).
-_TESTED = {"epd7in5_V2"}
+_TESTED = {"epd5in83", "epd7in5_V2"}
 
 _CALLS = {file: row[3] for file, row in _TABLE.items()}
 
@@ -311,6 +311,10 @@ class WaveshareDriver(Driver):
 
     def write(self, image: Image.Image, *, fast: bool = False) -> None:
         image = self.check_image(image)
+        if image.mode == "1":
+            # Pillow keeps a white pixel set to 1 as 1, not 255, and some Waveshare files
+            # take values below 64 as black: make white 255.
+            image = image.point(lambda v: 255 if v else 0)
         self._begin()
         calls = self._calls
         if fast and calls.fast is not None and self._shown is not None:
@@ -323,7 +327,7 @@ class WaveshareDriver(Driver):
         buffers = [getattr(self._epd, calls.buffer)(image)]
         if calls.layers == 2:
             if self._blank is None:
-                white = Image.new("1", image.size, 1)
+                white = Image.new("1", image.size, 255)
                 self._blank = getattr(self._epd, calls.buffer)(white)
             buffers.append(self._blank)
         self._shown = None  # unknown until the write has finished

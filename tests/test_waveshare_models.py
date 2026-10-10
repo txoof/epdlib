@@ -78,7 +78,7 @@ def test_three_colour_screens_get_an_empty_colour_layer():
         screen.write(image)
         black, colour = calls[0]
         assert black == screen._epd.getbuffer(screen.check_image(image))
-        assert colour == screen._epd.getbuffer(Image.new("1", image.size, 1))
+        assert colour == screen._epd.getbuffer(Image.new("1", image.size, 255))
         assert black != colour
 
 
@@ -130,3 +130,17 @@ def test_palette_colours_match_waveshare_values(model, colours):
 )
 def test_names(file, name):
     assert _name(file) == name
+
+
+def test_white_stored_as_1_in_a_1_bit_image_stays_white():
+    """Pillow keeps 1 (not 255) for a white pixel set to 1; epd5in83's file takes values
+    below 64 as black, which once turned a whole test page black on the screen."""
+    info = MODELS["epd5in83"]
+    image = Image.new("1", (info.width, info.height), 1)
+    image.putpixel((0, 0), 0)
+    with WaveshareDriver("epd5in83", board=FakeBoard(idle=None)) as screen:
+        calls = []
+        screen._epd.display = calls.append
+        screen.write(image)
+    buffer = calls[0]  # 2 bits per pixel: 0b00 black, 0b11 white
+    assert buffer[0] == 0b00111111 and set(buffer[1:]) == {0xFF}

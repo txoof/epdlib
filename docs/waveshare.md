@@ -50,7 +50,7 @@ The Waveshare driver shows images on Waveshare's small e-paper screens: the ones
 | `"epd5in79"` | 5.79" | 792 × 272 | black and white | untested |
 | `"epd5in79b"` | 5.79" B | 792 × 272 | black and white only (screen also has red or yellow) | untested |
 | `"epd5in79g"` | 5.79" G | 792 × 272 | 4 colours: black, white, yellow, red | untested |
-| `"epd5in83"` | 5.83" | 600 × 448 | black and white | untested |
+| `"epd5in83"` | 5.83" | 600 × 448 | black and white | tested |
 | `"epd5in83_V2"` | 5.83" V2 | 648 × 480 | black and white | untested |
 | `"epd5in83b_V2"` | 5.83" B V2 | 648 × 480 | black and white only (screen also has red or yellow) | untested |
 | `"epd5in83bc"` | 5.83" B/C | 600 × 448 | black and white only (screen also has red or yellow) | untested |
@@ -68,7 +68,7 @@ The Waveshare driver shows images on Waveshare's small e-paper screens: the ones
 | `"epd13in3b"` | 13.3" B | 960 × 680 | black and white only (screen also has red or yellow) | untested |
 | `"epd13in3k"` | 13.3" K | 960 × 680 | black and white | untested |
 
-Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, full and fast writes (also checked by eye), clear, sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen: every model is run against a pretend HAT in the unit tests, but that cannot show whether the picture on the screen is right. Reports are welcome.
+Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, full writes and, where the model has them, fast writes (also checked by eye, with text and a photo), clear, sleep, waking from sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen: every model is run against a pretend HAT in the unit tests, but that cannot show whether the picture on the screen is right. Reports are welcome.
 
 Sizes are given with the wide side first (landscape), also for screens that Waveshare describes as tall: Waveshare's code turns the picture for them. To show a picture upright (portrait), turn it before `write()`.
 
@@ -94,6 +94,13 @@ Four of Waveshare's files (2.13" D, 2.9" D, 4.2" and 4.2" V2) import libraries t
 To copy Waveshare's files again, for example after Waveshare fixed something: `uv run python tools/update_waveshare.py` (Waveshare's newest version) or `uv run python tools/update_waveshare.py <commit>`. It rewrites `UPSTREAM.txt` and prints which files are new, changed or gone. Then update the table in `src/epdlib/drivers/waveshare/__init__.py` and run the tests: one of them fails while a copied file is neither a model nor listed as not working.
 
 A model whose Waveshare file does not work is not repaired in epdlib. It is removed from the table of models, listed as not working on this page, and reported to Waveshare.
+
+## The HAT's switches
+
+Waveshare's e-Paper HAT has two small switches. Set them before switching the Pi on:
+
+- **Display Config**: **B** for most screens; A only for the screens Waveshare's wiki names for it. The wrong setting gives the screen too little power: on the 5.83" with the switch on A, black areas came out gray, with light streaks across rows that had many fine dots (photos, gray areas), and small text came out faint.
+- **Interface Config**: **0** (4-line SPI), which the driver uses.
 
 ## Install
 
