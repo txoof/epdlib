@@ -4,9 +4,9 @@ The Waveshare driver shows images on Waveshare's small e-paper screens: the ones
 
 | Model (`model=`) | Size in pixels | Colours | Status |
 |---|---|---|---|
-| `"epd7in5_V2"` (the default) | 800 × 480 | black and white | untested |
+| `"epd7in5_V2"` (the default) | 800 × 480 | black and white | tested |
 
-Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, writes, clear, sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen. Reports are welcome. More models will follow.
+Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, full and fast writes (also checked by eye), clear, sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen. Reports are welcome. More models will follow.
 
 ## How the driver uses Waveshare's code
 
@@ -74,15 +74,25 @@ Only one Waveshare screen can be open at a time in one program, because Waveshar
 
 **`power_pin`** (default `18`): GPIO 18 switches the screen's power on newer Waveshare HATs, so the driver claims it. Other numbers raise `ValueError`. Use `power_pin=None` to leave GPIO 18 alone, for example on a Pi with a HiFiBerry sound card, which also needs GPIO 18. On a HAT with a PWR pin, the screen may then get no power.
 
+**`max_refresh`** (default 4): after this many fast writes in a row, the next write is a full one. Fast writes refresh the whole screen too, but more briefly, so faint traces of earlier images (ghosting) can build up. A normal full write removes most of them. 4 is the recommended value. Higher numbers flash less often but leave more leftovers; 0 means never force a full write: then call `clear()` or a full `write()` yourself now and then, for example once an hour. Ignored on screens without fast writes.
+
 **`timeout`** (default 30 s): the longest one operation (`init`, `write`, `clear`, `sleep`) may take. When it runs out, the driver raises `DisplayTimeout`. It never waits forever.
 
 ## Refresh types
 
+Measured on the 7.5" V2 with a Pi 3:
+
 | Call | What the screen does |
 |---|---|
-| `write(image)` | Full refresh of the whole screen, with flashes. |
-| `write(image, fast=True)` | The same as a full refresh for now. Fast writes on the 7.5" V2 will follow. |
-| `clear()` | Full refresh to white. |
+| `write(image)` | Full refresh of the whole screen, with flashes (about 7 s). |
+| `write(image, fast=True)` | Waveshare's fast full refresh: the whole screen, with fewer and shorter flashes (about 3.7 s). If the image has the same pixels as the one on the screen, nothing is sent, and it does not count toward `max_refresh`. |
+| `clear()` | Full refresh to white (about 7 s). |
+
+The first write after `init()` and the first write after an error are always full, because the driver then does not know what the screen shows. After `sleep()` the driver still knows the last image, so a fast write after sleep is still fast. A fast write after `clear()` is fast too. A full write or `clear()` starts the count for `max_refresh` again.
+
+Waveshare's file also has a partial refresh for the 7.5" V2. Checked by eye, it flashed the whole screen as well and took the same time as the fast full refresh (about 3.7 s), but it depends on the screen's controller remembering the last image, so the driver uses the fast full refresh.
+
+Switching between full and fast writes runs the screen's start-up for that mode again (about 0.2 s, on top of the times above).
 
 ## Errors
 
@@ -106,4 +116,4 @@ With the screen attached:
 uv run pytest -m hardware tests/test_waveshare_hardware.py
 ```
 
-For another screen, set `EPDLIB_WAVESHARE_MODEL` to its name from the table at the top. Set `EPDLIB_WAVESHARE_NO_POWER_PIN=1` to leave GPIO 18 alone. The test draws a test page, wakes the screen from sleep, starts it again after `close()`, and checks that each step finishes within its time limit. It ends with a clear.
+For another screen, set `EPDLIB_WAVESHARE_MODEL` to its name from the table at the top. Set `EPDLIB_WAVESHARE_NO_POWER_PIN=1` to leave GPIO 18 alone. The test draws a test page, does fast writes (including one right after sleep), wakes the screen from sleep, starts it again after `close()`, and checks that each step finishes within its time limit. It ends with a clear.

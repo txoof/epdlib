@@ -83,9 +83,159 @@ def test_write_takes_1_bit_and_rgb_images(screen, fake):
     assert fake.data_after(NEW_IMAGE) == first
 
 
-def test_fast_write_is_a_full_write(screen, fake):
+# ---------------------------------------------------------------- fast writes
+
+
+def moved(n: int) -> Image.Image:
+    """The page with a second square moved ``n`` steps to the right."""
+    image = page()
+    ImageDraw.Draw(image).rectangle((300 + 20 * n, 300, 339 + 20 * n, 339), fill=0)
+    return image
+
+
+def kinds(fake, since: int) -> list[str]:
+    """ "full" or "fast" for each refresh sent after ``fake.sent[since]``, by the init that
+    set the screen up: Waveshare's init sends 0x06 0x17 ..., init_fast sends 0xE5 0x5A."""
+    out, mode, last = [], None, None
+    for i, (kind, data) in enumerate(fake.sent):
+        if kind == "cmd":
+            last = data[0]
+        elif last == 0x06 and data[0] == 0x17:
+            mode = "full"
+        elif last == 0xE5 and data[0] == 0x5A:
+            mode = "fast"
+        if i >= since and kind == "cmd" and data[0] == REFRESH:
+            out.append(mode)
+    return out
+
+
+def test_first_fast_write_is_full(screen, fake):
     screen.write(page(), fast=True)
+    assert kinds(fake, 0) == ["full"]
     assert len(fake.data_after(NEW_IMAGE)) == BYTES and REFRESH in fake.commands
+
+
+def test_fast_write_uses_waveshare_fast_refresh(screen, fake):
+    screen.write(moved(0))
+    start, starts = len(fake.sent), fake.commands.count(POWER_ON)
+    screen.write(moved(1), fast=True)
+    assert kinds(fake, start) == ["fast"]
+    assert shown(fake.data_after(NEW_IMAGE)) == screen.check_image(moved(1))
+    screen.write(moved(2), fast=True)  # still in fast mode: no second start-up
+    assert fake.commands.count(POWER_ON) == starts + 1
+
+
+def test_fast_write_of_an_unchanged_image_sends_nothing(screen, fake):
+    screen.write(page())
+    sent = len(fake.sent)
+    screen.write(page(), fast=True)
+    assert len(fake.sent) == sent
+
+
+@pytest.mark.parametrize(
+    ("max_refresh", "expected"),
+    [
+        (2, ["full", "fast", "fast", "full", "fast", "fast"]),
+        (0, ["full", "fast", "fast", "fast", "fast", "fast"]),
+    ],
+)
+def test_max_refresh(fake, max_refresh, expected):
+    with WaveshareDriver(board=fake, max_refresh=max_refresh) as screen:
+        for n in range(6):
+            screen.write(moved(n), fast=True)
+            screen.write(moved(n), fast=True)  # unchanged: does not count
+    assert kinds(fake, 0) == expected
+
+
+def test_full_write_after_fast_runs_the_normal_init(screen, fake):
+    screen.write(moved(0))
+    screen.write(moved(1), fast=True)
+    starts = fake.commands.count(POWER_ON)
+    screen.write(moved(2))
+    assert fake.commands.count(POWER_ON) == starts + 1
+    assert fake.data_after(0x06) == bytes([0x17, 0x17, 0x28, 0x17])  # init's first setting
+
+
+def test_fast_write_after_sleep_and_clear(screen, fake):
+    screen.write(moved(0))
+    screen.sleep()
+    start = len(fake.sent)
+    screen.write(moved(1), fast=True)  # wakes in fast mode; the last image is known
+    assert kinds(fake, start) == ["fast"]
+    screen.clear()
+    start = len(fake.sent)
+    screen.write(moved(2), fast=True)
+    assert kinds(fake, start) == ["fast"]
+
+
+def test_fast_write_after_close_and_init_is_full(screen, fake):
+    screen.write(moved(0))
+    screen.close()
+    screen.init()
+    start = len(fake.sent)
+    screen.write(moved(1), fast=True)
+    assert kinds(fake, start) == ["full"]
+
+
+def test_clear_starts_the_max_refresh_count_again(fake):
+    with WaveshareDriver(board=fake, max_refresh=2) as screen:
+        screen.write(moved(0))
+        screen.write(moved(1), fast=True)
+        screen.write(moved(2), fast=True)
+        screen.clear()
+        start = len(fake.sent)
+        screen.write(moved(3), fast=True)
+        screen.write(moved(4), fast=True)
+    assert kinds(fake, start) == ["fast", "fast"]
+
+
+def test_same_pixels_with_other_metadata_count_as_unchanged(screen, fake):
+    image = screen.check_image(page())
+    screen.write(image)
+    sent = len(fake.sent)
+    other = image.copy()
+    other.info["dpi"] = (72, 72)  # e.g. read from a PNG file
+    screen.write(other, fast=True)
+    assert len(fake.sent) == sent
+
+
+def test_drawing_on_the_written_image_afterwards_is_seen(screen, fake):
+    image = screen.check_image(page())  # a 1-bit image: the driver gets this very object
+    screen.write(image)
+    ImageDraw.Draw(image).rectangle((500, 300, 549, 349), fill=0)
+    sent = len(fake.sent)
+    screen.write(image, fast=True)
+    assert len(fake.sent) > sent
+
+
+def test_sleep_after_waking_sleeps_again(screen, fake):
+    screen.sleep()
+    screen.write(page())
+    screen.sleep()
+    assert fake.commands.count(DEEP_SLEEP) == 2
+
+
+@pytest.mark.timeout(5)
+def test_failed_wake_still_lets_sleep_switch_the_power_off(screen, fake):
+    screen.sleep()
+    fake.busy_stuck = True
+    with pytest.raises(DisplayTimeout):
+        screen.write(page())  # init fails while waking
+    fake.busy_stuck = False
+    screen.sleep()
+    assert fake.commands.count(DEEP_SLEEP) == 2 and fake.pins[PWR_PIN] is False
+
+
+@pytest.mark.timeout(5)
+def test_failed_fast_write_makes_the_next_write_full(screen, fake):
+    screen.write(moved(0))
+    fake.busy_stuck = True
+    with pytest.raises(DisplayTimeout):
+        screen.write(moved(1), fast=True)
+    fake.busy_stuck = False
+    start = len(fake.sent)
+    screen.write(moved(1), fast=True)
+    assert kinds(fake, start) == ["full"]
 
 
 def test_clear_makes_the_screen_white(screen, fake):
@@ -234,6 +384,9 @@ def test_wrong_image_size(screen):
         ({"model": "epd99in9"}, "unknown Waveshare model"),
         ({"power_pin": 12}, "power_pin"),
         ({"timeout": 0}, "timeout"),
+        ({"max_refresh": -1}, "max_refresh"),
+        ({"max_refresh": True}, "max_refresh"),
+        ({"max_refresh": 1.5}, "max_refresh"),
     ],
 )
 def test_bad_settings(options, message):
