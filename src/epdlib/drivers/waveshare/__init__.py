@@ -19,7 +19,9 @@ functions; their names differ between models, so each model has a row in a table
 from __future__ import annotations
 
 import importlib
+import sys
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from types import ModuleType
 
@@ -30,22 +32,34 @@ from .. import DisplayError, DisplayInfo, Driver
 from .board import BUSY_PIN, DC_PIN, PWR_PIN, RST_PIN, Board, GpioBoard
 from .vendor import epdconfig
 
-__all__ = ["MODELS", "WaveshareDriver"]
+__all__ = ["MODELS", "NOT_WORKING", "WaveshareDriver"]
 
 
 @dataclass(frozen=True)
 class _Calls:
-    """Names of the model file's functions for each operation.
+    """How the driver calls one model's Waveshare file.
 
-    ``fast_init`` and ``fast`` are for fast writes: the model's init for its fast mode,
-    and a function ``(epd, buffer)`` that shows a buffer in that mode. ``None``: the model
-    has no fast mode, and every write is full.
+    - ``file``: the Waveshare file whose code is used, if not the model's own.
+    - ``init``, ``buffer``, ``display``, ``clear``, ``sleep``: names of the file's
+      functions. ``init_args`` and ``clear_args`` are passed to them; a string there names
+      a value of the file's ``EPD`` object (for example ``"lut_full_update"``).
+    - ``layers``: 2 for three-colour screens, whose ``display`` takes a black layer and a
+      colour layer. The colour layer is sent empty (white): only black and white are
+      supported on them for now (issue #96).
+    - ``fast_init`` and ``fast``: for fast writes, the model's init for its fast mode, and
+      a function ``(epd, buffer)`` that shows a buffer in that mode. ``None``: the model
+      has no fast mode, and every write is full.
     """
 
+    file: str | None = None
     init: str = "init"
+    init_args: tuple = ()
     buffer: str = "getbuffer"
     display: str = "display"
     clear: str = "Clear"
+    clear_args: tuple = ()
+    sleep: str = "sleep"
+    layers: int = 1
     fast_init: str | None = None
     fast: Callable | None = None
 
@@ -54,30 +68,166 @@ def _display(epd, buffer) -> None:
     epd.display(buffer)
 
 
-# The 7.5" V2's fast write is Waveshare's fast full refresh (init_fast). Its partial
-# refresh (init_part + display_Partial) was tried too: on the screen it also flashed the
-# whole screen and took as long (3.7 s), but depends on the controller remembering the
-# last image, so the full refresh was chosen (txoof, 2026-10-10).
-_CALLS: dict[str, _Calls] = {
-    "epd7in5_V2": _Calls(fast_init="init_fast", fast=_display),
+_FULL = _Calls()
+_LUT = _Calls(init_args=("lut_full_update",))
+_TWO = _Calls(layers=2)
+
+_BW = ScreenMode.bw()
+# Waveshare's exact colours: their files match pixels to these values.
+_FOUR = ScreenMode.palette(("#000000", "#ffffff", "#ffff00", "#ff0000"))
+_SIX = ScreenMode.palette(("#000000", "#ffffff", "#ffff00", "#ff0000", "#0000ff", "#00ff00"))
+_SEVEN = ScreenMode.palette(
+    ("#000000", "#ffffff", "#00ff00", "#0000ff", "#ff0000", "#ffff00", "#ff8000")
+)
+
+# Every model: (width, height, mode, calls). Sizes are Waveshare's, wide side first;
+# Waveshare's files turn an image of a tall screen themselves. Only full writes, except
+# on tested models: a fast mode is added when it has been tried on the screen.
+_TABLE: dict[str, tuple[int, int, ScreenMode, _Calls]] = {
+    # Black and white
+    "epd1in02": (128, 80, _BW, _Calls(init="Init", sleep="Sleep")),
+    "epd1in54": (200, 200, _BW, _LUT),
+    "epd1in54_V2": (200, 200, _BW, _Calls(init_args=(False,))),
+    "epd2in13": (250, 122, _BW, _LUT),
+    "epd2in13_V2": (250, 122, _BW, _Calls(init_args=("FULL_UPDATE",))),
+    "epd2in13_V3": (250, 122, _BW, _FULL),
+    "epd2in13_V4": (250, 122, _BW, _FULL),
+    "epd2in13d": (212, 104, _BW, _FULL),
+    "epd2in66": (296, 152, _BW, _Calls(init_args=(0,))),
+    "epd2in7": (264, 176, _BW, _FULL),
+    "epd2in7_V2": (264, 176, _BW, _FULL),
+    "epd2in9": (296, 128, _BW, _LUT),
+    "epd2in9_V2": (296, 128, _BW, _FULL),
+    "epd2in9_V3": (296, 128, _BW, _FULL),
+    "epd2in9d": (296, 128, _BW, _FULL),
+    "epd3in52": (360, 240, _BW, _FULL),
+    # 3.7": init mode 1 is black and white (0 is 4 grays)
+    "epd3in7": (
+        480,
+        280,
+        _BW,
+        _Calls(init_args=(1,), display="display_1Gray", clear_args=(0xFF, 1)),
+    ),
+    "epd4in2": (400, 300, _BW, _FULL),
+    "epd4in2_V2": (400, 300, _BW, _FULL),
+    "epd4in26": (800, 480, _BW, _FULL),
+    "epd5in79": (792, 272, _BW, _FULL),
+    "epd5in83": (600, 448, _BW, _FULL),
+    "epd5in83_V2": (648, 480, _BW, _FULL),
+    "epd7in5": (640, 384, _BW, _FULL),
+    "epd7in5_HD": (880, 528, _BW, _FULL),
+    "epd7in5_V2": (800, 480, _BW, _Calls(fast_init="init_fast", fast=_display)),
+    "epd7in5_V2_old": (800, 480, _BW, _FULL),
+    "epd13in3k": (960, 680, _BW, _FULL),
+    # Three colours (black, white, red or yellow): black and white only for now
+    "epd1in54b": (200, 200, _BW, _TWO),
+    "epd1in54b_V2": (200, 200, _BW, _TWO),
+    "epd1in54c": (152, 152, _BW, _TWO),
+    "epd2in13b_V3": (212, 104, _BW, _TWO),
+    "epd2in13b_V4": (250, 122, _BW, _TWO),
+    "epd2in13bc": (212, 104, _BW, _TWO),
+    "epd2in15b": (296, 160, _BW, _TWO),
+    "epd2in66b": (296, 152, _BW, _TWO),
+    # The 2.7" B with the 2.7" black-and-white file: much faster than sending an empty
+    # red layer with its own file (txoof's screen).
+    "epd2in7b": (264, 176, _BW, _Calls(file="epd2in7")),
+    "epd2in7b_V2": (264, 176, _BW, _TWO),
+    "epd2in9b_V3": (296, 128, _BW, _TWO),
+    "epd2in9b_V4": (296, 128, _BW, _TWO),
+    "epd2in9bc": (296, 128, _BW, _TWO),
+    "epd4in2bc": (400, 300, _BW, _TWO),
+    "epd5in79b": (792, 272, _BW, _TWO),
+    "epd5in83b_V2": (648, 480, _BW, _TWO),
+    "epd5in83bc": (600, 448, _BW, _TWO),
+    "epd7in5b_HD": (880, 528, _BW, _TWO),
+    "epd7in5b_V2": (800, 480, _BW, _TWO),
+    "epd7in5b_V2_old": (800, 480, _BW, _TWO),
+    "epd7in5bc": (640, 384, _BW, _TWO),
+    "epd13in3b": (960, 680, _BW, _TWO),
+    # Four colours: black, white, yellow, red
+    "epd1in64g": (168, 168, _FOUR, _FULL),
+    "epd2in13g": (250, 122, _FOUR, _FULL),
+    "epd2in15g": (296, 160, _FOUR, _FULL),
+    "epd2in36g": (296, 168, _FOUR, _FULL),
+    "epd2in66g": (360, 184, _FOUR, _FULL),
+    "epd3in0g": (400, 168, _FOUR, _FULL),
+    "epd4in37g": (512, 368, _FOUR, _FULL),
+    "epd5in79g": (792, 272, _FOUR, _FULL),
+    "epd7in3g": (800, 480, _FOUR, _FULL),
+    # Six and seven colours
+    "epd4in01f": (640, 400, _SEVEN, _FULL),
+    "epd5in65f": (600, 448, _SEVEN, _FULL),
+    "epd7in3e": (800, 480, _SIX, _FULL),
+    "epd7in3f": (800, 480, _SEVEN, _FULL),
 }
 
+#: Waveshare files that do not work with epdlib, and why. A test checks that every copied
+#: file is either here or used for a model.
+NOT_WORKING: dict[str, str] = {
+    file: "it sends data through Waveshare's own compiled helper (software SPI), which "
+    "epdlib does not have"
+    for file in ("epd4in2b_V2", "epd4in2b_V2_old")
+}
 
-def _model(file: str, name: str, width: int, height: int, mode: ScreenMode, tested=False):
+#: Models run on a real screen (see docs/waveshare.md).
+_TESTED = {"epd7in5_V2"}
+
+_CALLS = {file: row[3] for file, row in _TABLE.items()}
+
+
+def _name(file: str) -> str:
+    """Waveshare's name for a model: "epd2in13bc" -> '2.13" B/C', "epd7in5b_V2_old" ->
+    '7.5" B V2 (old)'."""
+    first, *rest = file.split("_")
+    whole, rest_of_size = first[3:].split("in")
+    fraction = rest_of_size.rstrip("abcdefghijklmnopqrstuvwxyz")
+    letters = rest_of_size[len(fraction) :]
+    parts = [f'{whole}.{fraction}"', "/".join(letters.upper())]
+    parts += ["(old)" if part == "old" else part for part in rest]
+    return " ".join(p for p in parts if p)
+
+
+def _model(file: str) -> DisplayInfo:
+    width, height, mode, calls = _TABLE[file]
+    name = _name(file) + (" (black and white only)" if calls.layers == 2 or calls.file else "")
     return DisplayInfo(
         model=f"Waveshare {name}",
         width=width,
         height=height,
         mode=mode,
-        fast_refresh=_CALLS[file].fast is not None,
-        tested=tested,
+        fast_refresh=calls.fast is not None,
+        tested=file in _TESTED,
     )
 
 
 #: Supported screens, by the name of Waveshare's file for them (without ``.py``).
-MODELS: dict[str, DisplayInfo] = {
-    "epd7in5_V2": _model("epd7in5_V2", '7.5" V2', 800, 480, ScreenMode.bw(), tested=True),
-}
+MODELS: dict[str, DisplayInfo] = {file: _model(file) for file in _TABLE}
+
+# Some Waveshare files import a library they never use: RPi.GPIO (not installed with
+# epdlib, and fails on the Pi 5) and distutils (gone in Python 3.12). Empty stand-ins are
+# put in place of a missing one while such a file loads.
+_UNUSED_IMPORTS = {"RPi.GPIO": {}, "distutils.command.build_scripts": {"build_scripts": None}}
+
+
+@contextmanager
+def _stand_ins():
+    added = []
+    for name, values in _UNUSED_IMPORTS.items():
+        try:
+            importlib.import_module(name)
+        except Exception:  # missing, or fails on this computer
+            parts = name.split(".")
+            for i in range(1, len(parts) + 1):
+                part = ".".join(parts[:i])
+                if part not in sys.modules:
+                    sys.modules[part] = ModuleType(part)
+                    added.append(part)
+            vars(sys.modules[name]).update(values)
+    try:
+        yield
+    finally:
+        for part in added:
+            del sys.modules[part]
 
 
 class WaveshareDriver(Driver):
@@ -113,6 +263,10 @@ class WaveshareDriver(Driver):
         board: Callable[..., Board] = GpioBoard,
     ):
         super().__init__(timeout=timeout)
+        if model in NOT_WORKING:
+            raise ValueError(
+                f"Waveshare model {model!r} does not work with epdlib: {NOT_WORKING[model]}"
+            )
         if model not in MODELS:
             raise ValueError(f"unknown Waveshare model {model!r}; known: {', '.join(MODELS)}")
         if power_pin not in (PWR_PIN, None):
@@ -136,6 +290,8 @@ class WaveshareDriver(Driver):
         #: What the screen shows now, or None when unknown (then the next write is full).
         self._shown: Image.Image | None = None
         self._fast_in_row = 0
+        #: An empty colour layer for three-colour screens, made at the first write.
+        self._blank: object | None = None
 
     # ------------------------------------------------------------------ interface
 
@@ -164,12 +320,17 @@ class WaveshareDriver(Driver):
         else:
             fast = False
         self._start(calls.fast_init if fast else calls.init)
-        buffer = getattr(self._epd, calls.buffer)(image)
+        buffers = [getattr(self._epd, calls.buffer)(image)]
+        if calls.layers == 2:
+            if self._blank is None:
+                white = Image.new("1", image.size, 1)
+                self._blank = getattr(self._epd, calls.buffer)(white)
+            buffers.append(self._blank)
         self._shown = None  # unknown until the write has finished
         if fast:
-            self._guard(calls.fast, self._epd, buffer)
+            self._guard(calls.fast, self._epd, *buffers)
         else:
-            self._guard(self._call, calls.display, buffer)
+            self._guard(self._call, calls.display, *buffers)
         self._shown = image.copy()
         self._fast_in_row = self._fast_in_row + 1 if fast else 0
 
@@ -177,7 +338,7 @@ class WaveshareDriver(Driver):
         self._begin()
         self._start(self._calls.init)
         self._shown = None
-        self._guard(self._call, self._calls.clear)
+        self._guard(self._call, self._calls.clear, *self._calls.clear_args)
         self._shown = Image.new(self.info.mode.pil_mode, (self.info.width, self.info.height), 255)
         self._fast_in_row = 0
 
@@ -188,7 +349,7 @@ class WaveshareDriver(Driver):
             epdconfig.start(self.timeout)
             # Set first: if sleep fails part way, the screen may be off already.
             self._asleep, self._started = True, None
-            self._epd.sleep()
+            getattr(self._epd, self._calls.sleep)()
 
     def close(self) -> None:
         board, self._board = self._board, None
@@ -201,7 +362,8 @@ class WaveshareDriver(Driver):
     # ------------------------------------------------------------------ helpers
 
     def _module(self) -> ModuleType:
-        return importlib.import_module(f"{__name__}.vendor.{self.model}")
+        with _stand_ins():
+            return importlib.import_module(f"{__name__}.vendor.{self._calls.file or self.model}")
 
     def _begin(self) -> None:
         """Check the screen is open and start the operation's time limit."""
@@ -216,7 +378,12 @@ class WaveshareDriver(Driver):
             # Not asleep any more even if init fails: it may have switched the power on,
             # so the next sleep() must run.
             self._started, self._asleep = None, False
-            self._guard(self._call, init)
+            # Power on first: most inits do it themselves, but the 13.3" files only when
+            # the EPD object is made, so they would not wake from sleep.
+            self._guard(epdconfig.module_init)
+            args = self._calls.init_args if init == self._calls.init else ()
+            args = [getattr(self._epd, a) if isinstance(a, str) else a for a in args]
+            self._guard(self._call, init, *args)
             self._started = init
 
     def _guard(self, call: Callable, *args) -> None:

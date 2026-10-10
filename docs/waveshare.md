@@ -2,11 +2,81 @@
 
 The Waveshare driver shows images on Waveshare's small e-paper screens: the ones connected through Waveshare's e-Paper HAT (the board between the Raspberry Pi and the screen), without the IT8951 controller. For screens with the IT8951 controller, see [IT8951 screens](it8951.md).
 
-| Model (`model=`) | Size in pixels | Colours | Status |
-|---|---|---|---|
-| `"epd7in5_V2"` (the default) | 800 × 480 | black and white | tested |
+| Model (`model=`) | Waveshare's name | Size in pixels | Colours | Status |
+|---|---|---|---|---|
+| `"epd1in02"` | 1.02" | 128 × 80 | black and white | untested |
+| `"epd1in54"` | 1.54" | 200 × 200 | black and white | untested |
+| `"epd1in54_V2"` | 1.54" V2 | 200 × 200 | black and white | untested |
+| `"epd1in54b"` | 1.54" B | 200 × 200 | black and white only (screen also has red or yellow) | untested |
+| `"epd1in54b_V2"` | 1.54" B V2 | 200 × 200 | black and white only (screen also has red or yellow) | untested |
+| `"epd1in54c"` | 1.54" C | 152 × 152 | black and white only (screen also has red or yellow) | untested |
+| `"epd1in64g"` | 1.64" G | 168 × 168 | 4 colours: black, white, yellow, red | untested |
+| `"epd2in13"` | 2.13" | 250 × 122 | black and white | untested |
+| `"epd2in13_V2"` | 2.13" V2 | 250 × 122 | black and white | untested |
+| `"epd2in13_V3"` | 2.13" V3 | 250 × 122 | black and white | untested |
+| `"epd2in13_V4"` | 2.13" V4 | 250 × 122 | black and white | untested |
+| `"epd2in13b_V3"` | 2.13" B V3 | 212 × 104 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in13b_V4"` | 2.13" B V4 | 250 × 122 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in13bc"` | 2.13" B/C | 212 × 104 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in13d"` | 2.13" D | 212 × 104 | black and white | untested |
+| `"epd2in13g"` | 2.13" G | 250 × 122 | 4 colours: black, white, yellow, red | untested |
+| `"epd2in15b"` | 2.15" B | 296 × 160 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in15g"` | 2.15" G | 296 × 160 | 4 colours: black, white, yellow, red | untested |
+| `"epd2in36g"` | 2.36" G | 296 × 168 | 4 colours: black, white, yellow, red | untested |
+| `"epd2in66"` | 2.66" | 296 × 152 | black and white | untested |
+| `"epd2in66b"` | 2.66" B | 296 × 152 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in66g"` | 2.66" G | 360 × 184 | 4 colours: black, white, yellow, red | untested |
+| `"epd2in7"` | 2.7" | 264 × 176 | black and white | untested |
+| `"epd2in7_V2"` | 2.7" V2 | 264 × 176 | black and white | untested |
+| `"epd2in7b"` | 2.7" B | 264 × 176 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in7b_V2"` | 2.7" B V2 | 264 × 176 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in9"` | 2.9" | 296 × 128 | black and white | untested |
+| `"epd2in9_V2"` | 2.9" V2 | 296 × 128 | black and white | untested |
+| `"epd2in9_V3"` | 2.9" V3 | 296 × 128 | black and white | untested |
+| `"epd2in9b_V3"` | 2.9" B V3 | 296 × 128 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in9b_V4"` | 2.9" B V4 | 296 × 128 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in9bc"` | 2.9" B/C | 296 × 128 | black and white only (screen also has red or yellow) | untested |
+| `"epd2in9d"` | 2.9" D | 296 × 128 | black and white | untested |
+| `"epd3in0g"` | 3.0" G | 400 × 168 | 4 colours: black, white, yellow, red | untested |
+| `"epd3in52"` | 3.52" | 360 × 240 | black and white | untested |
+| `"epd3in7"` | 3.7" | 480 × 280 | black and white | untested |
+| `"epd4in01f"` | 4.01" F | 640 × 400 | 7 colours: black, white, green, blue, red, yellow, orange | untested |
+| `"epd4in2"` | 4.2" | 400 × 300 | black and white | untested |
+| `"epd4in2_V2"` | 4.2" V2 | 400 × 300 | black and white | untested |
+| `"epd4in2bc"` | 4.2" B/C | 400 × 300 | black and white only (screen also has red or yellow) | untested |
+| `"epd4in26"` | 4.26" | 800 × 480 | black and white | untested |
+| `"epd4in37g"` | 4.37" G | 512 × 368 | 4 colours: black, white, yellow, red | untested |
+| `"epd5in65f"` | 5.65" F | 600 × 448 | 7 colours: black, white, green, blue, red, yellow, orange | untested |
+| `"epd5in79"` | 5.79" | 792 × 272 | black and white | untested |
+| `"epd5in79b"` | 5.79" B | 792 × 272 | black and white only (screen also has red or yellow) | untested |
+| `"epd5in79g"` | 5.79" G | 792 × 272 | 4 colours: black, white, yellow, red | untested |
+| `"epd5in83"` | 5.83" | 600 × 448 | black and white | untested |
+| `"epd5in83_V2"` | 5.83" V2 | 648 × 480 | black and white | untested |
+| `"epd5in83b_V2"` | 5.83" B V2 | 648 × 480 | black and white only (screen also has red or yellow) | untested |
+| `"epd5in83bc"` | 5.83" B/C | 600 × 448 | black and white only (screen also has red or yellow) | untested |
+| `"epd7in3e"` | 7.3" E | 800 × 480 | 6 colours: black, white, yellow, red, blue, green | untested |
+| `"epd7in3f"` | 7.3" F | 800 × 480 | 7 colours: black, white, green, blue, red, yellow, orange | untested |
+| `"epd7in3g"` | 7.3" G | 800 × 480 | 4 colours: black, white, yellow, red | untested |
+| `"epd7in5"` | 7.5" | 640 × 384 | black and white | untested |
+| `"epd7in5_HD"` | 7.5" HD | 880 × 528 | black and white | untested |
+| `"epd7in5_V2"` (the default) | 7.5" V2 | 800 × 480 | black and white | tested |
+| `"epd7in5_V2_old"` | 7.5" V2 (old) | 800 × 480 | black and white | untested |
+| `"epd7in5b_HD"` | 7.5" B HD | 880 × 528 | black and white only (screen also has red or yellow) | untested |
+| `"epd7in5b_V2"` | 7.5" B V2 | 800 × 480 | black and white only (screen also has red or yellow) | untested |
+| `"epd7in5b_V2_old"` | 7.5" B V2 (old) | 800 × 480 | black and white only (screen also has red or yellow) | untested |
+| `"epd7in5bc"` | 7.5" B/C | 640 × 384 | black and white only (screen also has red or yellow) | untested |
+| `"epd13in3b"` | 13.3" B | 960 × 680 | black and white only (screen also has red or yellow) | untested |
+| `"epd13in3k"` | 13.3" K | 960 × 680 | black and white | untested |
 
-Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, full and fast writes (also checked by eye), clear, sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen. Reports are welcome. More models will follow.
+Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, full and fast writes (also checked by eye), clear, sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen: every model is run against a pretend HAT in the unit tests, but that cannot show whether the picture on the screen is right. Reports are welcome.
+
+Sizes are given with the wide side first (landscape), also for screens that Waveshare describes as tall: Waveshare's code turns the picture for them. To show a picture upright (portrait), turn it before `write()`.
+
+Only the 7.5" V2 has fast writes. Several other screens have a fast mode in Waveshare's code; it is added to the driver when it has been tried on a real screen.
+
+**Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: that is much faster, because the screen then skips the slow colour refresh.
+
+**Not working:** `"epd4in2b_V2"` and `"epd4in2b_V2_old"` (4.2" B V2). Waveshare's files for them send data through Waveshare's own compiled helper (software SPI: the data pins switched one by one by a program, instead of by the Pi's SPI hardware), which epdlib does not have. The driver refuses them with a `ValueError`.
 
 ## How the driver uses Waveshare's code
 
@@ -18,6 +88,10 @@ Only Waveshare's shared helper file, `epdconfig.py`, is replaced by epdlib's own
 - stops every wait for the busy pin when the operation's time limit runs out (`DisplayTimeout`); the fixed pauses in Waveshare's files still run in full,
 - claims only the pins below, and always releases them in `close()`,
 - pauses 1 ms between reads of the busy pin, so a wait does not keep a processor core busy.
+
+Four of Waveshare's files (2.13" D, 2.9" D, 4.2" and 4.2" V2) import libraries they never use: `RPi.GPIO`, which epdlib does not install and which fails on the Pi 5, and (2.9" D) `distutils`, which Python 3.12 removed. While such a file loads, the driver puts an empty stand-in in place of a missing library, and removes it again afterwards. The two 13.3" files switch the screen's power on only once, so the driver switches it on before each start-up, to wake them from sleep.
+
+To copy Waveshare's files again, for example after Waveshare fixed something: `uv run python tools/update_waveshare.py` (Waveshare's newest version) or `uv run python tools/update_waveshare.py <commit>`. It rewrites `UPSTREAM.txt` and prints which files are new, changed or gone. Then update the table in `src/epdlib/drivers/waveshare/__init__.py` and run the tests: one of them fails while a copied file is neither a model nor listed as not working.
 
 A model whose Waveshare file does not work is not repaired in epdlib. It is removed from the table of models, listed as not working on this page, and reported to Waveshare.
 
