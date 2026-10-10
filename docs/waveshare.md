@@ -68,17 +68,26 @@ The Waveshare driver shows images on Waveshare's small e-paper screens: the ones
 | `"epd13in3b"` | 13.3" B | 960 × 680 | black and white only (screen also has red or yellow) | untested |
 | `"epd13in3k"` | 13.3" K | 960 × 680 | black and white | untested |
 
-Models are named by Waveshare's file for them, which is also the name used in Waveshare's wiki. "Tested" means the driver was run on that screen: start, full writes and, where the model has them, fast writes (also checked by eye, with text and a photo), clear, sleep, waking from sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen: every model is run against a pretend HAT in the unit tests, but that cannot show whether the picture on the screen is right. Reports are welcome.
+Models are named after Waveshare's Python file for the screen (for example `epd7in5_V2.py`). To find yours, look up the screen's size and version (V2, V3, B, HD and so on) on its sticker, its box or Waveshare's product page, and pick the row with the same name. Versions of one size need different models: a wrong one gives a garbled or blank picture.
 
-Sizes are given with the wide side first (landscape), also for screens that Waveshare describes as tall: Waveshare's code turns the picture for them. To show a picture upright (portrait), turn it before `write()`.
+"Tested" means the driver was run on that screen: start, full writes and, where the model has them, fast writes (also checked by eye, with text and a photo), clear, sleep, waking from sleep, time limits and releasing the pins. "Untested" means it should work but has not been run on a real screen: every model is run against a pretend HAT in the unit tests, but that cannot show whether the picture on the screen is right. Reports are welcome.
 
-Only the 7.5" V2 has fast writes. Several other screens have a fast mode in Waveshare's code; it is added to the driver when it has been tried on a real screen.
+Sizes are given with the wide side first (landscape), also for screens that Waveshare describes as tall: Waveshare's code turns the picture for them. To show a picture upright (portrait), turn it before `write()`, for example `image.rotate(90, expand=True)` on a 480 × 800 picture for the 7.5" V2.
 
-**Colour screens** (4, 6 or 7 colours): epdlib reduces pictures to the screen's colours with dot patterns. For now, grays come out as dots of all colours (mostly yellow and black), and photos use Waveshare's ideal colours rather than the panel's real, darker ones (issue #97).
+In epdlib, only the 7.5" V2 has fast writes so far. Several other screens have a fast mode in Waveshare's code; it is added to the driver when it has been tried on a real screen.
 
-**Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: with epdlib 0.6 that was much faster than its own file, because the screen then skips the slow colour refresh. This has not been tried with this driver yet.
+**Colour screens** (4, 6 or 7 colours): epdlib reduces pictures to the screen's colours with dot patterns. For now, grays come out as dots of all colours (mostly yellow and black), and photos use Waveshare's ideal colours rather than the screen's real, darker ones (issue #97).
 
-**Not working:** `"epd4in2b_V2"` and `"epd4in2b_V2_old"` (4.2" B V2). Waveshare's files for them send data through Waveshare's own compiled helper (software SPI: the data pins switched one by one by a program, instead of by the Pi's SPI hardware), which epdlib does not have. The driver refuses them with a `ValueError`.
+**Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: with epdlib 0.6 that was much faster than its own file, because the screen then skips the slow colour refresh. This shortcut has not been tried with the new driver yet.
+
+**Not working:** `"epd4in2b_V2"` and `"epd4in2b_V2_old"` (4.2" B V2). Waveshare's files for them send data through Waveshare's own compiled helper (software SPI: the data pins switched one by one by a program, instead of by the Pi's SPI hardware), which epdlib does not have. The driver refuses them with a `ValueError`. Waveshare's files are not repaired in epdlib: a model whose file does not work is added to `NOT_WORKING` in the driver, listed here, and reported to Waveshare.
+
+## The HAT's switches
+
+Waveshare's e-Paper HAT has two small switches. Set them before switching the Pi on:
+
+- **Display Config**: **B** for most screens. Waveshare's page for your screen (on [waveshare.com/wiki](https://www.waveshare.com/wiki/Main_Page)) says which setting it needs. The wrong setting can make the picture faint or streaky: on the 5.83" with the switch on A, black areas came out gray, with light streaks across rows that had many fine dots (photos, gray areas), and small text came out faint.
+- **Interface Config**: **0** (4-line SPI: the setting that uses the separate DC pin listed under [Pins](#pins)), which the driver uses.
 
 ## How the driver uses Waveshare's code
 
@@ -91,18 +100,9 @@ Only Waveshare's shared helper file, `epdconfig.py`, is replaced by epdlib's own
 - claims only the pins below, and always releases them in `close()`,
 - pauses 1 ms between reads of the busy pin, so a wait does not keep a processor core busy.
 
-Four of Waveshare's files (2.13" D, 2.9" D, 4.2" and 4.2" V2) import libraries they never use: `RPi.GPIO`, which epdlib does not install and which fails on the Pi 5, and (2.9" D) `distutils`, which Python 3.12 removed. While such a file loads, the driver puts an empty stand-in in place of a missing library, and removes it again afterwards. The two 13.3" files switch the screen's power on only once, so the driver switches it on before each start-up, to wake them from sleep.
+Four of Waveshare's files (2.13" D, 2.9" D, 4.2" and 4.2" V2) import libraries they never use: `RPi.GPIO`, which epdlib does not install and which fails on the Pi 5, and (2.9" D) `distutils`, which Python 3.12 removed. While such a file loads, the driver puts an empty stand-in in place of a missing library, and removes it again afterwards. The two 13.3" files switch the screen's power on only once, so the driver switches it on before each start-up, to wake them from sleep. The 3.52" file's display function only sends the picture, so the driver then runs its refresh, as Waveshare's example does.
 
-To copy Waveshare's files again, for example after Waveshare fixed something: `uv run python tools/update_waveshare.py` (Waveshare's newest version) or `uv run python tools/update_waveshare.py <commit>`. It rewrites `UPSTREAM.txt` and prints which files are new, changed or gone. Then update the table in `src/epdlib/drivers/waveshare/__init__.py` and run the tests: one of them fails while a copied file is neither a model nor listed as not working.
-
-A model whose Waveshare file does not work is not repaired in epdlib. It is removed from the table of models, listed as not working on this page, and reported to Waveshare.
-
-## The HAT's switches
-
-Waveshare's e-Paper HAT has two small switches. Set them before switching the Pi on:
-
-- **Display Config**: **B** for most screens; A only for the screens Waveshare's wiki names for it. The wrong setting gives the screen too little power: on the 5.83" with the switch on A, black areas came out gray, with light streaks across rows that had many fine dots (photos, gray areas), and small text came out faint.
-- **Interface Config**: **0** (4-line SPI), which the driver uses.
+To copy Waveshare's files again, for example after Waveshare fixed something: `uv run python tools/update_waveshare.py` (Waveshare's newest version) or `uv run python tools/update_waveshare.py <commit>`. It rewrites `UPSTREAM.txt` and prints which files are new, changed or gone. Then update `_TABLE` in `src/epdlib/drivers/waveshare/__init__.py` and the table on this page, and run the tests: one of them fails while a copied file is neither a model nor listed as not working.
 
 ## Install
 
@@ -134,11 +134,13 @@ The user running the program must be in the `gpio` and `spi` groups. On Raspberr
 
 ```python
 from PIL import Image
-from epdlib.drivers.waveshare import WaveshareDriver
+from epdlib.drivers.waveshare import MODELS, WaveshareDriver
 
-image = Image.open("picture.png").resize((800, 480))  # must be the screen's size
+model = "epd7in5_V2"
+info = MODELS[model]
+image = Image.open("picture.png").resize((info.width, info.height))  # the screen's size
 
-with WaveshareDriver("epd7in5_V2") as screen:
+with WaveshareDriver(model) as screen:
     screen.write(image)
     screen.sleep()
 ```
@@ -199,4 +201,4 @@ With the screen attached:
 uv run pytest -m hardware tests/test_waveshare_hardware.py
 ```
 
-For another screen, set `EPDLIB_WAVESHARE_MODEL` to its name from the table at the top. Set `EPDLIB_WAVESHARE_NO_POWER_PIN=1` to leave GPIO 18 alone. The test draws a test page, does fast writes (including one right after sleep), wakes the screen from sleep, starts it again after `close()`, and checks that each step finishes within its time limit. It ends with a clear.
+For another screen, set `EPDLIB_WAVESHARE_MODEL` to its name from the table at the top. Set `EPDLIB_WAVESHARE_NO_POWER_PIN=1` to leave GPIO 18 alone. The test draws a test page, does fast writes on screens that have them (including one right after sleep), wakes the screen from sleep, starts it again after `close()`, and checks that each step finishes in time: within 10 s on the 7.5" V2, within the driver's time limit on other screens. It ends with a clear.

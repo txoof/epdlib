@@ -1,6 +1,6 @@
 """Copy Waveshare's model files into epdlib again and rewrite ``vendor/UPSTREAM.txt``.
 
-Usage (from the repository root; needs ``git`` and the internet)::
+Usage (needs ``git`` and the internet)::
 
     uv run python tools/update_waveshare.py            # Waveshare's newest version
     uv run python tools/update_waveshare.py <commit>   # a given version
@@ -8,12 +8,13 @@ Usage (from the repository root; needs ``git`` and the internet)::
 It downloads only Waveshare's Python folder, replaces every ``epd*.py`` file in
 ``src/epdlib/drivers/waveshare/vendor/`` with Waveshare's, and prints which files are new,
 changed or gone. epdlib's own ``epdconfig.py`` and ``__init__.py`` are not touched. Then
-add or remove rows in ``MODELS`` (``src/epdlib/drivers/waveshare/__init__.py``) and run the
-tests.
+add or remove rows in ``_TABLE`` (``src/epdlib/drivers/waveshare/__init__.py``) and in the
+table in ``docs/waveshare.md``, and run the tests.
 """
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,34 +37,56 @@ HEADER = """\
 """
 
 
+class UpdateError(Exception):
+    pass
+
+
 def git(*args: str, cwd: Path) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
-    ).stdout.strip()
+    try:
+        result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise UpdateError("git is not installed") from None
+    if result.returncode:
+        raise UpdateError(f"git {args[0]} failed: {result.stderr.strip()}")
+    return result.stdout.strip()
 
 
-def main(commit: str | None = None) -> None:
+def model_files(folder: Path) -> dict[str, bytes]:
+    """Waveshare's model files in ``folder`` (not links, not the helper file)."""
+    return {
+        p.name: p.read_bytes()
+        for p in folder.glob("epd*.py")
+        if p.name != "epdconfig.py" and not p.is_symlink()
+    }
+
+
+def main(commit: str | None = None, *, repo: str = REPO, vendor: Path = VENDOR) -> None:
+    if commit is not None and not re.fullmatch(r"[0-9a-f]{7,40}", commit):
+        raise UpdateError(f"not a commit id: {commit!r}")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        git("clone", "--quiet", "--filter=blob:none", "--sparse", REPO, "ep", cwd=work)
+        git("clone", "--quiet", "--filter=blob:none", "--sparse", repo, "ep", cwd=work)
         work /= "ep"
         git("sparse-checkout", "set", FOLDER, cwd=work)
         if commit:
             git("checkout", "--quiet", commit, cwd=work)
         full, date = git("log", "-1", "--format=%H %cs", cwd=work).split()
         source = work / FOLDER
+        new = model_files(source)
+        if not new:
+            raise UpdateError(f"no model files in {FOLDER} at {full}")
+        # Fingerprints first, so a failure leaves the vendor folder as it was.
+        lines = [
+            f"{git('hash-object', str(source / name), cwd=work)} {name}" for name in sorted(new)
+        ]
 
-        old = {p.name: p.read_bytes() for p in VENDOR.glob("epd*.py") if p.name != "epdconfig.py"}
-        new = {p.name: p.read_bytes() for p in source.glob("epd*.py") if p.name != "epdconfig.py"}
-        for name in old.keys() - new.keys():
-            (VENDOR / name).unlink()
-        lines = []
-        for name in sorted(new):
-            (VENDOR / name).write_bytes(new[name])
-            lines.append(f"{git('hash-object', str(VENDOR / name), cwd=work)} {name}")
-
+    old = model_files(vendor)
+    for name in old.keys() - new.keys():
+        (vendor / name).unlink()
+    for name, data in new.items():
+        (vendor / name).write_bytes(data)
     header = HEADER.format(folder=FOLDER, commit=full, date=date)
-    (VENDOR / "UPSTREAM.txt").write_text(header + "\n".join(lines) + "\n")
+    (vendor / "UPSTREAM.txt").write_text(header + "\n".join(lines) + "\n")
     print(f"Waveshare commit {full} ({date}): {len(new)} files")
     for label, names in (
         ("new", new.keys() - old.keys()),
@@ -75,4 +98,9 @@ def main(commit: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:2])
+    if len(sys.argv) > 2:
+        sys.exit(__doc__)
+    try:
+        main(*sys.argv[1:])
+    except UpdateError as error:
+        sys.exit(f"update_waveshare: {error}")

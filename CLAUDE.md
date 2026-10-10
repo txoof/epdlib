@@ -17,7 +17,7 @@ These rules apply to every person and agent working in this repository. The proc
 - **Do not copy code from v0.6.** Write new code. Good ideas are carried over through the inventory and design notes (milestone M1 in txoof/PaperPi), not by copying.
 
 ## Waveshare's files
-- The `epd*.py` files in `src/epdlib/drivers/waveshare/vendor/` are Waveshare's, copied unchanged (`UPSTREAM.txt` says from where). **Never edit them**, not even to fix a bug: a test checks them. A model whose file is broken is removed from `MODELS`, added to `NOT_WORKING`, listed as not working in `docs/waveshare.md`, and reported to Waveshare. Copy them again only with `tools/update_waveshare.py`.
+- The `epd*.py` files in `src/epdlib/drivers/waveshare/vendor/` are Waveshare's, copied unchanged (`UPSTREAM.txt` says from where). **Never edit them**, not even to fix a bug: a test checks them. A model whose file is broken is removed from `_TABLE`, added to `NOT_WORKING`, listed as not working in `docs/waveshare.md`, and reported to Waveshare. Copy them again only with `tools/update_waveshare.py`.
 - `epdconfig.py` in that folder is epdlib's own replacement for Waveshare's helper file, and is changed like any other code.
 
 ## Related repositories

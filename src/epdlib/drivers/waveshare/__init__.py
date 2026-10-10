@@ -41,8 +41,10 @@ class _Calls:
 
     - ``file``: the Waveshare file whose code is used, if not the model's own.
     - ``init``, ``buffer``, ``display``, ``clear``, ``sleep``: names of the file's
-      functions. ``init_args`` and ``clear_args`` are passed to them; a string there names
-      a value of the file's ``EPD`` object (for example ``"lut_full_update"``).
+      functions. ``init_args`` and ``clear_args`` are passed to them; a string there always
+      names a value of the file's ``EPD`` object (for example ``"lut_full_update"``).
+      ``display`` may also be a function ``(epd, *buffers)``, for a file whose display
+      function does not refresh the screen by itself.
     - ``layers``: 2 for three-colour screens, whose ``display`` takes a black layer and a
       colour layer. The colour layer is sent empty (white): only black and white are
       supported on them for now (issue #96).
@@ -55,7 +57,7 @@ class _Calls:
     init: str = "init"
     init_args: tuple = ()
     buffer: str = "getbuffer"
-    display: str = "display"
+    display: str | Callable = "display"
     clear: str = "Clear"
     clear_args: tuple = ()
     sleep: str = "sleep"
@@ -66,6 +68,13 @@ class _Calls:
 
 def _display(epd, buffer) -> None:
     epd.display(buffer)
+
+
+def _display_3in52(epd, buffer) -> None:
+    # Waveshare's display() only sends the image; their example then refreshes.
+    epd.display(buffer)
+    epd.lut_GC()
+    epd.refresh()
 
 
 _FULL = _Calls()
@@ -82,7 +91,7 @@ _SEVEN = ScreenMode.palette(
 
 # Every model: (width, height, mode, calls). Sizes are Waveshare's, wide side first;
 # Waveshare's files turn an image of a tall screen themselves. Only full writes, except
-# on tested models: a fast mode is added when it has been tried on the screen.
+# where a fast mode has been tried on a real screen (now only the 7.5" V2).
 _TABLE: dict[str, tuple[int, int, ScreenMode, _Calls]] = {
     # Black and white
     "epd1in02": (128, 80, _BW, _Calls(init="Init", sleep="Sleep")),
@@ -100,7 +109,7 @@ _TABLE: dict[str, tuple[int, int, ScreenMode, _Calls]] = {
     "epd2in9_V2": (296, 128, _BW, _FULL),
     "epd2in9_V3": (296, 128, _BW, _FULL),
     "epd2in9d": (296, 128, _BW, _FULL),
-    "epd3in52": (360, 240, _BW, _FULL),
+    "epd3in52": (360, 240, _BW, _Calls(display=_display_3in52)),
     # 3.7": init mode 1 is black and white (0 is 4 grays)
     "epd3in7": (
         480,
@@ -205,29 +214,45 @@ MODELS: dict[str, DisplayInfo] = {file: _model(file) for file in _TABLE}
 
 # Some Waveshare files import a library they never use: RPi.GPIO (not installed with
 # epdlib, and fails on the Pi 5) and distutils (gone in Python 3.12). Empty stand-ins are
-# put in place of a missing one while such a file loads.
-_UNUSED_IMPORTS = {"RPi.GPIO": {}, "distutils.command.build_scripts": {"build_scripts": None}}
+# put in place of a missing one while such a file loads. (Another thread importing the
+# same library at that moment would get the stand-in; epdlib does not do that.)
+_GPIO = {"RPi.GPIO": {}}
+_UNUSED_IMPORTS: dict[str, dict[str, dict]] = {
+    "epd2in13d": _GPIO,
+    "epd2in9d": {**_GPIO, "distutils.command.build_scripts": {"build_scripts": None}},
+    "epd4in2": _GPIO,
+    "epd4in2_V2": _GPIO,
+}
+
+
+_MISSING = object()
 
 
 @contextmanager
-def _stand_ins():
-    added = []
-    for name, values in _UNUSED_IMPORTS.items():
+def _stand_ins(imports: dict[str, dict]):
+    """Put an empty module in ``sys.modules`` for each name in ``imports`` that cannot be
+    imported (with the given values in it), and put back what was there afterwards."""
+    added: dict[str, object] = {}  # name -> what sys.modules had for it (None: blocked)
+    for name, values in imports.items():
         try:
             importlib.import_module(name)
         except Exception:  # missing, or fails on this computer
             parts = name.split(".")
             for i in range(1, len(parts) + 1):
                 part = ".".join(parts[:i])
-                if part not in sys.modules:
+                if sys.modules.get(part) is None:
+                    added[part] = sys.modules.get(part, _MISSING)
                     sys.modules[part] = ModuleType(part)
-                    added.append(part)
-            vars(sys.modules[name]).update(values)
+            if name in added:
+                vars(sys.modules[name]).update(values)
     try:
         yield
     finally:
-        for part in added:
-            del sys.modules[part]
+        for part, before in added.items():
+            if before is _MISSING:
+                sys.modules.pop(part, None)
+            else:
+                sys.modules[part] = before
 
 
 class WaveshareDriver(Driver):
@@ -334,7 +359,7 @@ class WaveshareDriver(Driver):
         if fast:
             self._guard(calls.fast, self._epd, *buffers)
         else:
-            self._guard(self._call, calls.display, *buffers)
+            self._guard(self._show, *buffers)
         self._shown = image.copy()
         self._fast_in_row = self._fast_in_row + 1 if fast else 0
 
@@ -343,7 +368,9 @@ class WaveshareDriver(Driver):
         self._start(self._calls.init)
         self._shown = None
         self._guard(self._call, self._calls.clear, *self._calls.clear_args)
-        self._shown = Image.new(self.info.mode.pil_mode, (self.info.width, self.info.height), 255)
+        self._shown = Image.new(
+            self.info.mode.pil_mode, (self.info.width, self.info.height), "white"
+        )
         self._fast_in_row = 0
 
     def sleep(self) -> None:
@@ -366,8 +393,9 @@ class WaveshareDriver(Driver):
     # ------------------------------------------------------------------ helpers
 
     def _module(self) -> ModuleType:
-        with _stand_ins():
-            return importlib.import_module(f"{__name__}.vendor.{self._calls.file or self.model}")
+        file = self._calls.file or self.model
+        with _stand_ins(_UNUSED_IMPORTS.get(file, {})):
+            return importlib.import_module(f"{__name__}.vendor.{file}")
 
     def _begin(self) -> None:
         """Check the screen is open and start the operation's time limit."""
@@ -398,6 +426,13 @@ class WaveshareDriver(Driver):
         except BaseException:
             self._started = self._shown = None
             raise
+
+    def _show(self, *buffers) -> None:
+        display = self._calls.display
+        if callable(display):
+            display(self._epd, *buffers)
+        else:
+            self._call(display, *buffers)
 
     def _call(self, name: str, *args) -> None:
         result = getattr(self._epd, name)(*args)
