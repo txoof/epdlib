@@ -170,7 +170,7 @@ NOT_WORKING: dict[str, str] = {
 }
 
 #: Models run on a real screen (see docs/waveshare.md).
-_TESTED = {"epd5in83", "epd7in5_V2"}
+_TESTED = {"epd5in65f", "epd5in83", "epd7in5_V2"}
 
 _CALLS = {file: row[3] for file, row in _TABLE.items()}
 
@@ -259,7 +259,7 @@ class WaveshareDriver(Driver):
         *,
         power_pin: int | None = PWR_PIN,
         max_refresh: int = 4,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
         board: Callable[..., Board] = GpioBoard,
     ):
         super().__init__(timeout=timeout)

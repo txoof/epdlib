@@ -46,7 +46,7 @@ The Waveshare driver shows images on Waveshare's small e-paper screens: the ones
 | `"epd4in2bc"` | 4.2" B/C | 400 × 300 | black and white only (screen also has red or yellow) | untested |
 | `"epd4in26"` | 4.26" | 800 × 480 | black and white | untested |
 | `"epd4in37g"` | 4.37" G | 512 × 368 | 4 colours: black, white, yellow, red | untested |
-| `"epd5in65f"` | 5.65" F | 600 × 448 | 7 colours: black, white, green, blue, red, yellow, orange | untested |
+| `"epd5in65f"` | 5.65" F | 600 × 448 | 7 colours: black, white, green, blue, red, yellow, orange | tested |
 | `"epd5in79"` | 5.79" | 792 × 272 | black and white | untested |
 | `"epd5in79b"` | 5.79" B | 792 × 272 | black and white only (screen also has red or yellow) | untested |
 | `"epd5in79g"` | 5.79" G | 792 × 272 | 4 colours: black, white, yellow, red | untested |
@@ -73,6 +73,8 @@ Models are named by Waveshare's file for them, which is also the name used in Wa
 Sizes are given with the wide side first (landscape), also for screens that Waveshare describes as tall: Waveshare's code turns the picture for them. To show a picture upright (portrait), turn it before `write()`.
 
 Only the 7.5" V2 has fast writes. Several other screens have a fast mode in Waveshare's code; it is added to the driver when it has been tried on a real screen.
+
+**Colour screens** (4, 6 or 7 colours): epdlib reduces pictures to the screen's colours with dot patterns. For now, grays come out as dots of all colours (mostly yellow and black), and photos use Waveshare's ideal colours rather than the panel's real, darker ones (issue #97).
 
 **Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: that is much faster, because the screen then skips the slow colour refresh.
 
@@ -157,7 +159,7 @@ Only one Waveshare screen can be open at a time in one program, because Waveshar
 
 **`max_refresh`** (default 4): after this many fast writes in a row, the next write is a full one. Fast writes refresh the whole screen too, but more briefly, so faint traces of earlier images (ghosting) can build up. A normal full write removes most of them. 4 is the recommended value. Higher numbers flash less often but leave more leftovers; 0 means never force a full write: then call `clear()` or a full `write()` yourself now and then, for example once an hour. Ignored on screens without fast writes.
 
-**`timeout`** (default 30 s): the longest one operation (`init`, `write`, `clear`, `sleep`) may take. When it runs out, the driver raises `DisplayTimeout`. It never waits forever.
+**`timeout`** (default 60 s): the longest one operation (`init`, `write`, `clear`, `sleep`) may take. A full write takes about 7 s on the 7.5" V2, 9 s on the 5.83" and 34 s on the 7-colour 5.65" F. When it runs out, the driver raises `DisplayTimeout`. It never waits forever.
 
 ## Refresh types
 
