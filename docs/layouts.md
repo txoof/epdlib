@@ -203,20 +203,23 @@ the block holds, not what screen it is for: the same layout works on every scree
 
 | `dither` | Method | Best for | Pi 3, 800×480 black and white / 1200×825 16 grays |
 |---|---|---|---|
-| `photo` (default) | Floyd–Steinberg: each pixel's rounding error is passed to its neighbours | photos | 0.08 s / 0.07 s |
+| `photo` (default) | Floyd–Steinberg: each pixel's rounding error (the difference between the wanted shade and the shade the pixel got) is passed to its neighbours | photos | 0.05 s / 0.08 s |
 | `pattern` | a fixed 8×8 Bayer pattern of dots | drawn pictures with flat gray areas: bars, icons, charts | 0.04 s / 0.08 s |
-| `smooth` | Atkinson: like `photo`, but only 6/8 of each error is passed on | the most even gray overall | **2.4 s / 1.9 s** |
+| `smooth` | Atkinson: like `photo`, but only 6/8 of each error is passed on | the most even gray overall | **3.4 s / 8.9 s** |
 
 - `photo` is what epdlib v0.6 did. On large flat gray areas a row of dots can slip by one
   pixel now and then, because the passed-on errors add up.
 - `pattern` never slips: each dot depends only on its place in the pattern. **Do not use it
   for photos**: on the screen test the moon photo looked poor with it.
 - `smooth` gives light grays a little lighter and dark grays a little darker. **It is
-  slow**: it is written in plain Python. The times above are for a picture that fills the
-  whole screen; a smaller block takes less time.
+  slow**: it is written in plain Python, about 9 s per million pixels on a Pi 3 (a Pi 4
+  is about 2.5 times faster). The times above are for a picture that fills the whole
+  screen; a smaller block takes less time.
 - On gray screens, dots are only mixed from the two grays nearest to the wanted shade, so
   on a 16-gray screen they hardly show.
-- On colour (palette) screens all three use `photo`'s method for now.
+- Colour blocks (`rgb_support: true`) on colour (palette) screens use `photo`'s method for
+  all three, for now. Blocks without colour are drawn in black and white there, with the
+  chosen method.
 - On full-colour screens nothing is dithered.
 
 A finished image your code drew itself can use the same choice:
@@ -241,6 +244,10 @@ that did not come from your own code** (for example one sent from a web page and
 
 Layouts in a plugin's `layouts.py` are Python code. Loading one runs it, so it has the same
 trust as the plugin itself.
+
+A layout can make rendering slow, but not endless: `dither: "smooth"` on a block that
+fills a large screen can take many seconds per render on a small Pi (see
+[Dithering](#dithering)).
 
 ## Errors
 

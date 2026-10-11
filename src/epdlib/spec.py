@@ -30,7 +30,6 @@ H_ALIGN = ("left", "center", "right", "random")
 V_ALIGN = ("top", "center", "bottom", "random")
 FITS = ("contain", "cover", "stretch", "none")
 
-
 _COMMON = {"name", "type", "size", "pixels", "padding", "background", "fill", "border"}
 _COMMON |= {"inverse", "rgb_support"}
 _KEYS = {

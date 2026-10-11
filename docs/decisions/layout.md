@@ -133,7 +133,7 @@ What v0.6 did badly:
   `pattern` (8x8 Bayer) or `smooth` (Atkinson); shapes always use `pattern`. Chosen after an
   eye test on the 7.5" V2: Floyd–Steinberg slipped rows on flat gray, Bayer gave the most
   even flat fills, Floyd–Steinberg the best photos, Atkinson came first or second
-  everywhere but is about 30 times slower (plain Python; no compiled code in epdlib).
+  everywhere but is about 70 times slower (plain Python; no compiled code in epdlib).
   Colour screens use Floyd–Steinberg for every choice for now.
 - Without `rgb_support`, a block on a colour screen is drawn without colour: in black and
   white on palette screens (they have no grays), and in gray on full-colour screens.

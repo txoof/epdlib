@@ -9,7 +9,10 @@ from epdlib.modes import DITHERS
 
 from .conftest import column
 
-GRAY_MODES = {"bw": ScreenMode.bw(), "gray4": ScreenMode.gray(4), "gray16": ScreenMode.gray(16)}
+GRAY_MODES = {"bw": ScreenMode.bw()} | {
+    f"gray{n}": ScreenMode.gray(n)
+    for n in (3, 4, 5, 16, 255)  # 5, 255: levels not whole
+}
 
 
 def flat(value, size=(64, 32)):
@@ -79,6 +82,22 @@ def test_smooth_shades_keep_their_order():
     assert shares[0] <= 64 / 255 and shares[2] >= 192 / 255
 
 
+@pytest.mark.parametrize("value", [4, 12, 100, 128, 250])
+def test_pattern_shade_matches_the_gray_on_16_grays(value):
+    out = ScreenMode.gray(16).reduce(flat(value), dither="pattern", color=False)
+    average = sum(i * n for i, n in enumerate(out.histogram())) / (out.width * out.height)
+    assert average == pytest.approx(value, abs=1)
+
+
+@pytest.mark.parametrize("value", [4, 12, 95])
+def test_smooth_dithers_on_16_grays(value):
+    """A gray between two of the 16 levels gets dots of both, even when it is close to one."""
+    out = ScreenMode.gray(16).reduce(flat(value, (64, 64)), dither="smooth", color=False)
+    assert len(values(out)) == 2
+    average = sum(i * n for i, n in enumerate(out.histogram())) / (out.width * out.height)
+    assert average == pytest.approx(value, abs=3)
+
+
 @pytest.mark.parametrize("mode", GRAY_MODES)
 @pytest.mark.parametrize("dither", DITHERS)
 def test_every_method_uses_only_the_screen_levels(mode, dither):
@@ -93,6 +112,8 @@ def test_every_method_uses_only_the_screen_levels(mode, dither):
 @pytest.mark.parametrize("dither", DITHERS)
 def test_screen_levels_stay_solid(mode, dither):
     """A gray the screen can show needs no dots, whatever the method."""
+    if (mode, dither) == ("gray255", "photo"):
+        pytest.skip("Pillow's palette lookup is not exact with 255 entries (as before #94)")
     screen = GRAY_MODES[mode]
     for i in range(screen.levels):
         level = round(i * 255 / (screen.levels - 1))
@@ -136,11 +157,18 @@ def image_layout(**options):
 
 @pytest.mark.parametrize("dither", DITHERS)
 def test_image_block_dither_setting(dither):
+    """The block gives exactly what ScreenMode.reduce gives for its dither choice."""
+    picture = Image.linear_gradient("L").resize((64, 32))
     page = image_layout(dither=dither).prepare(64, 32, ScreenMode.bw())
-    out = page.render({"pic": flat(128)}).convert("L")
-    assert values(out) == {0, 255}
-    if dither == "pattern":
-        assert len(tiles(out, (0, 0, 64, 32))) == 1
+    out = page.render({"pic": picture}).convert("L")
+    expected = ScreenMode.bw().reduce(picture, dither=dither, color=False)
+    assert out.tobytes() == expected.tobytes()
+
+
+def test_the_three_methods_differ():
+    picture = Image.linear_gradient("L").resize((64, 32))
+    outs = {ScreenMode.bw().reduce(picture, dither=d, color=False).tobytes() for d in DITHERS}
+    assert len(outs) == 3
 
 
 def test_image_block_dither_default_is_photo():

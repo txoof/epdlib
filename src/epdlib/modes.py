@@ -15,12 +15,13 @@ from PIL import Image, ImageChops, ImageColor
 
 Kind = Literal["bw", "gray", "palette", "rgb"]
 
-#: Ways to dither. ``photo``: Floyd-Steinberg, each pixel's rounding error is passed to
-#: its neighbours; best for photos, but on large flat gray areas a row of dots can slip.
+#: Ways to dither. ``photo``: Floyd-Steinberg, each pixel's rounding error (the difference
+#: between the wanted shade and the shade the pixel got) is passed to its neighbours; best
+#: for photos, but on large flat gray areas a row of dots can slip.
 #: ``pattern``: a fixed 8x8 Bayer pattern; flat areas stay even and never slip, best for
 #: drawn graphics. ``smooth``: Atkinson, the most even gray overall, but slow (plain
-#: Python: about 2.4 s for a whole 800x480 black-and-white image on a Pi 3). On colour
-#: (palette) screens all three use the ``photo`` method for now.
+#: Python: about 3.4 s for a whole 800x480 image on a Pi 3). Colour blocks on colour
+#: (palette) screens use the ``photo`` method for all three, for now.
 DITHERS = ("photo", "pattern", "smooth")
 
 #: The colours of the common 7-colour Waveshare screens (ACeP).
@@ -159,8 +160,9 @@ class ScreenMode:
     def convert(self, image: Image.Image, dither: str = "photo") -> Image.Image:
         """Convert any image (for example one a program drew itself) to this mode.
 
-        ``dither`` is one of :data:`DITHERS`: ``"pattern"`` suits drawn graphics with flat
-        gray areas, such as bars and icons.
+        ``dither`` is one of :data:`DITHERS`. The default ``"photo"`` suits photos;
+        ``"pattern"`` suits drawn graphics with flat gray areas, such as bars and icons;
+        ``"smooth"`` is slow (seconds for a whole screen on a Pi 3).
         """
         if has_transparency(image):
             image = flatten(image)
@@ -193,12 +195,19 @@ def _ordered(gray: Image.Image, levels: int) -> Image.Image:
     """Ordered dithering: each pixel goes to one of its two nearest levels, chosen by its
     place in a fixed 8x8 pattern. It needs no neighbours, so flat areas never slip."""
     w, h = gray.size
-    # v * (levels - 1) = lower * 255 + rest: "lower" is the level below, "rest" how far
-    # it is (0-254) towards the level above.
+    # For each value: the screen level below it, the one above, and how far (0-254) it
+    # is from the lower towards the upper one.
     steps = [round(i * 255 / (levels - 1)) for i in range(levels)]
-    lower = gray.point([steps[v * (levels - 1) // 255] for v in range(256)])
-    upper = gray.point([steps[min(v * (levels - 1) // 255 + 1, levels - 1)] for v in range(256)])
-    rest = gray.point([v * (levels - 1) % 255 for v in range(256)])
+    below = [max(i for i, s in enumerate(steps) if s <= v) for v in range(256)]
+    up = [steps[min(i + 1, levels - 1)] for i in below]
+    lower = gray.point([steps[i] for i in below])
+    upper = gray.point(up)
+    rest = gray.point(
+        [
+            0 if up[v] == steps[i] else round((v - steps[i]) * 255 / (up[v] - steps[i]))
+            for v, i in enumerate(below)
+        ]
+    )
     rows = [bytes(row[x % 8] for x in range(w)) for row in _THRESHOLDS]
     thresholds = Image.frombytes("L", (w, h), b"".join(rows[y % 8] for y in range(h)))
     above = ImageChops.subtract(rest, thresholds).point(lambda v: 255 if v else 0)
@@ -210,13 +219,15 @@ def _atkinson(gray: Image.Image, levels: int) -> Image.Image:
     error is passed on, so it cannot build up. Plain Python, so slow."""
     w, h = gray.size
     nearest = _nearest_level_table(levels)
-    px = list(gray.tobytes())
+    # Values are kept in 64ths, so small errors are not lost to rounding (on a 16-gray
+    # screen most errors are smaller than 8, the share passed to each neighbour).
+    px = [v << 6 for v in gray.tobytes()]
     n = w * h
     for i in range(n):
         old = px[i]
-        new = nearest[min(max(old, 0), 255)]
+        new = nearest[min(max((old + 32) >> 6, 0), 255)]
         px[i] = new
-        err = (old - new) // 8 if old >= new else -((new - old) // 8)  # towards 0
+        err = (old - (new << 6)) >> 3
         if err:
             x = i % w
             if x + 1 < w:
