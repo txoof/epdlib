@@ -88,6 +88,21 @@ _SIX = ScreenMode.palette(("#000000", "#ffffff", "#ffff00", "#ff0000", "#0000ff"
 _SEVEN = ScreenMode.palette(
     ("#000000", "#ffffff", "#00ff00", "#0000ff", "#ff0000", "#ffff00", "#ff8000")
 )
+# The 5.65" F's real colours, measured by Pimoroni for the same kind of 600 x 448 panel:
+# SATURATED_PALETTE in https://github.com/pimoroni/inky (MIT licence, Copyright (c) 2018
+# Pimoroni Ltd). Chosen by eye on the 5.65" F (issue #97).
+_SEVEN_565 = ScreenMode.palette(
+    _SEVEN.colors,
+    measured=(
+        (57, 48, 57),
+        (255, 255, 255),
+        (58, 91, 70),
+        (61, 59, 94),
+        (156, 72, 75),
+        (208, 190, 71),
+        (177, 106, 73),
+    ),
+)
 
 # Every model: (width, height, mode, calls). Sizes are Waveshare's, wide side first;
 # Waveshare's files turn an image of a tall screen themselves. Only full writes, except
@@ -165,7 +180,7 @@ _TABLE: dict[str, tuple[int, int, ScreenMode, _Calls]] = {
     "epd7in3g": (800, 480, _FOUR, _FULL),
     # Six and seven colours
     "epd4in01f": (640, 400, _SEVEN, _FULL),
-    "epd5in65f": (600, 448, _SEVEN, _FULL),
+    "epd5in65f": (600, 448, _SEVEN_565, _FULL),
     "epd7in3e": (800, 480, _SIX, _FULL),
     "epd7in3f": (800, 480, _SEVEN, _FULL),
 }

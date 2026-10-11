@@ -1,5 +1,5 @@
 import pytest
-from PIL import Image, ImageColor
+from PIL import Image, ImageColor, ImageDraw
 
 from epdlib import SEVEN_COLORS, Layout, ScreenMode
 
@@ -104,3 +104,78 @@ def test_palette_must_have_black_and_white():
 def test_gray_levels_checked():
     with pytest.raises(ValueError):
         ScreenMode.gray(1)
+
+
+# Black, white and green, where the panel's green really looks dark.
+DARK_GREEN = (0, 90, 0)
+MEASURED = ScreenMode.palette(
+    ("#000000", "#ffffff", "#00ff00"), measured=((0, 0, 0), (255, 255, 255), DARK_GREEN)
+)
+
+
+def test_measured_colours_choose_the_dots():
+    """A flat area in the panel's real green is sent as green, not as dots of other colours."""
+    area = Image.new("RGB", (60, 40), DARK_GREEN)
+    assert colors(MEASURED.reduce(area, dither=True, color=True)) == {(0, 255, 0)}
+    ideal = ScreenMode.palette(MEASURED.colors)
+    assert len(colors(ideal.reduce(area, dither=True, color=True))) > 1
+
+
+def test_text_is_not_changed_by_measured_colours():
+    """Without dithering (text), soft edges go to the nearest screen value, as without
+    measured colours: matched to the dark measured colours they got coloured pixels."""
+    text = Image.new("RGB", (200, 40), "white")
+    ImageDraw.Draw(text).text((4, 4), "Jumping fox", fill="black", font_size=28)
+    seven = ScreenMode.palette(SEVEN_COLORS, measured=INKY)
+    ideal = ScreenMode.palette(SEVEN_COLORS)
+    out = seven.reduce(text, dither=False, color=True)
+    assert out.tobytes() == ideal.reduce(text, dither=False, color=True).tobytes()
+
+
+def test_measured_palette_uses_only_its_colors():
+    seven = ScreenMode.palette(SEVEN_COLORS, measured=INKY)
+    assert colors(render(seven)) <= {ImageColor.getrgb(c) for c in SEVEN_COLORS}
+
+
+# Pimoroni's measured colours for their 5.7" seven-colour panel, in SEVEN_COLORS order.
+INKY = (
+    (57, 48, 57),
+    (255, 255, 255),
+    (58, 91, 70),
+    (61, 59, 94),
+    (156, 72, 75),
+    (208, 190, 71),
+    (177, 106, 73),
+)
+
+
+@pytest.mark.parametrize("colour", SEVEN_COLORS)
+def test_screen_colours_stay_solid_with_measured_colours(colour):
+    """Areas drawn in one of the screen's own colours get no dots of other colours."""
+    seven = ScreenMode.palette(SEVEN_COLORS, measured=INKY)
+    area = Image.new("RGB", (60, 40), colour)
+    assert colors(seven.reduce(area, dither=True, color=True)) == {ImageColor.getrgb(colour)}
+
+
+def test_measured_colours_may_be_lists_or_hex():
+    mode = ScreenMode.palette(MEASURED.colors, measured=([0, 0, 0], "#ffffff", "#005a00"))
+    assert mode.measured == MEASURED.measured
+    assert hash(mode) == hash(MEASURED)
+
+
+@pytest.mark.parametrize(
+    "measured",
+    [
+        ((0, 0, 0), (255, 255, 255)),  # one too few
+        ((0, 0, 0), (255, 255, 255), (0, 300, 0)),
+        ((0, 0),) * 3,
+        ((0, 0, 0), (255, 255, 255), (True, 0, 0)),
+        ((0, 0, 0), (255, 255, 255), (0.5, 0, 0)),
+        ((0, 0, 0), (255, 255, 255), 5),
+        ((0, 0, 0), (255, 255, 255), "not a colour"),
+        ((0, 0, 0), (255, 255, 255), (0, 0, 0)),  # twice the same: red could never be shown
+    ],
+)
+def test_measured_colours_checked(measured):
+    with pytest.raises(ValueError, match="measured"):
+        ScreenMode.palette(MEASURED.colors, measured=measured)

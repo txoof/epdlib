@@ -180,6 +180,10 @@ def test_palette_colours_match_waveshare_values(model):
             assert codes == {code}, colour
 
 
+def test_only_the_tested_565f_has_measured_colours():
+    assert [m for m, info in MODELS.items() if info.mode.measured] == ["epd5in65f"]
+
+
 @pytest.mark.parametrize(
     ("file", "name"),
     [
