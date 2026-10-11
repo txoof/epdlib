@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from PIL import Image, ImageColor
+from PIL import Image, ImageChops, ImageColor
 
 Kind = Literal["bw", "gray", "palette", "rgb"]
 
@@ -37,6 +37,9 @@ class ScreenMode:
     kind: Kind
     levels: int = 2
     colors: tuple[str, ...] = ()
+    #: What each of :attr:`colors` really looks like on the panel, as ``(r, g, b)``, or
+    #: empty when not measured. Dots are chosen by these; :attr:`colors` are sent.
+    measured: tuple[tuple[int, int, int], ...] = ()
 
     @classmethod
     def bw(cls) -> ScreenMode:
@@ -51,12 +54,29 @@ class ScreenMode:
         return cls("gray", levels=levels)
 
     @classmethod
-    def palette(cls, colors: tuple[str, ...] = SEVEN_COLORS) -> ScreenMode:
-        """A fixed set of colours, given as names or ``#rrggbb``. Must include black and white."""
+    def palette(
+        cls,
+        colors: tuple[str, ...] = SEVEN_COLORS,
+        measured: tuple[tuple[int, int, int], ...] = (),
+    ) -> ScreenMode:
+        """A fixed set of colours, given as names or ``#rrggbb``. Must include black and white.
+
+        ``colors`` are the values the screen is sent. Colour panels often look much
+        darker than these values; ``measured`` (optional) gives what each colour really
+        looks like, in the same order, so dots are chosen by the panel's real colours.
+        """
         rgb = {ImageColor.getrgb(c) for c in colors}
         if (0, 0, 0) not in rgb or (255, 255, 255) not in rgb:
             raise ValueError("a palette must include black and white")
-        return cls("palette", levels=len(colors), colors=tuple(colors))
+        measured = tuple(tuple(c) for c in measured)
+        if measured and len(measured) != len(colors):
+            raise ValueError(
+                f"measured needs one colour per palette colour: {len(colors)}, got {len(measured)}"
+            )
+        for c in measured:
+            if len(c) != 3 or not all(isinstance(v, int) and 0 <= v <= 255 for v in c):
+                raise ValueError(f"a measured colour must be (r, g, b) with 0-255 each, got {c}")
+        return cls("palette", levels=len(colors), colors=tuple(colors), measured=measured)
 
     @classmethod
     def rgb(cls) -> ScreenMode:
@@ -93,7 +113,12 @@ class ScreenMode:
         if color and self.kind == "rgb":
             return image.convert("RGB")
         if color and self.kind == "palette":
-            return _quantize(image.convert("RGB"), self.colors, dither).convert("RGB")
+            image = image.convert("RGB")
+            if not self.measured:
+                return _quantize(image, self.colors, dither).convert("RGB")
+            reduced = _quantize(_exact_to_measured(image, self), self.measured, dither)
+            reduced.putpalette(_palette_data(self.colors))  # send the screen's own values
+            return reduced.convert("RGB")
         gray = image.convert("L")
         levels = self.levels if self.kind == "gray" else 2
         if self.kind in ("palette", "rgb") and not color:
@@ -124,13 +149,25 @@ def _nearest_level_table(levels: int) -> list[int]:
     return [round(round(v / step) * step) for v in range(256)]
 
 
-def _quantize(image: Image.Image, colors, dither: bool) -> Image.Image:
+def _palette_data(colors) -> list[int]:
     rgb = [c if isinstance(c, tuple) else ImageColor.getrgb(c) for c in colors]
-    pal = Image.new("P", (1, 1))
-    flat = [v for c in rgb for v in c]
     # Pad by repeating the first colour, so no unused black entries are matched.
-    flat += list(rgb[0]) * (256 - len(rgb))
-    pal.putpalette(flat)
+    return [v for c in rgb + [rgb[0]] * (256 - len(rgb)) for v in c]
+
+
+def _exact_to_measured(image: Image.Image, mode: ScreenMode) -> Image.Image:
+    """Swap pixels that are exactly one of the screen's colours for its measured colour,
+    so areas drawn in a screen colour stay solid instead of getting dots of other colours."""
+    nearest = _quantize(image, mode.colors, False)
+    r, g, b = ImageChops.difference(image, nearest.convert("RGB")).split()
+    exact = ImageChops.lighter(ImageChops.lighter(r, g), b).point(lambda v: 255 if v == 0 else 0)
+    nearest.putpalette(_palette_data(mode.measured))
+    return Image.composite(nearest.convert("RGB"), image, exact.convert("1"))
+
+
+def _quantize(image: Image.Image, colors, dither: bool) -> Image.Image:
+    pal = Image.new("P", (1, 1))
+    pal.putpalette(_palette_data(colors))
     method = Image.Dither.FLOYDSTEINBERG if dither else Image.Dither.NONE
     return image.quantize(palette=pal, dither=method)
 

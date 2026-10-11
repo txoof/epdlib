@@ -174,6 +174,16 @@ narrower than a single letter: that letter is cut at the edge.
 | `ScreenMode.palette()` | the 7-colour screens (or pass your own colours) |
 | `ScreenMode.rgb()` | full colour |
 
+Colour panels often look much darker than the values they are sent. A palette can carry
+what each colour really looks like, in the same order; dots are then chosen by these real
+colours, and the screen's own values are sent:
+
+```python
+ScreenMode.palette(
+    ("#000000", "#ffffff", "#ff0000"), measured=((40, 40, 40), (230, 230, 220), (150, 30, 30))
+)
+```
+
 Each block is drawn directly in the screen's mode. Text is never dithered, so it stays
 sharp; images and shapes are dithered (dot patterns for in-between shades).
 

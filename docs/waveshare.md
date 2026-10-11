@@ -76,7 +76,7 @@ Sizes are given with the wide side first (landscape), also for screens that Wave
 
 In epdlib, only the 7.5" V2 has fast writes so far. Several other screens have a fast mode in Waveshare's code; it is added to the driver when it has been tried on a real screen.
 
-**Colour screens** (4, 6 or 7 colours): epdlib reduces pictures to the screen's colours with dot patterns. For now, grays come out as dots of all colours (mostly yellow and black), and photos use Waveshare's ideal colours rather than the screen's real, darker ones (issue #97).
+**Colour screens** (4, 6 or 7 colours): epdlib reduces pictures to the screen's colours with dot patterns. The panels' real colours are much darker than Waveshare's values (the 5.65" F's green is a dark olive). On the **5.65" F**, dots are chosen by its real colours: Pimoroni's measurements of the same kind of panel. Checked by eye, this made grays, photos and in-between colours look much better (issue #97). The other colour models still use Waveshare's values: grays there come out as dots of all colours (mostly yellow and black). Areas drawn in one of the screen's own colours (for example `#ff0000`) always stay solid.
 
 **Three-colour screens** (black, white and red or yellow; a B or C in the name) show **black and white only** for now. Red and yellow will follow (issue #96). The driver sends Waveshare's file an empty colour layer, except on the 2.7" B, which is run with the 2.7" black-and-white file: with epdlib 0.6 that was much faster than its own file, because the screen then skips the slow colour refresh. This shortcut has not been tried with the new driver yet.
 
