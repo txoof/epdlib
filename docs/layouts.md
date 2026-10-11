@@ -95,6 +95,7 @@ Transparent parts of the image get the block's `background`. Image files larger 
 |---|---|---|
 | `fit` | `"contain"` | `contain`: whole image, shape kept. `cover`: fills the block, sides cut. `stretch`: fills the block, shape changed. `none`: original size |
 | `align` / `valign` | `"center"` | which side the image sits on, and which side is kept when it is cut. Also `random` |
+| `dither` | `"photo"` | how grays and colours the screen does not have are made from dots: `photo`, `pattern` or `smooth` (see [Dithering](#dithering)) |
 
 Pictures your code draws itself (bars, dots, icons) look best at the exact size they are
 shown, because any resizing blurs their edges. `page.content_size("name")` gives that
@@ -192,6 +193,34 @@ panel. The Waveshare driver already has them for the 5.65" F (see `docs/waveshar
 
 Each block is drawn directly in the screen's mode. Text is never dithered, so it stays
 sharp; images and shapes are dithered (dot patterns for in-between shades).
+
+### Dithering
+
+Dithering fakes the grays (or colours) a screen does not have with a pattern of dots.
+There are three ways to place the dots. Image blocks choose one with `dither`; shape blocks
+always use `pattern`, because they are flat areas. The setting says what kind of picture
+the block holds, not what screen it is for: the same layout works on every screen.
+
+| `dither` | Method | Best for | Pi 3, 800×480 black and white / 1200×825 16 grays |
+|---|---|---|---|
+| `photo` (default) | Floyd–Steinberg: each pixel's rounding error is passed to its neighbours | photos | 0.08 s / 0.07 s |
+| `pattern` | a fixed 8×8 Bayer pattern of dots | drawn pictures with flat gray areas: bars, icons, charts | 0.04 s / 0.08 s |
+| `smooth` | Atkinson: like `photo`, but only 6/8 of each error is passed on | the most even gray overall | **2.4 s / 1.9 s** |
+
+- `photo` is what epdlib v0.6 did. On large flat gray areas a row of dots can slip by one
+  pixel now and then, because the passed-on errors add up.
+- `pattern` never slips: each dot depends only on its place in the pattern. **Do not use it
+  for photos**: on the screen test the moon photo looked poor with it.
+- `smooth` gives light grays a little lighter and dark grays a little darker. **It is
+  slow**: it is written in plain Python. The times above are for a picture that fills the
+  whole screen; a smaller block takes less time.
+- On gray screens, dots are only mixed from the two grays nearest to the wanted shade, so
+  on a 16-gray screen they hardly show.
+- On colour (palette) screens all three use `photo`'s method for now.
+- On full-colour screens nothing is dithered.
+
+A finished image your code drew itself can use the same choice:
+`mode.convert(image, dither="pattern")`.
 
 ## Layouts from JSON files
 

@@ -116,9 +116,9 @@ MEASURED = ScreenMode.palette(
 def test_measured_colours_choose_the_dots():
     """A flat area in the panel's real green is sent as green, not as dots of other colours."""
     area = Image.new("RGB", (60, 40), DARK_GREEN)
-    assert colors(MEASURED.reduce(area, dither=True, color=True)) == {(0, 255, 0)}
+    assert colors(MEASURED.reduce(area, dither="photo", color=True)) == {(0, 255, 0)}
     ideal = ScreenMode.palette(MEASURED.colors)
-    assert len(colors(ideal.reduce(area, dither=True, color=True))) > 1
+    assert len(colors(ideal.reduce(area, dither="photo", color=True))) > 1
 
 
 def test_text_is_not_changed_by_measured_colours():
@@ -128,8 +128,8 @@ def test_text_is_not_changed_by_measured_colours():
     ImageDraw.Draw(text).text((4, 4), "Jumping fox", fill="black", font_size=28)
     seven = ScreenMode.palette(SEVEN_COLORS, measured=INKY)
     ideal = ScreenMode.palette(SEVEN_COLORS)
-    out = seven.reduce(text, dither=False, color=True)
-    assert out.tobytes() == ideal.reduce(text, dither=False, color=True).tobytes()
+    out = seven.reduce(text, dither=None, color=True)
+    assert out.tobytes() == ideal.reduce(text, dither=None, color=True).tobytes()
 
 
 def test_measured_palette_uses_only_its_colors():
@@ -154,7 +154,7 @@ def test_screen_colours_stay_solid_with_measured_colours(colour):
     """Areas drawn in one of the screen's own colours get no dots of other colours."""
     seven = ScreenMode.palette(SEVEN_COLORS, measured=INKY)
     area = Image.new("RGB", (60, 40), colour)
-    assert colors(seven.reduce(area, dither=True, color=True)) == {ImageColor.getrgb(colour)}
+    assert colors(seven.reduce(area, dither="photo", color=True)) == {ImageColor.getrgb(colour)}
 
 
 def test_measured_colours_may_be_lists_or_hex():

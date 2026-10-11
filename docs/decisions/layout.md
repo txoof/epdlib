@@ -129,6 +129,12 @@ What v0.6 did badly:
 - **Text is never dithered**: each pixel goes to the nearest available shade, so it stays
   sharp. **Images and shapes are dithered**, so a gray fill shows as a dot pattern on a
   black-and-white screen instead of disappearing.
+- Dithering (#94): image blocks choose `photo` (Floyd–Steinberg, the default, as in v0.6),
+  `pattern` (8x8 Bayer) or `smooth` (Atkinson); shapes always use `pattern`. Chosen after an
+  eye test on the 7.5" V2: Floyd–Steinberg slipped rows on flat gray, Bayer gave the most
+  even flat fills, Floyd–Steinberg the best photos, Atkinson came first or second
+  everywhere but is about 30 times slower (plain Python; no compiled code in epdlib).
+  Colour screens use Floyd–Steinberg for every choice for now.
 - Without `rgb_support`, a block on a colour screen is drawn without colour: in black and
   white on palette screens (they have no grays), and in gray on full-colour screens.
 - `ScreenMode.convert()` turns any finished image (for example one a program drew itself)

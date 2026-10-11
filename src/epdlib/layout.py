@@ -205,14 +205,15 @@ class PreparedLayout:
             elif block.type == "shape":
                 self._draw_shape(block, draw, inner, fill, color, rng)
         # Text is never dithered, so it stays sharp. Shapes are, so a gray fill on a
-        # black-and-white screen shows as a dot pattern instead of disappearing.
-        dither = block.type == "shape"
+        # black-and-white screen shows as a dot pattern instead of disappearing; a fixed
+        # pattern, because shapes are flat areas.
+        dither = "pattern" if block.type == "shape" else None
         result = self.mode.reduce(canvas, dither=dither, color=color)
         if block.type == "image" and inner.width > 0 and inner.height > 0:
             picture = self._image_value(block, value)
             if picture is not None:
                 fitted, pos = _fit_image(picture, inner, o, background, rng)
-                reduced = self.mode.reduce(fitted, dither=True, color=color)
+                reduced = self.mode.reduce(fitted, dither=o["dither"], color=color)
                 result.paste(reduced, pos)
         return result
 

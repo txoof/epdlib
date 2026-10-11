@@ -3,7 +3,7 @@
 Every block is drawn in a working image ("L" for gray, "RGB" for colour) and then reduced
 to the screen's mode. Text is reduced without dithering (each pixel goes to the nearest
 colour the screen has), so it stays sharp. Images and shapes are dithered: dot patterns
-fake the in-between shades.
+fake the in-between shades. There are three ways to place the dots (see :data:`DITHERS`).
 """
 
 from __future__ import annotations
@@ -14,6 +14,14 @@ from typing import Literal
 from PIL import Image, ImageChops, ImageColor
 
 Kind = Literal["bw", "gray", "palette", "rgb"]
+
+#: Ways to dither. ``photo``: Floyd-Steinberg, each pixel's rounding error is passed to
+#: its neighbours; best for photos, but on large flat gray areas a row of dots can slip.
+#: ``pattern``: a fixed 8x8 Bayer pattern; flat areas stay even and never slip, best for
+#: drawn graphics. ``smooth``: Atkinson, the most even gray overall, but slow (plain
+#: Python: about 2.4 s for a whole 800x480 black-and-white image on a Pi 3). On colour
+#: (palette) screens all three use the ``photo`` method for now.
+DITHERS = ("photo", "pattern", "smooth")
 
 #: The colours of the common 7-colour Waveshare screens (ACeP).
 SEVEN_COLORS: tuple[str, ...] = (
@@ -104,22 +112,26 @@ class ScreenMode:
         """Turn a colour name or ``#rrggbb`` into a pixel value for :meth:`work_mode`."""
         return ImageColor.getcolor(value, self.work_mode(color))
 
-    def reduce(self, image: Image.Image, *, dither: bool, color: bool) -> Image.Image:
+    def reduce(self, image: Image.Image, *, dither: str | None, color: bool) -> Image.Image:
         """Reduce a drawn block to what the screen can show.
 
-        Returns an ``L`` image (gray and black-and-white screens) or an ``RGB`` image
-        (colour screens). ``color=False`` draws a block in gray or black and white even
-        on a colour screen.
+        ``dither`` is one of :data:`DITHERS`, or ``None`` for no dithering (each pixel
+        goes to the nearest shade, as for text). Returns an ``L`` image (gray and
+        black-and-white screens) or an ``RGB`` image (colour screens). ``color=False``
+        draws a block in gray or black and white even on a colour screen.
         """
+        if dither is not None and dither not in DITHERS:
+            raise ValueError(f"dither must be one of {', '.join(DITHERS)} or None, got {dither!r}")
         if color and self.kind == "rgb":
             return image.convert("RGB")
         if color and self.kind == "palette":
             image = image.convert("RGB")
-            if not (self.measured and dither):
+            # Every dither choice uses Floyd-Steinberg here for now (no colour patterns yet).
+            if not (self.measured and dither is not None):
                 # Without dithering (text), each pixel goes to the nearest screen value as
                 # before: matched to measured colours, soft text edges got coloured pixels.
-                return _quantize(image, self.colors, dither).convert("RGB")
-            reduced = _quantize(_exact_to_measured(image, self), self.measured, dither)
+                return _quantize(image, self.colors, dither is not None).convert("RGB")
+            reduced = _quantize(_exact_to_measured(image, self), self.measured, True)
             reduced.putpalette(_palette_data(self.colors))  # send the screen's own values
             return reduced.convert("RGB")
         gray = image.convert("L")
@@ -129,9 +141,13 @@ class ScreenMode:
             levels = 2 if self.kind == "palette" else 256
         if levels >= 256:
             reduced = gray
-        elif dither:
+        elif dither == "photo":
             steps = [round(i * 255 / (levels - 1)) for i in range(levels)]
             reduced = _quantize(gray.convert("RGB"), [(s, s, s) for s in steps], True).convert("L")
+        elif dither == "pattern":
+            reduced = _ordered(gray, levels)
+        elif dither == "smooth":
+            reduced = _atkinson(gray, levels)
         else:
             reduced = gray.point(_nearest_level_table(levels))
         return reduced.convert("RGB") if self.has_color else reduced
@@ -140,16 +156,83 @@ class ScreenMode:
         """Convert a finished screen image to :attr:`pil_mode`."""
         return image.convert(self.pil_mode) if image.mode != self.pil_mode else image
 
-    def convert(self, image: Image.Image) -> Image.Image:
-        """Convert any image (for example one a program drew itself) to this mode, dithered."""
+    def convert(self, image: Image.Image, dither: str = "photo") -> Image.Image:
+        """Convert any image (for example one a program drew itself) to this mode.
+
+        ``dither`` is one of :data:`DITHERS`: ``"pattern"`` suits drawn graphics with flat
+        gray areas, such as bars and icons.
+        """
         if has_transparency(image):
             image = flatten(image)
-        return self.finish(self.reduce(image, dither=True, color=True))
+        return self.finish(self.reduce(image, dither=dither, color=True))
 
 
 def _nearest_level_table(levels: int) -> list[int]:
     step = 255 / (levels - 1)
     return [round(round(v / step) * step) for v in range(256)]
+
+
+def _bayer(n: int) -> list[list[int]]:
+    """The n x n Bayer matrix: the order in which dots are turned on, spread out evenly."""
+    m = [[0]]
+    while len(m) < n:
+        k = len(m)
+        m = [
+            [4 * m[y % k][x % k] + ((0, 2), (3, 1))[y // k][x // k] for x in range(2 * k)]
+            for y in range(2 * k)
+        ]
+    return m
+
+
+_BAYER8 = _bayer(8)
+# Thresholds 0-254: a pixel moves up one level when its remainder is above its threshold.
+_THRESHOLDS = [[(v * 255 + 127) // 64 for v in row] for row in _BAYER8]
+
+
+def _ordered(gray: Image.Image, levels: int) -> Image.Image:
+    """Ordered dithering: each pixel goes to one of its two nearest levels, chosen by its
+    place in a fixed 8x8 pattern. It needs no neighbours, so flat areas never slip."""
+    w, h = gray.size
+    # v * (levels - 1) = lower * 255 + rest: "lower" is the level below, "rest" how far
+    # it is (0-254) towards the level above.
+    steps = [round(i * 255 / (levels - 1)) for i in range(levels)]
+    lower = gray.point([steps[v * (levels - 1) // 255] for v in range(256)])
+    upper = gray.point([steps[min(v * (levels - 1) // 255 + 1, levels - 1)] for v in range(256)])
+    rest = gray.point([v * (levels - 1) % 255 for v in range(256)])
+    rows = [bytes(row[x % 8] for x in range(w)) for row in _THRESHOLDS]
+    thresholds = Image.frombytes("L", (w, h), b"".join(rows[y % 8] for y in range(h)))
+    above = ImageChops.subtract(rest, thresholds).point(lambda v: 255 if v else 0)
+    return Image.composite(upper, lower, above.convert("1"))
+
+
+def _atkinson(gray: Image.Image, levels: int) -> Image.Image:
+    """Atkinson dithering: like Floyd-Steinberg, but only 6/8 of each pixel's rounding
+    error is passed on, so it cannot build up. Plain Python, so slow."""
+    w, h = gray.size
+    nearest = _nearest_level_table(levels)
+    px = list(gray.tobytes())
+    n = w * h
+    for i in range(n):
+        old = px[i]
+        new = nearest[min(max(old, 0), 255)]
+        px[i] = new
+        err = (old - new) // 8 if old >= new else -((new - old) // 8)  # towards 0
+        if err:
+            x = i % w
+            if x + 1 < w:
+                px[i + 1] += err
+                if x + 2 < w:
+                    px[i + 2] += err
+            j = i + w
+            if j < n:
+                if x:
+                    px[j - 1] += err
+                px[j] += err
+                if x + 1 < w:
+                    px[j + 1] += err
+                if j + w < n:
+                    px[j + w] += err
+    return Image.frombytes("L", (w, h), bytes(px))
 
 
 def _palette_data(colors) -> list[int]:

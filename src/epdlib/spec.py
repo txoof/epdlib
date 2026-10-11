@@ -15,6 +15,8 @@ from typing import Any
 
 from PIL import ImageColor
 
+from .modes import DITHERS
+
 #: Deepest allowed nesting of rows and columns.
 MAX_DEPTH = 10
 #: Largest layout file that :func:`read_json` reads, in bytes.
@@ -28,13 +30,14 @@ H_ALIGN = ("left", "center", "right", "random")
 V_ALIGN = ("top", "center", "bottom", "random")
 FITS = ("contain", "cover", "stretch", "none")
 
+
 _COMMON = {"name", "type", "size", "pixels", "padding", "background", "fill", "border"}
 _COMMON |= {"inverse", "rgb_support"}
 _KEYS = {
     "text": _COMMON
     | {"text", "sample", "font", "font_size", "max_lines", "shrink", "align", "valign"}
     | {"ellipsis"},
-    "image": _COMMON | {"image", "fit", "align", "valign"},
+    "image": _COMMON | {"image", "fit", "align", "valign", "dither"},
     "shape": _COMMON | {"shape", "line_width", "align", "valign"},
 }
 _CONTAINER_KEYS = {"row", "column", "size", "pixels", "gap", "padding"}
@@ -222,6 +225,7 @@ class _Parser:
         elif kind == "image":
             o["image"] = self.path(data.get("image"), "image", where)
             o["fit"] = _choice(data.get("fit", "contain"), FITS, "fit", where)
+            o["dither"] = _choice(data.get("dither", "photo"), DITHERS, "dither", where)
             o["align"] = _choice(data.get("align", "center"), H_ALIGN, "align", where)
             o["valign"] = _choice(data.get("valign", "center"), V_ALIGN, "valign", where)
         else:
