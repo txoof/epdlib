@@ -88,8 +88,9 @@ _SIX = ScreenMode.palette(("#000000", "#ffffff", "#ffff00", "#ff0000", "#0000ff"
 _SEVEN = ScreenMode.palette(
     ("#000000", "#ffffff", "#00ff00", "#0000ff", "#ff0000", "#ffff00", "#ff8000")
 )
-# The 5.65" F's real colours, measured by Pimoroni for the same kind of 600 x 448 panel
-# (SATURATED_PALETTE in their inky library). Chosen by eye on the 5.65" F (issue #97).
+# The 5.65" F's real colours, measured by Pimoroni for the same kind of 600 x 448 panel:
+# SATURATED_PALETTE in https://github.com/pimoroni/inky (MIT licence, Copyright (c) 2018
+# Pimoroni Ltd). Chosen by eye on the 5.65" F (issue #97).
 _SEVEN_565 = ScreenMode.palette(
     _SEVEN.colors,
     measured=(

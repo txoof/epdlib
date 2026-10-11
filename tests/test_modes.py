@@ -1,5 +1,5 @@
 import pytest
-from PIL import Image, ImageColor
+from PIL import Image, ImageColor, ImageDraw
 
 from epdlib import SEVEN_COLORS, Layout, ScreenMode
 
@@ -121,9 +121,15 @@ def test_measured_colours_choose_the_dots():
     assert len(colors(ideal.reduce(area, dither=True, color=True))) > 1
 
 
-def test_measured_colours_without_dithering_send_the_screen_values():
-    area = Image.new("RGB", (4, 4), (10, 80, 10))
-    assert colors(MEASURED.reduce(area, dither=False, color=True)) == {(0, 255, 0)}
+def test_text_is_not_changed_by_measured_colours():
+    """Without dithering (text), soft edges go to the nearest screen value, as without
+    measured colours: matched to the dark measured colours they got coloured pixels."""
+    text = Image.new("RGB", (200, 40), "white")
+    ImageDraw.Draw(text).text((4, 4), "Jumping fox", fill="black", font_size=28)
+    seven = ScreenMode.palette(SEVEN_COLORS, measured=INKY)
+    ideal = ScreenMode.palette(SEVEN_COLORS)
+    out = seven.reduce(text, dither=False, color=True)
+    assert out.tobytes() == ideal.reduce(text, dither=False, color=True).tobytes()
 
 
 def test_measured_palette_uses_only_its_colors():
@@ -151,9 +157,24 @@ def test_screen_colours_stay_solid_with_measured_colours(colour):
     assert colors(seven.reduce(area, dither=True, color=True)) == {ImageColor.getrgb(colour)}
 
 
+def test_measured_colours_may_be_lists_or_hex():
+    mode = ScreenMode.palette(MEASURED.colors, measured=([0, 0, 0], "#ffffff", "#005a00"))
+    assert mode.measured == MEASURED.measured
+    assert hash(mode) == hash(MEASURED)
+
+
 @pytest.mark.parametrize(
     "measured",
-    [((0, 0, 0), (255, 255, 255)), ((0, 0, 0), (255, 255, 255), (0, 300, 0)), ((0, 0),) * 3],
+    [
+        ((0, 0, 0), (255, 255, 255)),  # one too few
+        ((0, 0, 0), (255, 255, 255), (0, 300, 0)),
+        ((0, 0),) * 3,
+        ((0, 0, 0), (255, 255, 255), (True, 0, 0)),
+        ((0, 0, 0), (255, 255, 255), (0.5, 0, 0)),
+        ((0, 0, 0), (255, 255, 255), 5),
+        ((0, 0, 0), (255, 255, 255), "not a colour"),
+        ((0, 0, 0), (255, 255, 255), (0, 0, 0)),  # twice the same: red could never be shown
+    ],
 )
 def test_measured_colours_checked(measured):
     with pytest.raises(ValueError, match="measured"):

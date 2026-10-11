@@ -57,25 +57,26 @@ class ScreenMode:
     def palette(
         cls,
         colors: tuple[str, ...] = SEVEN_COLORS,
-        measured: tuple[tuple[int, int, int], ...] = (),
+        measured: tuple[str | tuple[int, int, int], ...] = (),
     ) -> ScreenMode:
         """A fixed set of colours, given as names or ``#rrggbb``. Must include black and white.
 
         ``colors`` are the values the screen is sent. Colour panels often look much
         darker than these values; ``measured`` (optional) gives what each colour really
-        looks like, in the same order, so dots are chosen by the panel's real colours.
+        looks like, in the same order, as ``(r, g, b)`` or ``#rrggbb``. Dots are then
+        chosen by the panel's real colours; text and areas drawn in one of ``colors``
+        are not changed.
         """
         rgb = {ImageColor.getrgb(c) for c in colors}
         if (0, 0, 0) not in rgb or (255, 255, 255) not in rgb:
             raise ValueError("a palette must include black and white")
-        measured = tuple(tuple(c) for c in measured)
+        measured = tuple(_measured_rgb(c) for c in measured)
         if measured and len(measured) != len(colors):
             raise ValueError(
                 f"measured needs one colour per palette colour: {len(colors)}, got {len(measured)}"
             )
-        for c in measured:
-            if len(c) != 3 or not all(isinstance(v, int) and 0 <= v <= 255 for v in c):
-                raise ValueError(f"a measured colour must be (r, g, b) with 0-255 each, got {c}")
+        if len(set(measured)) != len(measured):
+            raise ValueError("measured colours must all be different")
         return cls("palette", levels=len(colors), colors=tuple(colors), measured=measured)
 
     @classmethod
@@ -114,7 +115,9 @@ class ScreenMode:
             return image.convert("RGB")
         if color and self.kind == "palette":
             image = image.convert("RGB")
-            if not self.measured:
+            if not (self.measured and dither):
+                # Without dithering (text), each pixel goes to the nearest screen value as
+                # before: matched to measured colours, soft text edges got coloured pixels.
                 return _quantize(image, self.colors, dither).convert("RGB")
             reduced = _quantize(_exact_to_measured(image, self), self.measured, dither)
             reduced.putpalette(_palette_data(self.colors))  # send the screen's own values
@@ -153,6 +156,21 @@ def _palette_data(colors) -> list[int]:
     rgb = [c if isinstance(c, tuple) else ImageColor.getrgb(c) for c in colors]
     # Pad by repeating the first colour, so no unused black entries are matched.
     return [v for c in rgb + [rgb[0]] * (256 - len(rgb)) for v in c]
+
+
+def _measured_rgb(colour) -> tuple[int, int, int]:
+    if isinstance(colour, str):
+        try:
+            return ImageColor.getrgb(colour)[:3]
+        except ValueError:
+            raise ValueError(f"unknown measured colour {colour!r}") from None
+    if (
+        isinstance(colour, (tuple, list))
+        and len(colour) == 3
+        and all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 255 for v in colour)
+    ):
+        return tuple(colour)
+    raise ValueError(f"a measured colour must be (r, g, b) with 0-255 each, got {colour!r}")
 
 
 def _exact_to_measured(image: Image.Image, mode: ScreenMode) -> Image.Image:

@@ -175,14 +175,20 @@ narrower than a single letter: that letter is cut at the edge.
 | `ScreenMode.rgb()` | full colour |
 
 Colour panels often look much darker than the values they are sent. A palette can carry
-what each colour really looks like, in the same order; dots are then chosen by these real
-colours, and the screen's own values are sent:
+`measured` colours: what each colour really looks like, in the same order, as `(r, g, b)` or
+`#rrggbb`. Dots are then chosen by these real colours, and the screen's own values are sent.
+Text, and areas drawn exactly in one of the screen's colours, are not changed. The numbers
+below are made up:
 
 ```python
 ScreenMode.palette(
     ("#000000", "#ffffff", "#ff0000"), measured=((40, 40, 40), (230, 230, 220), (150, 30, 30))
 )
 ```
+
+To find the values, show each colour over the whole screen and photograph it in even
+daylight (or use a colour meter), or take them from another project that measured the same
+panel. The Waveshare driver already has them for the 5.65" F (see `docs/waveshare.md`).
 
 Each block is drawn directly in the screen's mode. Text is never dithered, so it stays
 sharp; images and shapes are dithered (dot patterns for in-between shades).
