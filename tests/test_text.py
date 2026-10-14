@@ -246,3 +246,52 @@ def test_fixed_font_size_is_capped_at_block_height():
     )
     assert line_height(load_font(None, page.font_sizes["t"])) <= 100
     page.render({"t": "Hi"})  # must not try to draw a 5000 px font
+
+
+def _placed(line_align, align="center"):
+    font = load_font(None, 30)
+    lines = ["a long first line of text", "short", "middle line"]
+    placed = arrange(font, lines, 600, 200, align, "top", line_align=line_align)
+    return font, lines, placed
+
+
+def _ink_left(font, line, x):
+    return x + font.getbbox(line, anchor="ls")[0]
+
+
+def test_line_align_left_starts_every_line_at_the_same_edge():
+    font, lines, placed = _placed("left")
+    lefts = {_ink_left(font, p.text, p.x) for p in placed}
+    assert len(lefts) == 1
+    # The group is centered: the widest line has as much room left as right.
+    widest = font.getbbox(lines[0], anchor="ls")
+    left = _ink_left(font, lines[0], placed[0].x)
+    right = 600 - (placed[0].x + widest[2])
+    assert abs(left - right) <= 1
+
+
+def test_line_align_right_ends_every_line_at_the_same_edge():
+    font, _, placed = _placed("right", align="left")
+    rights = {p.x + font.getbbox(p.text, anchor="ls")[2] for p in placed}
+    assert len(rights) == 1
+    assert _ink_left(font, placed[0].text, placed[0].x) == 0  # the group starts at the left
+
+
+def test_line_align_same_as_align_places_lines_like_before():
+    _, _, old = _placed(None, align="left")
+    _, _, new = _placed("left", align="left")
+    assert old == new
+
+
+def test_line_align_with_random_align_moves_the_group():
+    font = load_font(None, 30)
+    lines = ["a long first line", "short"]
+    starts = set()
+    for offset in (0.0, 0.5, 1.0):
+        placed = arrange(font, lines, 600, 200, "random", "top", (offset, 0.5), "left")
+        assert (
+            placed[0].x - placed[1].x
+            == font.getbbox(lines[1], anchor="ls")[0] - font.getbbox(lines[0], anchor="ls")[0]
+        )
+        starts.add(placed[0].x)
+    assert len(starts) == 3

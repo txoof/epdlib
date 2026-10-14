@@ -83,6 +83,7 @@ Every block has a unique `name` and a `type`. Options for all blocks:
 | `font` | DejaVu Sans | path to a `.ttf` or `.otf` font file |
 | `align` | `"left"` | `left`, `center`, `right` or `random` |
 | `valign` | `"center"` | `top`, `center`, `bottom` or `random` |
+| `line_align` | none | `left`, `center` or `right`. When set, `align` places all lines together as one group (as wide as the longest line) and `line_align` places each line inside that group. `align: "center", line_align: "left"` gives a centered paragraph whose lines all start at the same left edge |
 | `ellipsis` | `"…"` | added where too-long text is cut |
 
 ### image

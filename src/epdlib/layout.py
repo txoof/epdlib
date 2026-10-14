@@ -222,7 +222,14 @@ class PreparedLayout:
         result = self._fit_text(block, value)
         offset = (rng.random(), rng.random())
         lines = text.arrange(
-            result.font, result.lines, inner.width, inner.height, o["align"], o["valign"], offset
+            result.font,
+            result.lines,
+            inner.width,
+            inner.height,
+            o["align"],
+            o["valign"],
+            offset,
+            o["line_align"],
         )
         # Draw on a canvas the size of the content area, so that text can never reach the
         # block's padding or border, even when a single letter is wider than the block.
