@@ -223,10 +223,13 @@ def arrange(
     align: str,
     valign: str,
     offset: tuple[float, float] = (0.5, 0.5),
+    line_align: str | None = None,
 ) -> list[PlacedLine]:
     """Place lines inside a ``width`` x ``height`` area.
 
     ``offset`` is used for ``random`` alignment: 0 puts the text at the start, 1 at the end.
+    Without ``line_align``, ``align`` places each line on its own. With it, ``align`` places
+    the group of lines (as wide as the widest line) and ``line_align`` each line inside it.
     """
     ascent, descent = font.getmetrics()
     step = ascent + descent
@@ -235,9 +238,15 @@ def arrange(
     bottom = (len(lines) - 1) * step + extents[-1].bottom
     block_height = bottom - top
     y0 = align_offset(height - block_height, valign, offset[1]) - top
+    if line_align is not None:
+        group = max(ext.width for ext in extents)
+        x0 = align_offset(width - group, align, offset[0])
     placed = []
     for i, (line, ext) in enumerate(zip(lines, extents, strict=True)):
-        x = align_offset(width - ext.width, align, offset[0]) - ext.left
+        if line_align is None:
+            x = align_offset(width - ext.width, align, offset[0]) - ext.left
+        else:
+            x = x0 + align_offset(group - ext.width, line_align) - ext.left
         placed.append(PlacedLine(line, x, y0 + i * step))
     return placed
 

@@ -27,6 +27,7 @@ MAX_PIXELS = 20_000
 BLOCK_TYPES = ("text", "image", "shape")
 SHAPES = ("rectangle", "square", "circle", "ellipse", "hline", "vline")
 H_ALIGN = ("left", "center", "right", "random")
+LINE_ALIGN = ("left", "center", "right")
 V_ALIGN = ("top", "center", "bottom", "random")
 FITS = ("contain", "cover", "stretch", "none")
 
@@ -35,7 +36,7 @@ _COMMON |= {"inverse", "rgb_support"}
 _KEYS = {
     "text": _COMMON
     | {"text", "sample", "font", "font_size", "max_lines", "shrink", "align", "valign"}
-    | {"ellipsis"},
+    | {"ellipsis", "line_align"},
     "image": _COMMON | {"image", "fit", "align", "valign", "dither"},
     "shape": _COMMON | {"shape", "line_width", "align", "valign"},
 }
@@ -221,6 +222,8 @@ class _Parser:
             o["align"] = _choice(data.get("align", "left"), H_ALIGN, "align", where)
             o["valign"] = _choice(data.get("valign", "center"), V_ALIGN, "valign", where)
             o["ellipsis"] = _str(data.get("ellipsis", "…"), "ellipsis", where)
+            la = data.get("line_align")
+            o["line_align"] = None if la is None else _choice(la, LINE_ALIGN, "line_align", where)
         elif kind == "image":
             o["image"] = self.path(data.get("image"), "image", where)
             o["fit"] = _choice(data.get("fit", "contain"), FITS, "fit", where)
