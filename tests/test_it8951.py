@@ -167,6 +167,8 @@ def test_after_a_failed_write_the_next_write_is_full(screen, fake):
     fake.busy_stuck = False
     screen.write(page((108, 100)), fast=True)
     assert fake.draws[-1] == (*FULL, Mode.GC16)
+    # The failed write's reset cleared the settings; the next write sent them again.
+    assert fake.resets == 3
 
 
 def test_unaligned_left_edge_rounds_down(screen, fake):
@@ -300,7 +302,10 @@ def test_busy_line_stuck_times_out(screen, fake):
     start = time.monotonic()
     with pytest.raises(DisplayTimeout, match="busy line"):
         screen.write(page())
-    assert time.monotonic() - start < 0.3  # ready_timeout is 0.05 s
+    # One reset is tried (see test_write_resets_once_when_the_screen_does_not_wake), all
+    # within the operation's time limit of 0.5 s.
+    assert time.monotonic() - start < 0.8
+    assert fake.resets == 2
 
 
 def test_busy_line_stuck_at_start_times_out_within_the_operation_limit(fake):
@@ -383,6 +388,43 @@ def test_fast_write_after_sleep_sends_only_the_changed_area(screen, fake):
     screen.write(page((102, 100)), fast=True)
     assert fake.resets == 1  # woken without a reset, so the last image is still known
     assert fake.draws[-1] == (100, 100, 52, 50, Mode.DU)
+
+
+def test_drawing_may_keep_the_busy_line_low_longer_than_ready_timeout(screen, fake):
+    # epdlib #104: after sleep, the 9.7" keeps the busy line low 2.2 s while it clears;
+    # ready_timeout is 2 s. Here 0.2 s against 0.05 s, within the 0.5 s time limit.
+    screen.sleep()
+    fake.draw_busy_seconds = 0.2
+    screen.clear()
+    assert fake.resets == 1  # no reset needed
+    assert fake.draws[-1] == (*FULL, Mode.INIT)
+
+
+def test_drawing_longer_than_the_time_limit_times_out(screen, fake):
+    fake.draw_busy_seconds = 1.0
+    with pytest.raises(DisplayTimeout, match="busy line"):
+        screen.clear()
+
+
+def test_write_resets_once_when_the_screen_does_not_wake(screen, fake, caplog):
+    screen.write(page())
+    screen.sleep()
+    fake.stuck_after_wake = True
+    screen.write(page((102, 100)), fast=True)
+    assert fake.resets == 2  # the one of init, and one to recover
+    assert fake.vcom == pytest.approx(-1.90)  # the settings were sent again
+    # A reset keeps the picture, so the fast write still sends only the changed area.
+    assert fake.draws[-1] == (100, 100, 52, 50, Mode.DU)
+    assert fake.memory.tobytes() == page((102, 100)).tobytes()
+    assert "did not answer after waking" in caplog.text
+
+
+def test_clear_resets_once_when_the_screen_does_not_wake(screen, fake):
+    screen.sleep()
+    fake.stuck_after_wake = True
+    screen.clear()
+    assert fake.resets == 2
+    assert fake.draws[-1] == (*FULL, Mode.INIT)
 
 
 def test_import_does_not_load_hardware_libraries():

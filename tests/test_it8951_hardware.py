@@ -53,6 +53,17 @@ def test_full_fast_and_clear(screen):
     assert timed(screen.write, page_image(screen, 3), fast=True) < 0.5  # nothing changed
 
 
+def test_fast_write_after_sleep(screen):
+    # epdlib #104: waking from sleep can take longer than ready_timeout, also for a clear.
+    screen.write(page_image(screen))
+    screen.sleep()
+    time.sleep(1)
+    assert timed(screen.write, page_image(screen, 1), fast=True) < 4
+    screen.sleep()
+    time.sleep(1)
+    assert timed(screen.clear) < 6
+
+
 def test_close_and_init_again(screen):
     screen.write(page_image(screen))
     screen.close()

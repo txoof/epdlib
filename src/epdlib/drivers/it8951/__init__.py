@@ -16,6 +16,7 @@ significant byte first. Before each transfer the driver waits until the busy lin
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 from collections.abc import Callable
@@ -28,6 +29,12 @@ from .. import DisplayError, DisplayInfo, DisplayTimeout, Driver
 from .bus import Bus, SpiBus
 
 __all__ = ["MODELS", "VCOM_RANGE", "IT8951Driver", "Mode"]
+
+log = logging.getLogger(__name__)
+
+
+class _NotReady(DisplayTimeout):
+    """The busy line stayed low."""
 
 
 class Mode(IntEnum):
@@ -170,6 +177,8 @@ class IT8951Driver(Driver):
         self._fast_in_row = 0
         #: The controller was sent the sleep command and has not been woken since.
         self._asleep = False
+        #: A reset to recover was started and the settings were not sent again yet.
+        self._reset_pending = False
         #: Firmware and waveform table names the controller reported in :meth:`init`.
         self.firmware = ""
         self.lut = ""
@@ -188,15 +197,20 @@ class IT8951Driver(Driver):
                     f"the controller reports {width}x{height}, but {self.info.model} is "
                     f"{self.info.width}x{self.info.height}: check the selected model"
                 )
-            self._write_reg(_I80CPCR, 1)
-            millivolts = round(-self.vcom * 1000)
-            self._command(_VCOM, 1, millivolts)
-            self._command(_VCOM, 0)
-            if self._read_words(1)[0] != millivolts:
-                raise DisplayError("the controller did not take the VCOM setting")
+            self._setup()
+            self._reset_pending = False
         except BaseException:
             self.close()
             raise
+
+    def _setup(self) -> None:
+        """The settings a reset clears: packed pixels and VCOM."""
+        self._write_reg(_I80CPCR, 1)
+        millivolts = round(-self.vcom * 1000)
+        self._command(_VCOM, 1, millivolts)
+        self._command(_VCOM, 0)
+        if self._read_words(1)[0] != millivolts:
+            raise DisplayError("the controller did not take the VCOM setting")
 
     def write(self, image: Image.Image, *, fast: bool = False) -> None:
         image = self.check_image(image)
@@ -262,16 +276,37 @@ class IT8951Driver(Driver):
         if self._bus is None:
             raise DisplayError("screen is closed: call init() first")
         w, h = image.size
-        self._command(_SYS_RUN)
-        self._asleep = False
-        self._wait_redraw()
+        self._wake()
         self._write_reg(_LISAR + 2, self._img_addr >> 16)
         self._write_reg(_LISAR, self._img_addr & 0xFFFF)
         self._command(_LD_IMG_AREA, _LOAD_4BPP, x, y, w, h)
         self._send_pixels(_pack(image))
         self._command(_LD_IMG_END)
         self._command(_DPY_AREA, x, y, w, h, int(mode))
-        self._wait_redraw()
+        self._wait_redraw(drawing=True)
+
+    def _wake(self) -> None:
+        """Wake the controller and wait until it has finished any drawing.
+
+        When the busy line stays low, the controller is reset once
+        and gets its settings again, within the same time limit. A reset keeps the picture
+        on the screen and the image address, so the write goes on as planned.
+        """
+        if not self._reset_pending:
+            try:
+                self._command(_SYS_RUN)
+                self._wait_redraw()
+            except _NotReady:
+                log.warning("IT8951 screen did not answer after waking; resetting it")
+            else:
+                self._asleep = False
+                return
+        # Until the settings are sent again, every write starts with this reset.
+        self._reset_pending = True
+        self._reset()
+        self._setup()
+        self._reset_pending = False
+        self._asleep = False
 
     def _send_pixels(self, packed: bytes) -> None:
         step = (self._bus.block - 2) // 2 * 2  # whole 16-bit words per transfer
@@ -297,12 +332,20 @@ class IT8951Driver(Driver):
         deadline = min(time.monotonic() + (limit or self.ready_timeout), self._deadline)
         while not self._bus.ready():
             if time.monotonic() > deadline:
-                raise DisplayTimeout("screen not ready: the busy line stayed low")
+                raise _NotReady("screen not ready: the busy line stayed low")
             time.sleep(0.0002)
 
-    def _wait_redraw(self) -> None:
-        """Wait until the controller has finished drawing."""
-        while self._read_reg(_LUTAFSR):
+    def _wait_redraw(self, drawing: bool = False) -> None:
+        """Wait until the controller has finished drawing.
+
+        ``drawing``: right after a draw command. The controller may then keep the busy line
+        low for longer than ``ready_timeout`` (a clear right after waking from sleep: 2.2 s
+        on the 9.7", epdlib #104), so only the operation's time limit counts.
+        """
+        while True:
+            self._wait_ready(self.timeout if drawing else None)
+            if not self._read_reg(_LUTAFSR):
+                return
             if time.monotonic() > self._deadline:
                 raise DisplayTimeout(f"screen did not finish drawing within {self.timeout} s")
             time.sleep(0.005)
