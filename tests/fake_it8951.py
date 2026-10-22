@@ -6,6 +6,8 @@ records every area the driver asks it to draw. Faults are switched on with attri
 
 from __future__ import annotations
 
+import time
+
 from PIL import Image
 
 # How many argument words each command takes (VCOM is handled on its own).
@@ -41,6 +43,12 @@ class FakeIT8951:
         self.pixel_hz: set[int] = set()
         # Faults
         self.busy_stuck = False  # busy line stays low
+        # After a draw command, the busy line stays low this many seconds (the 9.7", a clear
+        # right after waking from sleep: 2.2)
+        self.draw_busy_seconds = 0.0
+        self._busy_until = 0.0
+        # Waking with SYS_RUN works, but then the busy line stays low until a reset
+        self.stuck_after_wake = False
         self.redraw_stuck = False  # the drawing after a draw command never ends
         self.silent = False  # device info is all zeros
         self.vcom_ignored = False  # reading VCOM back gives 0
@@ -56,12 +64,17 @@ class FakeIT8951:
         return self
 
     def ready(self) -> bool:
-        return not self.busy_stuck and not self.in_reset
+        return not self.busy_stuck and not self.in_reset and time.monotonic() >= self._busy_until
 
     def set_reset(self, active: bool) -> None:
         if self.in_reset and not active:
             self.resets += 1
             self.asleep = False
+            if self.stuck_after_wake:
+                self.busy_stuck = False
+            # A reset clears the settings.
+            self.registers.pop(0x0004, None)
+            self.vcom = None
         self.in_reset = active
 
     def close(self) -> None:
@@ -102,6 +115,7 @@ class FakeIT8951:
         if self.asleep:
             assert cmd == 0x0001, f"command {cmd:#06x} while asleep: send SYS_RUN first"
             self.asleep = False
+            self.busy_stuck = self.busy_stuck or self.stuck_after_wake
         if cmd == 0x0003:
             self.asleep = True
         elif cmd == 0x0302:  # device info
@@ -137,11 +151,13 @@ class FakeIT8951:
             self.registers[args[0]] = args[1]
         elif cmd == 0x0021:
             assert args[0] == (1 << 8) | (2 << 4), "expected big-endian 4 bits per pixel"
+            assert self.registers.get(0x0004) == 1, "image load without packed pixel mode"
             self._load = tuple(args[1:])
             self._pixels = bytearray()
         elif cmd == 0x0034:
             self.draws.append(tuple(args))
             self._drawing = self.draw_reads
+            self._busy_until = time.monotonic() + self.draw_busy_seconds
         elif cmd == 0x0039:
             if args[0] == 1:
                 self.vcom = -args[1] / 1000
