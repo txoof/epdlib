@@ -85,6 +85,7 @@ Every block has a unique `name` and a `type`. Options for all blocks:
 | `valign` | `"center"` | `top`, `center`, `bottom` or `random` |
 | `line_align` | none | `left`, `center` or `right`. When set, `align` places all lines together as one group (as wide as the longest line) and `line_align` places each line inside that group. `align: "center", line_align: "left"` gives a centered paragraph whose lines all start at the same left edge |
 | `ellipsis` | `"…"` | added where too-long text is cut |
+| `line_spacing` | `"normal"` | `normal`: lines are as tall as the font says. `tight`: lines are only as tall as the letters A–Z, a–z, 0–9 and common punctuation, plus a gap of 10% of the font size. Gives a larger font in blocks with several lines when the font leaves much room above its letters (such as Anton). Accents on capitals (Å, É) are not counted and can come close to the line above |
 
 ### image
 

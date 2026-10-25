@@ -7,13 +7,15 @@ Rules (see "Measuring text" in ``docs/decisions/layout.md``):
   exactly what is drawn.
 - The height of a line is the font's ascent (how far the tallest letters reach above the
   baseline) plus its descent (how far letters such as g and y reach below it). It is the
-  same for every line, whatever letters are in it.
+  same for every line, whatever letters are in it. With ``line_spacing: tight`` it is the
+  ink of the letters in :data:`TIGHT_LETTERS` plus a small gap (see :func:`metrics`).
 - The width of a line is its real ink, including letters that reach left of the start
   (italic f and j) or past the end.
 """
 
 from __future__ import annotations
 
+import string
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -26,6 +28,14 @@ FontType = ImageFont.FreeTypeFont
 
 #: The steps a ``shrink: true`` block may use, as a share of its normal font size.
 SHRINK_STEPS = (1.0, 0.8, 0.6)
+
+
+#: The letters a ``tight`` line is measured from. Accents are left out on purpose: they
+#: reach far above capitals and would undo most of the gain.
+TIGHT_LETTERS = string.ascii_letters + string.digits + "'\"()[]!?,.;:&%$#/-"
+
+#: Space between ``tight`` lines, as a share of the font size.
+TIGHT_GAP = 0.1
 
 
 #: The font used when a block does not name one: DejaVu Sans, which covers most
@@ -45,20 +55,41 @@ def load_font(path: str | None, size: int) -> FontType:
     return ImageFont.truetype(path or DEFAULT_FONT, size, layout_engine=ImageFont.Layout.BASIC)
 
 
-def line_height(font: FontType) -> int:
-    ascent, descent = font.getmetrics()
+def metrics(font: FontType, spacing: str = "normal") -> tuple[int, int]:
+    """How far a line reaches above and below its baseline: (ascent, descent).
+
+    ``normal`` is the font's own ascent and descent. ``tight`` is the ink of
+    :data:`TIGHT_LETTERS` with half of :data:`TIGHT_GAP` added above and below, so the
+    letters of one line never touch those of the next. Some fonts (such as Anton) leave a
+    lot of room above their letters; ``tight`` lines sit much closer together.
+    """
+    if spacing == "tight":
+        return _tight_metrics(font.path, font.size)
+    return font.getmetrics()
+
+
+@lru_cache(maxsize=256)
+def _tight_metrics(path: str, size: int) -> tuple[int, int]:
+    font = load_font(path, size)
+    _, top, _, bottom = font.getbbox(TIGHT_LETTERS, anchor="ls")
+    half_gap = -(-size * TIGHT_GAP // 2)
+    return int(half_gap - top), int(bottom + half_gap)
+
+
+def line_height(font: FontType, spacing: str = "normal") -> int:
+    ascent, descent = metrics(font, spacing)
     return ascent + descent
 
 
-def size_for_height(path: str | None, height: int) -> int:
+def size_for_height(path: str | None, height: int, spacing: str = "normal") -> int:
     """The largest font size whose line height fits in ``height`` pixels (at least 1)."""
     if height < 1:
         return 1
     # Line height grows almost exactly in step with font size: estimate, then check nearby.
     ref = 1000
-    guess = max(1, int(height * ref / line_height(load_font(path, ref))))
+    guess = max(1, int(height * ref / line_height(load_font(path, ref), spacing)))
     size = guess + 1
-    while size > 1 and line_height(load_font(path, size)) > height:
+    while size > 1 and line_height(load_font(path, size), spacing) > height:
         size -= 1
     return size
 
@@ -89,13 +120,14 @@ class Extent:
         return self.right - self.left
 
 
-def extent(font: FontType, text: str) -> Extent:
+def extent(font: FontType, text: str, spacing: str = "normal") -> Extent:
     """Where a line's ink reaches, also counting the normal space a line takes.
 
-    The box covers both the ink and the font's normal line box (from 0 to the text's
-    advance width, ascent above to descent below), so that spaces and empty lines count.
+    The box covers both the ink and the line box (from 0 to the text's advance width,
+    ascent above to descent below, see :func:`metrics`), so that spaces and empty lines
+    count.
     """
-    ascent, descent = font.getmetrics()
+    ascent, descent = metrics(font, spacing)
     if not text:
         return Extent(0, 0, -ascent, descent)
     x0, y0, x1, y1 = font.getbbox(text, anchor="ls")
@@ -224,6 +256,7 @@ def arrange(
     valign: str,
     offset: tuple[float, float] = (0.5, 0.5),
     line_align: str | None = None,
+    spacing: str = "normal",
 ) -> list[PlacedLine]:
     """Place lines inside a ``width`` x ``height`` area.
 
@@ -231,9 +264,8 @@ def arrange(
     Without ``line_align``, ``align`` places each line on its own. With it, ``align`` places
     the group of lines (as wide as the widest line) and ``line_align`` each line inside it.
     """
-    ascent, descent = font.getmetrics()
-    step = ascent + descent
-    extents = [extent(font, line) for line in lines]
+    step = line_height(font, spacing)
+    extents = [extent(font, line, spacing) for line in lines]
     top = extents[0].top
     bottom = (len(lines) - 1) * step + extents[-1].bottom
     block_height = bottom - top
@@ -268,6 +300,7 @@ def fit_text(
     max_lines: int,
     shrink: bool,
     ellipsis: str,
+    spacing: str = "normal",
 ) -> TextFit:
     """Wrap ``text`` at ``base_size``; with ``shrink``, try the smaller fixed steps too.
 
@@ -278,7 +311,7 @@ def fit_text(
     result = None
     for step in steps:
         font = load_font(path, max(1, round(base_size * step)))
-        by_height = max(1, height // line_height(font))
+        by_height = max(1, height // line_height(font, spacing))
         allowed = by_height if step < 1 else min(max_lines, by_height)
         lines, complete = wrap(font, text, width, allowed, ellipsis)
         result = TextFit(font, lines, complete, step)

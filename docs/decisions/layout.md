@@ -113,6 +113,10 @@ What v0.6 did badly:
   the line the text sits on (the baseline; Pillow anchor `ls`).
 - Line height is the font's ascent plus descent: the same for every line, so a line with
   a *g* does not move the others.
+- `line_spacing: tight` (#107): line height is the ink of A–Z, a–z, 0–9 and common
+  punctuation, plus 10% of the font size as a gap. Anton at 148 px takes 218 px per line
+  normally but only about 170 px tight, so PaperPi's 3-line word clock gets a larger font.
+  Accents are left out: they reach far above capitals and would undo most of the gain.
 - Line width is the real ink, including letters that reach left of the start (italic *f*,
   *j*) or past the end. Text is moved right by any left overhang.
 - An image test draws italics, *gjpqy* and accents (*Å*) in every alignment and size, and
