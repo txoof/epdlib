@@ -130,6 +130,7 @@ class PreparedLayout:
             o["max_lines"],
             o["shrink"],
             o["ellipsis"],
+            o["line_spacing"],
         )
 
     def _inner(self, block: Block) -> Box:
@@ -142,11 +143,12 @@ class PreparedLayout:
     def _font_size(self, block: Block) -> int:
         o = block.options
         inner = self._inner(block)
-        tallest = text.size_for_height(o["font"], inner.height)
+        spacing = o["line_spacing"]
+        tallest = text.size_for_height(o["font"], inner.height, spacing)
         if o["font_size"] is not None:
             # A fixed size wins, but never makes one line taller than the block.
             return max(1, min(o["font_size"].to_pixels(self.short_side), tallest))
-        size = text.size_for_height(o["font"], inner.height // o["max_lines"])
+        size = text.size_for_height(o["font"], inner.height // o["max_lines"], spacing)
         # The sample (or else the block's fixed text) must also fit the width.
         sample = o["sample"] or o["text"]
         if sample:
@@ -230,6 +232,7 @@ class PreparedLayout:
             o["valign"],
             offset,
             o["line_align"],
+            o["line_spacing"],
         )
         # Draw on a canvas the size of the content area, so that text can never reach the
         # block's padding or border, even when a single letter is wider than the block.

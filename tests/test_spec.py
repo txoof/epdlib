@@ -33,6 +33,7 @@ def test_minimal_layout():
         (column(text_block("a", max_lines=0)), "'max_lines' must be a whole number"),
         (column(text_block("a", align="middle")), "'align' must be one of"),
         (column(text_block("a", line_align="random")), "'line_align' must be one of"),
+        (column(text_block("a", line_spacing="close")), "'line_spacing' must be one of"),
         (column({"name": "i", "type": "image", "line_align": "left"}), "unknown key 'line_align'"),
         (column(text_block("a", fill="blurple")), "not a colour name"),
         (column(text_block("a", shrink="yes")), "'shrink' must be true or false"),

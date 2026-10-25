@@ -4,6 +4,7 @@ from PIL import Image, ImageChops, ImageDraw
 from epdlib import Layout, ScreenMode
 from epdlib.text import (
     SHRINK_STEPS,
+    TIGHT_LETTERS,
     arrange,
     fit_text,
     fits,
@@ -218,6 +219,7 @@ def rendered_ink_inside(block, width=300, height=120):
         {"border": {"pixels": 4}, "padding": {"pixels": 6}},
         {"font_size": {"pixels": 60}, "padding": {"pixels": 10}},
         {"font_size": {"pixels": 40}, "shrink": True, "padding": {"pixels": 10}},
+        {"line_spacing": "tight", "padding": {"pixels": 10}},
     ],
 )
 def test_rendered_text_stays_in_content_area(max_lines, extra, italic_font):
@@ -295,3 +297,34 @@ def test_line_align_with_random_align_moves_the_group():
         )
         starts.add(placed[0].x)
     assert len(starts) == 3
+
+
+def test_tight_lines_use_the_whole_height():
+    for height in [10, 33, 100, 480]:
+        size = size_for_height(None, height, "tight")
+        assert line_height(load_font(None, size), "tight") <= height
+        assert line_height(load_font(None, size + 1), "tight") > height
+
+
+def test_tight_lines_give_a_larger_font():
+    normal = prepared(max_lines=3).font_sizes["t"]
+    assert prepared(max_lines=3, line_spacing="tight").font_sizes["t"] > normal
+
+
+@pytest.mark.parametrize("font", ["default", "italic"])
+@pytest.mark.parametrize("size", [12, 40, 150])
+def test_tight_lines_never_touch(font, size, italic_font):
+    """The lowest letters of one line stay clear of the tallest letters of the next."""
+    font = load_font(italic_font if font == "italic" else None, size)
+    lines = [TIGHT_LETTERS[:30], TIGHT_LETTERS[30:60], TIGHT_LETTERS[60:]]
+    width = 100 * size
+    placed = arrange(font, lines, width, 3 * size, "left", "top", spacing="tight")
+    ink = []
+    for line in placed:
+        canvas = Image.new("L", (width, 6 * size), 255)
+        ImageDraw.Draw(canvas).text(
+            (line.x, line.baseline + size), line.text, font=font, anchor="ls"
+        )
+        ink.append(ImageChops.invert(canvas).getbbox())
+    for upper, lower in zip(ink, ink[1:], strict=False):
+        assert upper[3] < lower[1], (upper, lower)
