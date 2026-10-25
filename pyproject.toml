@@ -8,7 +8,7 @@ license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 authors = [{ name = "Aaron Ciuffo" }]
 dependencies = [
-    "pillow>=11",
+    "pillow>=13.0.0",
 ]
 
 [project.optional-dependencies]
