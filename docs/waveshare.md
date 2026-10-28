@@ -109,7 +109,7 @@ To copy Waveshare's files again, for example after Waveshare fixed something: `u
 Install as for [IT8951 screens](it8951.md#install) (turn SPI on, install `gcc` and `python3-dev`, make a virtual environment), but with the `waveshare` install group:
 
 ```bash
-~/epdlib-venv/bin/pip install "epdlib[waveshare] @ git+https://github.com/txoof/epdlib"
+~/epdlib-venv/bin/pip install "epdlib[waveshare]>=1.0.0a1"
 ```
 
 For working on epdlib itself: `uv sync --extra waveshare`.

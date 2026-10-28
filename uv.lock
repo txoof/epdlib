@@ -13,7 +13,7 @@ wheels = [
 
 [[package]]
 name = "epdlib"
-version = "1.0.0.dev0"
+version = "1.0.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "pillow" },
