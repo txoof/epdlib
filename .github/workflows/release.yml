@@ -1,0 +1,60 @@
+name: release
+
+# Publishes epdlib to PyPI when a GitHub release is published (see docs/releasing.md).
+# PyPI trusts uploads only from this file name (release.yml) and the environment `pypi`
+# ("trusted publishing": no password is stored). Renaming either breaks publishing until
+# the trusted-publisher setting on PyPI is changed to match.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # The release tag must match the version in pyproject.toml, with or without a "v":
+      # tag v1.0.0a1 publishes version 1.0.0a1.
+      - name: Check the tag matches the version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(uv version --short)
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "::error::Release tag '$TAG' does not match version '$version' in pyproject.toml"
+            exit 1
+          fi
+      - run: uv sync --locked
+      - run: uv run pytest
+      - run: uv build
+      # Install the built wheel on its own (without the repo's files) and import it, to
+      # catch files missing from the package.
+      - name: Check the wheel installs and imports
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import epdlib; print(epdlib.__name__)"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # The `pypi` environment waits for txoof's approval before this job starts.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/epdlib/${{ github.event.release.tag_name }}
+    permissions:
+      id-token: write # lets PyPI check that the upload comes from this workflow
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
