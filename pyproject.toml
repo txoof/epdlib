@@ -42,7 +42,7 @@ Issues = "https://github.com/txoof/epdlib/issues"
 
 [dependency-groups]
 dev = [
-    "pytest>=8",
+    "pytest>=9.2.0",
     "pytest-html>=4",
     "pytest-timeout>=2",
     "ruff>=0.6",
